@@ -35,7 +35,7 @@ WordPress で作ったサイトを、普通の HTML ファイルに変換する�
 
 ## インストール
 
-1. [Releases](https://github.com/villyoshioka/static-generation-engine/releases) から ZIP ファイルをダウンロード
+1. [Releases](https://github.com/villyoshioka/StaticGenerationEngine/releases) から ZIP ファイルをダウンロード
 2. WordPress の管理画面で「プラグイン」→「新規追加」→「プラグインのアップロード」
 3. ダウンロードした ZIP ファイルを選択してインストール
 4. 「有効化」をクリック
@@ -48,7 +48,7 @@ WordPress で作ったサイトを、普通の HTML ファイルに変換する�
 
 1. **設定画面**で出力先を選択（GitHub / ローカル Git / ZIP / ディレクトリ）
 2. **実行画面**で「静的化を実行」ボタンをクリック
-3. 進捗を確認しながら完了を待つ
+3. 進捗を確認しながら完了を待つ。結構時間かかりますので、その間にお茶でもどうぞ。
 
 ---
 
