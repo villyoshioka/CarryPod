@@ -229,7 +229,7 @@ class SGE_GitLab_API implements SGE_Git_Provider_Interface {
     }
 
     /**
-     * ファイルをバッチ処理でプッシュ（ディスクから直接読み込み）
+     * ファイルをバッチ処理でプッシュ（ディスクから直接読み込み、差分検出対応）
      *
      * @param array  $file_paths ファイルパスの配列
      * @param string $base_dir ベースディレクトリ
@@ -248,19 +248,29 @@ class SGE_GitLab_API implements SGE_Git_Provider_Interface {
             return new WP_Error( 'temp_dir_not_found', '一時ディレクトリが存在しません' );
         }
 
-        // 既存ファイルリストを取得（差分検出用）
-        $existing_files = $this->get_repository_tree();
+        // 既存ファイルリストを取得（差分検出用：パスとSHAのマップ）
+        $existing_files = $this->get_repository_tree_with_sha();
         $existing_file_map = array();
         if ( ! is_wp_error( $existing_files ) ) {
             foreach ( $existing_files as $file ) {
                 if ( $file['type'] === 'blob' ) {
-                    $existing_file_map[ $file['path'] ] = true;
+                    // パスとSHA（content_sha256またはid）を保持
+                    $existing_file_map[ $file['path'] ] = isset( $file['id'] ) ? $file['id'] : null;
                 }
             }
         }
 
-        // バッチに分割
-        $path_batches = array_chunk( $file_paths, $batch_size );
+        // 差分検出：変更されたファイルのみ抽出
+        $changed_file_paths = $this->get_changed_file_paths_from_disk( $file_paths, $base_dir, $existing_file_map );
+
+        if ( empty( $changed_file_paths ) ) {
+            // 変更なし
+            $this->logger->debug( '変更なし: GitLabへのプッシュをスキップしました' );
+            return true;
+        }
+
+        // バッチに分割（変更ファイルのみ）
+        $path_batches = array_chunk( $changed_file_paths, $batch_size );
         $total_batches = count( $path_batches );
 
         if ( $total_batches > 1 ) {
@@ -296,7 +306,7 @@ class SGE_GitLab_API implements SGE_Git_Provider_Interface {
                 }
 
                 // 既存ファイルがあればupdate、なければcreate
-                $action = isset( $existing_file_map[ $relative_path ] ) ? 'update' : 'create';
+                $action = array_key_exists( $relative_path, $existing_file_map ) ? 'update' : 'create';
 
                 $actions[] = array(
                     'action'    => $action,
@@ -306,7 +316,7 @@ class SGE_GitLab_API implements SGE_Git_Provider_Interface {
                 );
 
                 // 新規作成したファイルは次バッチで update 扱いにする
-                $existing_file_map[ $relative_path ] = true;
+                $existing_file_map[ $relative_path ] = 'new';
             }
 
             if ( empty( $actions ) ) {
@@ -387,6 +397,73 @@ class SGE_GitLab_API implements SGE_Git_Provider_Interface {
         } while ( count( $body ) === $per_page );
 
         return $all_files;
+    }
+
+    /**
+     * リポジトリツリーを取得（SHA情報付き）
+     * GitLabのツリーAPIは各ファイルの 'id' フィールドにGit blob SHAを返す
+     *
+     * @return array|WP_Error ファイルリスト（id含む）、エラーならWP_Error
+     */
+    private function get_repository_tree_with_sha() {
+        // get_repository_tree() と同じだが、idフィールドを確実に取得
+        return $this->get_repository_tree();
+    }
+
+    /**
+     * 変更されたファイルパスのみ抽出（ディスクから読み込み、差分検出）
+     *
+     * @param array $file_paths ファイルパスの配列（相対パス）
+     * @param string $base_dir ベースディレクトリ
+     * @param array $existing_file_map 既存ファイルのマップ（パス => SHA）
+     * @return array 変更されたファイルパスの配列
+     */
+    private function get_changed_file_paths_from_disk( $file_paths, $base_dir, $existing_file_map ) {
+        $changed_file_paths = array();
+
+        foreach ( $file_paths as $relative_path ) {
+            // Windowsのパスセパレータを正規化
+            $relative_path = str_replace( '\\', '/', $relative_path );
+            $full_path = trailingslashit( $base_dir ) . $relative_path;
+
+            if ( ! is_readable( $full_path ) ) {
+                continue;
+            }
+            $content = file_get_contents( $full_path );
+            if ( $content === false ) {
+                continue;
+            }
+
+            // ファイルが存在しない場合は新規ファイルとして変更扱い
+            if ( ! array_key_exists( $relative_path, $existing_file_map ) ) {
+                $changed_file_paths[] = $relative_path;
+                continue;
+            }
+
+            // 既存ファイルのSHAがない場合（GitLabツリーAPIの制限）は変更扱い
+            $existing_sha = $existing_file_map[ $relative_path ];
+            if ( empty( $existing_sha ) ) {
+                $changed_file_paths[] = $relative_path;
+                continue;
+            }
+
+            // Git Blob SHA を計算（git hash-object アルゴリズム）
+            $blob_content = 'blob ' . strlen( $content ) . "\0" . $content;
+            $new_sha = sha1( $blob_content );
+
+            // SHAが異なる場合は変更あり
+            if ( $existing_sha !== $new_sha ) {
+                $changed_file_paths[] = $relative_path;
+            }
+        }
+
+        $total_files = count( $file_paths );
+        $changed_count = count( $changed_file_paths );
+        $unchanged_count = $total_files - $changed_count;
+
+        $this->logger->debug( "差分検出: {$changed_count}個が変更、{$unchanged_count}個が未変更（全{$total_files}個）" );
+
+        return $changed_file_paths;
     }
 
     /**

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Static Generation Engine
  * Description: WordPressサイトを静的化してGitHubまたはローカルに出力するプラグイン
- * Version: 1.2.0
+ * Version: 1.3.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: Vill Yoshioka
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // プラグインの定数を定義
-define( 'SGE_VERSION', '1.2.0' );
+define( 'SGE_VERSION', '1.3.0' );
 define( 'SGE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SGE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'SGE_PLUGIN_FILE', __FILE__ );
@@ -87,6 +87,8 @@ class Static_Generation_Engine {
 
         // 管理画面を初期化
         if ( is_admin() ) {
+            // 権限が未登録の場合は登録
+            add_action( 'admin_init', array( $this, 'ensure_capabilities' ) );
             SGE_Admin::get_instance();
         }
 
@@ -133,6 +135,9 @@ class Static_Generation_Engine {
             set_transient( 'sge_git_warning', true, 30 );
         }
 
+        // カスタム権限を登録
+        $this->register_capabilities();
+
         // デフォルト設定を保存
         $default_settings = array(
             'version' => SGE_VERSION,
@@ -176,10 +181,57 @@ class Static_Generation_Engine {
     }
 
     /**
+     * カスタム権限を登録
+     */
+    private function register_capabilities() {
+        // 管理者: 両方の権限
+        $admin = get_role( 'administrator' );
+        if ( $admin ) {
+            $admin->add_cap( 'sge_execute' );
+            $admin->add_cap( 'sge_manage_settings' );
+        }
+
+        // 編集者: 実行権限のみ
+        $editor = get_role( 'editor' );
+        if ( $editor ) {
+            $editor->add_cap( 'sge_execute' );
+        }
+    }
+
+    /**
+     * 権限が未登録の場合に登録（既存インストール対応）
+     */
+    public function ensure_capabilities() {
+        $admin = get_role( 'administrator' );
+        if ( $admin && ! $admin->has_cap( 'sge_execute' ) ) {
+            $this->register_capabilities();
+        }
+    }
+
+    /**
+     * カスタム権限を削除
+     */
+    private function remove_capabilities() {
+        $roles = array( 'administrator', 'editor' );
+        $caps = array( 'sge_execute', 'sge_manage_settings' );
+
+        foreach ( $roles as $role_name ) {
+            $role = get_role( $role_name );
+            if ( $role ) {
+                foreach ( $caps as $cap ) {
+                    $role->remove_cap( $cap );
+                }
+            }
+        }
+    }
+
+    /**
      * プラグイン無効化時の処理
      */
     public function deactivate() {
         // 実行中のタスクは続行（Action Schedulerがバックグラウンドで処理）
+        // カスタム権限を削除
+        $this->remove_capabilities();
     }
 
     /**
@@ -189,6 +241,18 @@ class Static_Generation_Engine {
         // 設定データ削除
         delete_option( 'sge_settings' );
         delete_option( 'sge_logs' );
+
+        // カスタム権限を削除
+        $roles = array( 'administrator', 'editor' );
+        $caps = array( 'sge_execute', 'sge_manage_settings' );
+        foreach ( $roles as $role_name ) {
+            $role = get_role( $role_name );
+            if ( $role ) {
+                foreach ( $caps as $cap ) {
+                    $role->remove_cap( $cap );
+                }
+            }
+        }
 
         // Action Schedulerのタスク削除
         if ( function_exists( 'as_unschedule_all_actions' ) ) {

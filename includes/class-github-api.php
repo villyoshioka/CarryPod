@@ -377,12 +377,7 @@ class SGE_GitHub_API {
                 $changed_file_paths = $file_paths;
             } elseif ( empty( $changed_file_paths ) ) {
                 // 変更なし
-                $this->logger->debug( "変更なし: プッシュをスキップします" );
-                $this->logger->debug( sprintf(
-                    "GitHubプッシュ完了: %s (合計処理時間: %.2f秒)",
-                    date( 'Y-m-d H:i:s' ),
-                    microtime( true ) - $start_time
-                ) );
+                $this->logger->debug( '変更なし: GitHubへのプッシュをスキップしました' );
                 return true;
             }
         } else {
@@ -408,7 +403,7 @@ class SGE_GitHub_API {
 
             // 2バッチ目以降は待機（GitHub API負荷軽減 & 反映待ち）
             if ( $batch_index > 0 ) {
-                sleep( 5 ); // バッチ間の反映を確実にするため
+                sleep( 2 ); // バッチ間の反映を確実にするため（5秒→2秒に短縮）
             }
 
             // このバッチのファイルのみ読み込み
@@ -529,7 +524,7 @@ class SGE_GitHub_API {
 
             // 変更がない場合はスキップ
             if ( empty( $files_to_push ) ) {
-                $this->logger->debug( "変更なし: プッシュをスキップします" );
+                $this->logger->debug( '変更なし: GitHubへのプッシュをスキップしました' );
                 return true;
             }
         } else {
@@ -538,7 +533,7 @@ class SGE_GitHub_API {
 
         // 並列でBlobを作成
         $this->logger->debug( "Blob並列作成開始: " . count( $files_to_push ) . "個のファイル" );
-        $tree_items = $this->create_blobs_parallel( $files_to_push, 5 );
+        $tree_items = $this->create_blobs_parallel( $files_to_push, 10 );
 
         if ( is_wp_error( $tree_items ) ) {
             return $tree_items;
@@ -842,7 +837,7 @@ class SGE_GitHub_API {
 
             // チャンク間で待機（セカンダリレート制限回避）
             if ( $chunk_index < $total_chunks - 1 ) {
-                usleep( 1500000 ); // 1.5秒
+                usleep( 500000 ); // 0.5秒（1.5秒→0.5秒に短縮）
             }
         }
 

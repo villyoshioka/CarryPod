@@ -5,7 +5,7 @@
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue.svg)](https://www.php.net/)
-[![Version](https://img.shields.io/badge/Version-1.2.0-green.svg)](https://github.com/villyoshioka/StaticGenerationEngine/releases)
+[![Version](https://img.shields.io/badge/Version-1.3.0-green.svg)](https://github.com/villyoshioka/StaticGenerationEngine/releases)
 
 > **注意**: **このプラグインについて、コードは公開していますが、サポートは行っていません。使用は自己責任でお願いします。**
 
@@ -19,7 +19,7 @@ WordPress で作ったサイトを、静的な HTML や CSS などのファイ�
 
 - WordPress のページや記事を HTML ファイルに変換
 - 画像や CSS なども一緒に出力
-- 変更部分だけ更新する差分検出機能（ローカル Git / GitHub / GitLab）
+- 変更部分だけ更新する差分検出機能（GitHub / GitLab）
 - 自動静的化機能
 
 ### 出力先
@@ -50,7 +50,7 @@ WordPress で作ったサイトを、静的な HTML や CSS などのファイ�
 
 1. **設定画面**で出力先を選択します。（GitHub / GitLab / Cloudflare Workers / ローカル Git / ZIP / ディレクトリ）
 2. **実行画面**で「静的化を実行」ボタンをクリックします。
-3. 進捗を確認しながら完了を待ちます。結構時間がかかる場合がありますので、その間にお茶でもどうぞ。
+3. 進捗を確認しながら完了を待ちます。結構時間がかかる場合がありますので、その間に金つばでもどうぞ。
 
 ### デバッグモード
 

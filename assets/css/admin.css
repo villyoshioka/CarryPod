@@ -631,35 +631,114 @@ form#sge-settings-form {
     }
 
     /* モバイルではテキストフィールドを全幅に */
-    .sge-subsection .sge-form-group > div > input[type="text"].regular-text,
-    #sge-github-existing-branch,
-    #sge-git-work-dir {
+    .sge-subsection input[type="text"],
+    .sge-subsection input[type="password"],
+    .sge-subsection input.regular-text,
+    .sge-subsection .sge-form-group input[type="text"],
+    .sge-subsection .sge-form-group input[type="password"],
+    #sge-github-settings input[type="text"],
+    #sge-github-settings input[type="password"],
+    #sge-gitlab-settings input[type="text"],
+    #sge-gitlab-settings input[type="password"],
+    #sge-cloudflare-settings input[type="text"],
+    #sge-cloudflare-settings input[type="password"],
+    #sge-git-local-settings input[type="text"],
+    #sge-local-settings input[type="text"],
+    #sge-zip-settings input[type="text"] {
         display: block !important;
         width: 100% !important;
         max-width: 100% !important;
         margin-left: 0 !important;
         margin-top: 8px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ブランチ設定 */
+    .sge-branch-settings {
+        padding: 12px !important;
+    }
+
+    .sge-branch-option {
+        display: block !important;
+        margin-bottom: 15px !important;
+    }
+
+    /* ラジオボタン+ラベルは同じ行に */
+    .sge-radio-label {
+        display: inline-flex !important;
+        align-items: center !important;
+        font-weight: normal !important;
+        margin-bottom: 0 !important;
+        white-space: nowrap !important;
+    }
+
+    .sge-radio-label input[type="radio"] {
+        margin-top: 0 !important;
+        margin-right: 8px !important;
+    }
+
+    /* 入力フィールドは次の行に */
+    .sge-branch-input {
+        display: block !important;
+        margin-top: 8px !important;
+        margin-left: 0 !important;
+    }
+
+    .sge-branch-input input[type="text"] {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ネストされた設定（新規ブランチ作成時） */
+    .sge-branch-nested {
+        display: block !important;
+        margin-top: 10px !important;
+        margin-left: 0 !important;
+        padding: 10px !important;
+        background: #f9f9f9 !important;
+        border-left: 3px solid #dcdcde !important;
+        border-radius: 2px !important;
+    }
+
+    .sge-branch-nested label {
+        display: block !important;
+        margin-bottom: 5px !important;
+        font-weight: normal !important;
+        font-size: 13px !important;
+    }
+
+    .sge-branch-nested input[type="text"] {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-bottom: 10px !important;
+        box-sizing: border-box !important;
     }
 
     /* ネストされた要素のmarginを調整 */
-    .sge-subsection div[style*="margin-left: 20px"] {
+    .sge-subsection div[style*="margin-left: 20px"],
+    .sge-subsection div[style*="margin-left:20px"] {
         margin-left: 0 !important;
         padding: 10px !important;
     }
 
-    .sge-subsection div[style*="margin-left: 20px"] label {
+    .sge-subsection div[style*="margin-left: 20px"] label,
+    .sge-subsection div[style*="margin-left:20px"] label {
         display: block !important;
         width: auto !important;
         margin-bottom: 5px !important;
     }
 
     .sge-subsection div[style*="margin-left: 20px"] input[type="text"],
-    #sge-github-base-branch,
-    #sge-github-new-branch {
+    .sge-subsection div[style*="margin-left:20px"] input[type="text"] {
         display: block !important;
         width: 100% !important;
         max-width: 100% !important;
         margin-bottom: 10px !important;
+        box-sizing: border-box !important;
     }
 
     .sge-subsection .sge-form-group > div {
@@ -841,39 +920,95 @@ input[type="text"].regular-text {
     cursor: not-allowed;
 }
 
-/* ブランチ設定のコンテナ - 各行を独立させる */
-.sge-subsection .sge-form-group > div {
+/* ブランチ設定（デスクトップ用） */
+.sge-branch-settings {
+    padding: 15px;
+}
+
+.sge-branch-option {
+    display: block;
+    margin-bottom: 15px;
+}
+
+.sge-branch-option:last-child {
+    margin-bottom: 0;
+}
+
+.sge-radio-label {
+    display: inline-flex;
+    align-items: center;
+    font-weight: normal;
+    margin-bottom: 0;
+    cursor: pointer;
+}
+
+.sge-radio-label input[type="radio"] {
+    margin-right: 8px;
+}
+
+.sge-branch-input {
+    display: block;
+    margin-top: 8px;
+    margin-left: 28px;
+}
+
+.sge-branch-input input[type="text"] {
+    width: 250px;
+    max-width: 100%;
+}
+
+.sge-branch-nested {
+    display: block;
+    margin-top: 10px;
+    margin-left: 28px;
+    padding: 12px;
+    background: #f9f9f9;
+    border-left: 3px solid #dcdcde;
+    border-radius: 2px;
+}
+
+.sge-branch-nested label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: normal;
+    font-size: 13px;
+    color: #2c3338;
+}
+
+.sge-branch-nested input[type="text"] {
+    display: block;
+    width: 100%;
+    max-width: 300px;
+    margin-bottom: 12px;
+}
+
+.sge-branch-nested input[type="text"]:last-child {
+    margin-bottom: 0;
+}
+
+/* ブランチ設定のコンテナ - 各行を独立させる（旧スタイル：新クラスを持たない要素用） */
+.sge-subsection .sge-form-group:not(.sge-branch-settings) > div {
     margin-bottom: 15px;
     display: flex !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
 }
 
-/* 新規ブランチセクションの親divはflexを解除 - style属性で判別 */
-.sge-subsection .sge-form-group > div[style*="margin-top: 10px"] {
+/* 新規ブランチセクションの親divはflexを解除 - style属性で判別（旧スタイル） */
+.sge-subsection .sge-form-group:not(.sge-branch-settings) > div[style*="margin-top: 10px"] {
     display: block !important;
     flex-wrap: unset !important;
     align-items: unset !important;
 }
 
-/* ラジオボタンを含むラベル */
-.sge-subsection .sge-form-group > div > label {
+/* ラジオボタンを含むラベル（旧スタイル：新クラスを持たない要素用） */
+.sge-subsection .sge-form-group:not(.sge-branch-settings) > div > label {
     display: inline-flex !important;
     align-items: center !important;
     margin-right: 10px !important;
     margin-bottom: 0 !important;
     line-height: 28px !important;
     white-space: nowrap !important;
-}
-
-/* 既存ブランチ入力欄を確実に同じ行に配置 */
-#sge-github-existing-branch {
-    display: inline-block !important;
-    width: 250px !important;
-    margin-left: 5px !important;
-    margin-right: 5px !important;
-    vertical-align: middle !important;
-    flex-shrink: 0 !important;
 }
 
 /* Git作業ディレクトリ入力欄 */
@@ -885,8 +1020,8 @@ input[type="text"].regular-text {
     flex-shrink: 0 !important;
 }
 
-/* すべてのregular-textクラスの入力欄 */
-.sge-subsection .sge-form-group > div > input[type="text"].regular-text {
+/* すべてのregular-textクラスの入力欄（旧スタイル：新クラスを持たない要素用） */
+.sge-subsection .sge-form-group:not(.sge-branch-settings) > div > input[type="text"].regular-text {
     display: inline-block !important;
     width: 250px !important;
     margin-left: 5px !important;
@@ -894,42 +1029,7 @@ input[type="text"].regular-text {
     vertical-align: middle !important;
 }
 
-/* 新規ブランチ作成の下のネストされた要素 - flexを解除 */
-.sge-subsection .sge-form-group div[style*="margin-left: 20px"] {
-    display: block !important;
-    margin-top: 10px !important;
-    margin-left: 30px !important;
-    padding: 12px !important;
-    background: #f9f9f9 !important;
-    border-left: 3px solid #dcdcde !important;
-    border-radius: 2px !important;
-    /* flexboxの親要素の影響を受けないようにする */
-    flex: none !important;
-    width: auto !important;
-}
-
-/* ネストされた要素内のラベル */
-.sge-subsection .sge-form-group div[style*="margin-left: 20px"] label {
-    display: block !important;
-    width: auto !important;
-    margin-bottom: 8px !important;
-    margin-top: 10px !important;
-    font-size: 13px !important;
-    color: #2c3338 !important;
-    font-weight: normal !important;
-    text-align: left !important;
-}
-
-/* ネストされた要素内の入力欄 */
-.sge-subsection .sge-form-group div[style*="margin-left: 20px"] input[type="text"] {
-    display: block !important;
-    width: 100% !important;
-    max-width: 400px !important;
-    margin-bottom: 15px !important;
-    margin-top: 0 !important;
-}
-
-/* 新規ブランチ名・分岐元ブランチ名の個別対応 */
+/* 新規ブランチ名・分岐元ブランチ名の個別対応（旧スタイル - 非推奨） */
 #sge-github-base-branch,
 #sge-github-new-branch {
     display: block !important;
@@ -1184,4 +1284,114 @@ input[type="text"].regular-text {
 
 .sge-tab:hover {
     background: #f6f7f7;
+}
+
+/* ========================================
+   スマホ対応（375px以下 - iPhone SE等）
+   ======================================== */
+@media screen and (max-width: 480px) {
+    /* 管理画面のラップ */
+    .sge-admin-wrap {
+        padding: 10px;
+        margin: 0;
+    }
+
+    /* フォームグループ */
+    .sge-form-group {
+        padding: 10px;
+    }
+
+    /* サブセクション */
+    .sge-subsection {
+        margin-left: 0;
+        padding: 10px;
+    }
+
+    .sge-subsection .sge-form-group {
+        padding: 8px;
+    }
+
+    /* 入力フィールド */
+    .sge-form-group input[type="text"],
+    .sge-form-group input[type="password"],
+    .sge-form-group input[type="number"],
+    .sge-form-group textarea,
+    .sge-form-group select,
+    input[type="text"].regular-text,
+    input[type="password"].regular-text {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
+    }
+
+    /* ラジオボタン・チェックボックスのラベル */
+    .sge-subsection label {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    /* ブランチ設定の入力欄 */
+    .sge-subsection > .sge-form-group > div {
+        display: block;
+    }
+
+    .sge-subsection > .sge-form-group > div > label {
+        display: block;
+        margin-bottom: 5px;
+    }
+
+    .sge-subsection > .sge-form-group > div input[type="text"] {
+        margin-top: 5px;
+        margin-left: 0 !important;
+    }
+
+    /* ネストされたブランチ設定 */
+    .sge-subsection div[style*="margin-left"] {
+        margin-left: 0 !important;
+        padding-left: 10px;
+    }
+
+    /* description */
+    .sge-form-group .description {
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+    /* トークン設定済み表示 */
+    .sge-token-status {
+        display: block;
+        margin-top: 5px;
+    }
+
+    /* h3見出し */
+    .sge-admin-wrap h3 {
+        font-size: 16px;
+        margin: 20px 0 10px;
+    }
+}
+
+/* ========================================
+   ボタン群のレスポンシブ対応（1267px未満）
+   ======================================== */
+@media screen and (max-width: 1266px) {
+    .sge-form-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .sge-form-actions .button,
+    .sge-form-actions button.button {
+        width: 100% !important;
+        margin-right: 0 !important;
+        margin-bottom: 0 !important;
+        text-align: center;
+        justify-content: center;
+        height: 40px !important;
+        min-height: 40px !important;
+        line-height: 38px !important;
+        padding: 0 16px !important;
+        font-size: 14px !important;
+    }
 }

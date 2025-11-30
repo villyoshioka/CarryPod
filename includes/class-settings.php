@@ -719,14 +719,12 @@ class SGE_Settings {
      * 設定をリセット
      */
     public function reset_settings() {
-        $current = get_option( 'sge_settings', array() );
-
         $default_settings = array(
             'version' => SGE_VERSION,
             'github_enabled' => false,
             'local_enabled' => false,
             'zip_enabled' => true, // Ver1.2: デフォルト有効
-            'github_token' => isset( $current['github_token'] ) ? $current['github_token'] : '', // トークンは保持
+            'github_token' => '', // トークンもクリア
             'github_repo' => '',
             'github_branch_mode' => 'existing',
             'github_existing_branch' => '',
@@ -750,11 +748,20 @@ class SGE_Settings {
             'enable_sitemap' => true,
             'enable_robots_txt' => false,
             'enable_rss' => true,
-            // Cloudflare Workers設定（トークンは保持）
+            // Cloudflare Workers設定
             'cloudflare_enabled' => false,
-            'cloudflare_api_token' => isset( $current['cloudflare_api_token'] ) ? $current['cloudflare_api_token'] : '',
+            'cloudflare_api_token' => '', // トークンもクリア
             'cloudflare_account_id' => '',
             'cloudflare_script_name' => '',
+            // GitLab設定
+            'gitlab_enabled' => false,
+            'gitlab_token' => '', // トークンもクリア
+            'gitlab_project' => '',
+            'gitlab_branch_mode' => 'existing',
+            'gitlab_existing_branch' => '',
+            'gitlab_new_branch' => '',
+            'gitlab_base_branch' => '',
+            'gitlab_api_url' => 'https://gitlab.com/api/v4',
         );
 
         update_option( 'sge_settings', $default_settings );

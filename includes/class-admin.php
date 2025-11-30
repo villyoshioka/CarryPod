@@ -52,10 +52,11 @@ class SGE_Admin {
      * 管理メニューを追加
      */
     public function add_admin_menu() {
+        // 実行権限があるユーザーにメインメニューを表示
         add_menu_page(
             'Static Generation Engine',
             'Static Generation Engine',
-            'manage_options',
+            'sge_execute',
             'static-generation-engine',
             array( $this, 'render_execute_page' ),
             'dashicons-download',
@@ -66,16 +67,17 @@ class SGE_Admin {
             'static-generation-engine',
             '実行',
             '実行',
-            'manage_options',
+            'sge_execute',
             'static-generation-engine',
             array( $this, 'render_execute_page' )
         );
 
+        // 設定ページは管理権限が必要
         add_submenu_page(
             'static-generation-engine',
             '設定',
             '設定',
-            'manage_options',
+            'sge_manage_settings',
             'static-generation-engine-settings',
             array( $this, 'render_settings_page' )
         );
@@ -150,8 +152,8 @@ class SGE_Admin {
      * 実行画面を表示
      */
     public function render_execute_page() {
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( '権限がありません。' );
+        if ( ! current_user_can( 'sge_execute' ) ) {
+            wp_die( '静的化実行の権限がありません。' );
         }
 
         $settings_manager = SGE_Settings::get_instance();
@@ -242,8 +244,8 @@ class SGE_Admin {
      * 設定画面を表示
      */
     public function render_settings_page() {
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( '権限がありません。' );
+        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+            wp_die( '設定変更の権限がありません。' );
         }
 
         $settings_manager = SGE_Settings::get_instance();
@@ -283,125 +285,7 @@ class SGE_Admin {
 
                     <h3>出力先設定</h3>
 
-                    <div class="sge-form-group">
-                        <label>
-                            <input type="checkbox" id="sge-github-enabled" name="github_enabled" value="1" <?php checked( ! empty( $settings['github_enabled'] ) ); ?>>
-                            GitHubに出力
-                        </label>
-                    </div>
-
-                    <div id="sge-github-settings" class="sge-subsection" <?php echo empty( $settings['github_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="sge-form-group">
-                            <label for="sge-github-token">GitHub Personal Access Token <span class="required">*</span></label>
-                            <?php
-                            $has_token = ! empty( $settings['github_token'] );
-                            $placeholder = $has_token ? '設定済み（変更する場合は新しいトークンを入力）' : 'トークンを入力してください';
-                            ?>
-                            <input type="password" id="sge-github-token" name="github_token" class="regular-text" value="" placeholder="<?php echo esc_attr( $placeholder ); ?>">
-                            <?php if ( $has_token ) : ?>
-                                <span class="sge-token-status sge-token-set">✓ トークン設定済み</span>
-                            <?php endif; ?>
-                            <p class="description">必要権限: repo（フルアクセス）<br>※ wp-config.phpの認証用定数変更時は再入力が必要です</p>
-                        </div>
-
-                        <div class="sge-form-group">
-                            <label for="sge-github-repo">リポジトリ名 <span class="required">*</span></label>
-                            <input type="text" id="sge-github-repo" name="github_repo" class="regular-text" value="<?php echo esc_attr( $settings['github_repo'] ?? '' ); ?>" placeholder="owner/repo">
-                            <p class="description">形式: owner/repo</p>
-                        </div>
-
-                        <div class="sge-form-group">
-                            <label>ブランチ設定</label>
-                            <div>
-                                <label>
-                                    <input type="radio" name="github_branch_mode" value="existing" <?php checked( $settings['github_branch_mode'] ?? 'existing', 'existing' ); ?>>
-                                    既存ブランチを使用
-                                </label>
-                                <input type="text" id="sge-github-existing-branch" name="github_existing_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_existing_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'existing' ? 'disabled' : ''; ?>>
-                            </div>
-                            <div style="margin-top: 10px;">
-                                <label>
-                                    <input type="radio" name="github_branch_mode" value="new" <?php checked( $settings['github_branch_mode'] ?? 'existing', 'new' ); ?>>
-                                    新規ブランチを作成
-                                </label>
-                                <div style="margin-left: 20px;">
-                                    <label>分岐元ブランチ名</label>
-                                    <input type="text" id="sge-github-base-branch" name="github_base_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_base_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
-                                    <br>
-                                    <label>新規ブランチ名</label>
-                                    <input type="text" id="sge-github-new-branch" name="github_new_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_new_branch'] ?? '' ); ?>" placeholder="static-site" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <div class="sge-form-group">
-                        <label>
-                            <input type="checkbox" id="sge-git-local-enabled" name="git_local_enabled" value="1" <?php checked( ! empty( $settings['git_local_enabled'] ) ); ?>>
-                            ローカルGitに出力
-                        </label>
-                    </div>
-
-                    <div id="sge-git-local-settings" class="sge-subsection" <?php echo empty( $settings['git_local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="sge-form-group">
-                            <label for="sge-git-local-work-dir">Git作業ディレクトリ <span class="required">*</span></label>
-                            <input type="text" id="sge-git-local-work-dir" name="git_local_work_dir" class="regular-text" value="<?php echo esc_attr( $settings['git_local_work_dir'] ?? '' ); ?>" placeholder="/path/to/git/repo">
-                            <p class="description">ローカルGitリポジトリのパス（絶対パス）</p>
-                        </div>
-
-                        <div class="sge-form-group">
-                            <label for="sge-git-local-branch">ブランチ名 <span class="required">*</span></label>
-                            <input type="text" id="sge-git-local-branch" name="git_local_branch" class="regular-text" value="<?php echo esc_attr( $settings['git_local_branch'] ?? 'main' ); ?>" placeholder="main">
-                            <p class="description">コミット先のブランチ名</p>
-                        </div>
-
-                        <div class="sge-form-group">
-                            <label>
-                                <input type="checkbox" id="sge-git-local-push-remote" name="git_local_push_remote" value="1" <?php checked( ! empty( $settings['git_local_push_remote'] ) ); ?>>
-                                リモートにプッシュする
-                            </label>
-                            <p class="description">チェックを入れると、コミット後にリモート（origin）にプッシュします</p>
-                        </div>
-                    </div>
-
-                    <div class="sge-form-group">
-                        <label>
-                            <input type="checkbox" id="sge-local-enabled" name="local_enabled" value="1" <?php checked( ! empty( $settings['local_enabled'] ) ); ?>>
-                            ローカルディレクトリに出力
-                        </label>
-                    </div>
-
-                    <div id="sge-local-settings" class="sge-subsection" <?php echo empty( $settings['local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="sge-form-group">
-                            <label for="sge-local-output-path">静的ファイル出力先パス <span class="required">*</span></label>
-                            <input type="text" id="sge-local-output-path" name="local_output_path" class="regular-text" value="<?php echo esc_attr( $settings['local_output_path'] ?? '' ); ?>" placeholder="<?php echo esc_attr( ( PHP_OS === 'WINNT' ? 'C:/output' : '/Users/username/output' ) ); ?>">
-                            <p class="description">
-                                例：<br>
-                                Windows: C:\output または C:/output<br>
-                                Mac/Linux: /Users/username/output
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="sge-form-group">
-                        <label>
-                            <input type="checkbox" id="sge-zip-enabled" name="zip_enabled" value="1" <?php checked( ! empty( $settings['zip_enabled'] ) ); ?>>
-                            ZIPファイルとして出力
-                        </label>
-                    </div>
-
-                    <div id="sge-zip-settings" class="sge-subsection" <?php echo empty( $settings['zip_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="sge-form-group">
-                            <label for="sge-zip-output-path">ZIP出力先パス <span class="required">*</span></label>
-                            <input type="text" id="sge-zip-output-path" name="zip_output_path" class="regular-text" value="<?php echo esc_attr( $settings['zip_output_path'] ?? '' ); ?>">
-                            <p class="description">
-                                ZIPファイルを保存するディレクトリを指定します。<br>
-                                ファイル名: static-output-YYYYMMDD_HHMMSS.zip
-                            </p>
-                        </div>
-                    </div>
-
+                    <!-- 1. Cloudflare Workers -->
                     <div class="sge-form-group">
                         <label>
                             <input type="checkbox" id="sge-cloudflare-enabled" name="cloudflare_enabled" value="1" <?php checked( ! empty( $settings['cloudflare_enabled'] ) ); ?>>
@@ -437,6 +321,62 @@ class SGE_Admin {
 
                     </div>
 
+                    <!-- 2. GitHub -->
+                    <div class="sge-form-group">
+                        <label>
+                            <input type="checkbox" id="sge-github-enabled" name="github_enabled" value="1" <?php checked( ! empty( $settings['github_enabled'] ) ); ?>>
+                            GitHubに出力
+                        </label>
+                    </div>
+
+                    <div id="sge-github-settings" class="sge-subsection" <?php echo empty( $settings['github_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="sge-form-group">
+                            <label for="sge-github-token">GitHub Personal Access Token <span class="required">*</span></label>
+                            <?php
+                            $has_token = ! empty( $settings['github_token'] );
+                            $placeholder = $has_token ? '設定済み（変更する場合は新しいトークンを入力）' : 'トークンを入力してください';
+                            ?>
+                            <input type="password" id="sge-github-token" name="github_token" class="regular-text" value="" placeholder="<?php echo esc_attr( $placeholder ); ?>">
+                            <?php if ( $has_token ) : ?>
+                                <span class="sge-token-status sge-token-set">✓ トークン設定済み</span>
+                            <?php endif; ?>
+                            <p class="description">必要権限: repo（フルアクセス）<br>※ wp-config.phpの認証用定数変更時は再入力が必要です</p>
+                        </div>
+
+                        <div class="sge-form-group">
+                            <label for="sge-github-repo">リポジトリ名 <span class="required">*</span></label>
+                            <input type="text" id="sge-github-repo" name="github_repo" class="regular-text" value="<?php echo esc_attr( $settings['github_repo'] ?? '' ); ?>" placeholder="owner/repo">
+                            <p class="description">形式: owner/repo</p>
+                        </div>
+
+                        <div class="sge-form-group sge-branch-settings">
+                            <label>ブランチ設定</label>
+                            <div class="sge-branch-option">
+                                <label class="sge-radio-label">
+                                    <input type="radio" name="github_branch_mode" value="existing" <?php checked( $settings['github_branch_mode'] ?? 'existing', 'existing' ); ?>>
+                                    既存ブランチを使用
+                                </label>
+                                <div class="sge-branch-input">
+                                    <input type="text" id="sge-github-existing-branch" name="github_existing_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_existing_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'existing' ? 'disabled' : ''; ?>>
+                                </div>
+                            </div>
+                            <div class="sge-branch-option" style="margin-top: 10px;">
+                                <label class="sge-radio-label">
+                                    <input type="radio" name="github_branch_mode" value="new" <?php checked( $settings['github_branch_mode'] ?? 'existing', 'new' ); ?>>
+                                    新規ブランチを作成
+                                </label>
+                                <div class="sge-branch-input sge-branch-nested">
+                                    <label>分岐元ブランチ名</label>
+                                    <input type="text" id="sge-github-base-branch" name="github_base_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_base_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
+                                    <label>新規ブランチ名</label>
+                                    <input type="text" id="sge-github-new-branch" name="github_new_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_new_branch'] ?? '' ); ?>" placeholder="static-site" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- 3. GitLab -->
                     <div class="sge-form-group">
                         <label>
                             <input type="checkbox" id="sge-gitlab-enabled" name="gitlab_enabled" value="1" <?php checked( ! empty( $settings['gitlab_enabled'] ) ); ?>>
@@ -464,24 +404,25 @@ class SGE_Admin {
                             <p class="description">形式: username/project または group/subgroup/project</p>
                         </div>
 
-                        <div class="sge-form-group">
+                        <div class="sge-form-group sge-branch-settings">
                             <label>ブランチ設定</label>
-                            <div>
-                                <label>
+                            <div class="sge-branch-option">
+                                <label class="sge-radio-label">
                                     <input type="radio" name="gitlab_branch_mode" value="existing" <?php checked( $settings['gitlab_branch_mode'] ?? 'existing', 'existing' ); ?>>
                                     既存ブランチを使用
                                 </label>
-                                <input type="text" id="sge-gitlab-existing-branch" name="gitlab_existing_branch" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_existing_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['gitlab_branch_mode'] ?? 'existing' ) !== 'existing' ? 'disabled' : ''; ?>>
+                                <div class="sge-branch-input">
+                                    <input type="text" id="sge-gitlab-existing-branch" name="gitlab_existing_branch" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_existing_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['gitlab_branch_mode'] ?? 'existing' ) !== 'existing' ? 'disabled' : ''; ?>>
+                                </div>
                             </div>
-                            <div style="margin-top: 10px;">
-                                <label>
+                            <div class="sge-branch-option" style="margin-top: 10px;">
+                                <label class="sge-radio-label">
                                     <input type="radio" name="gitlab_branch_mode" value="new" <?php checked( $settings['gitlab_branch_mode'] ?? 'existing', 'new' ); ?>>
                                     新規ブランチを作成
                                 </label>
-                                <div style="margin-left: 20px;">
+                                <div class="sge-branch-input sge-branch-nested">
                                     <label>分岐元ブランチ名</label>
                                     <input type="text" id="sge-gitlab-base-branch" name="gitlab_base_branch" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_base_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['gitlab_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
-                                    <br>
                                     <label>新規ブランチ名</label>
                                     <input type="text" id="sge-gitlab-new-branch" name="gitlab_new_branch" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_new_branch'] ?? '' ); ?>" placeholder="static-site" <?php echo ( $settings['gitlab_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
                                 </div>
@@ -492,6 +433,75 @@ class SGE_Admin {
                             <label for="sge-gitlab-api-url">GitLab API URL</label>
                             <input type="text" id="sge-gitlab-api-url" name="gitlab_api_url" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_api_url'] ?? 'https://gitlab.com/api/v4' ); ?>" placeholder="https://gitlab.com/api/v4">
                             <p class="description">セルフホストのGitLabを使用する場合は変更してください<br>例: https://gitlab.example.com/api/v4</p>
+                        </div>
+                    </div>
+
+                    <!-- 4. ローカルGit -->
+                    <div class="sge-form-group">
+                        <label>
+                            <input type="checkbox" id="sge-git-local-enabled" name="git_local_enabled" value="1" <?php checked( ! empty( $settings['git_local_enabled'] ) ); ?>>
+                            ローカルGitに出力
+                        </label>
+                    </div>
+
+                    <div id="sge-git-local-settings" class="sge-subsection" <?php echo empty( $settings['git_local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="sge-form-group">
+                            <label for="sge-git-local-work-dir">Git作業ディレクトリ <span class="required">*</span></label>
+                            <input type="text" id="sge-git-local-work-dir" name="git_local_work_dir" class="regular-text" value="<?php echo esc_attr( $settings['git_local_work_dir'] ?? '' ); ?>" placeholder="/path/to/git/repo">
+                            <p class="description">ローカルGitリポジトリのパス（絶対パス）</p>
+                        </div>
+
+                        <div class="sge-form-group">
+                            <label for="sge-git-local-branch">ブランチ名 <span class="required">*</span></label>
+                            <input type="text" id="sge-git-local-branch" name="git_local_branch" class="regular-text" value="<?php echo esc_attr( $settings['git_local_branch'] ?? 'main' ); ?>" placeholder="main">
+                            <p class="description">コミット先のブランチ名</p>
+                        </div>
+
+                        <div class="sge-form-group">
+                            <label>
+                                <input type="checkbox" id="sge-git-local-push-remote" name="git_local_push_remote" value="1" <?php checked( ! empty( $settings['git_local_push_remote'] ) ); ?>>
+                                リモートにプッシュする
+                            </label>
+                            <p class="description">チェックを入れると、コミット後にリモート（origin）にプッシュします</p>
+                        </div>
+                    </div>
+
+                    <!-- 5. ローカルディレクトリ -->
+                    <div class="sge-form-group">
+                        <label>
+                            <input type="checkbox" id="sge-local-enabled" name="local_enabled" value="1" <?php checked( ! empty( $settings['local_enabled'] ) ); ?>>
+                            ローカルディレクトリに出力
+                        </label>
+                    </div>
+
+                    <div id="sge-local-settings" class="sge-subsection" <?php echo empty( $settings['local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="sge-form-group">
+                            <label for="sge-local-output-path">静的ファイル出力先パス <span class="required">*</span></label>
+                            <input type="text" id="sge-local-output-path" name="local_output_path" class="regular-text" value="<?php echo esc_attr( $settings['local_output_path'] ?? '' ); ?>" placeholder="<?php echo esc_attr( ( PHP_OS === 'WINNT' ? 'C:/output' : '/Users/username/output' ) ); ?>">
+                            <p class="description">
+                                例：<br>
+                                Windows: C:\output または C:/output<br>
+                                Mac/Linux: /Users/username/output
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 6. ZIP -->
+                    <div class="sge-form-group">
+                        <label>
+                            <input type="checkbox" id="sge-zip-enabled" name="zip_enabled" value="1" <?php checked( ! empty( $settings['zip_enabled'] ) ); ?>>
+                            ZIPファイルとして出力
+                        </label>
+                    </div>
+
+                    <div id="sge-zip-settings" class="sge-subsection" <?php echo empty( $settings['zip_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="sge-form-group">
+                            <label for="sge-zip-output-path">ZIP出力先パス <span class="required">*</span></label>
+                            <input type="text" id="sge-zip-output-path" name="zip_output_path" class="regular-text" value="<?php echo esc_attr( $settings['zip_output_path'] ?? '' ); ?>">
+                            <p class="description">
+                                ZIPファイルを保存するディレクトリを指定します。<br>
+                                ファイル名: static-output-YYYYMMDD_HHMMSS.zip
+                            </p>
                         </div>
                     </div>
 
@@ -616,7 +626,7 @@ class SGE_Admin {
 
                     <div class="sge-form-actions">
                         <button type="submit" class="button button-primary" id="sge-save-settings" <?php echo $is_running ? 'disabled' : ''; ?>>設定を保存</button>
-                        <button type="button" class="button" id="sge-reset-settings" <?php echo $is_running ? 'disabled' : ''; ?>>リセット</button>
+                        <button type="button" class="button" id="sge-reset-settings" <?php echo $is_running ? 'disabled' : ''; ?>>設定をリセット</button>
                         <button type="button" class="button" id="sge-clear-cache" <?php echo $is_running ? 'disabled' : ''; ?>>キャッシュをクリア</button>
                         <button type="button" class="button" id="sge-clear-logs" <?php echo $is_running ? 'disabled' : ''; ?>>ログをクリア</button>
                         <button type="button" class="button" id="sge-export-settings">設定をエクスポート</button>
@@ -645,8 +655,8 @@ class SGE_Admin {
             wp_send_json_error( array( 'message' => 'リクエストが多すぎます。しばらく待ってから再試行してください。' ) );
         }
 
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        if ( ! current_user_can( 'sge_execute' ) ) {
+            wp_send_json_error( array( 'message' => '静的化実行の権限がありません。' ) );
         }
 
         // Action Schedulerが利用可能かチェック
@@ -738,7 +748,7 @@ class SGE_Admin {
         delete_option( $lock_key );
 
         // 初期進捗状態をセット
-        $logger->update_progress( 0, 1, '静的化処理を開始中...' );
+        $logger->update_progress( 0, 1, 'バックグラウンド処理を待機中...' );
 
         wp_send_json_success( array( 'message' => '静的化を開始しました。' ) );
     }
@@ -749,7 +759,7 @@ class SGE_Admin {
     public function ajax_get_logs() {
         check_ajax_referer( 'sge_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'manage_options' ) ) {
+        if ( ! current_user_can( 'sge_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
         }
 
@@ -772,7 +782,7 @@ class SGE_Admin {
     public function ajax_get_progress() {
         check_ajax_referer( 'sge_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'manage_options' ) ) {
+        if ( ! current_user_can( 'sge_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
         }
 
@@ -792,7 +802,7 @@ class SGE_Admin {
     public function ajax_clear_logs() {
         check_ajax_referer( 'sge_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'manage_options' ) ) {
+        if ( ! current_user_can( 'sge_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
         }
 
@@ -824,8 +834,8 @@ class SGE_Admin {
             wp_send_json_error( array( 'message' => 'セキュリティチェックに失敗しました。' ) );
         }
 
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+            wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
         // ホワイトリスト: 許可されたフィールドのみ処理
@@ -927,8 +937,8 @@ class SGE_Admin {
     public function ajax_reset_settings() {
         check_ajax_referer( 'sge_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+            wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
         $settings_manager = SGE_Settings::get_instance();
@@ -943,8 +953,8 @@ class SGE_Admin {
     public function ajax_export_settings() {
         check_ajax_referer( 'sge_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+            wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
         $settings_manager = SGE_Settings::get_instance();
@@ -959,16 +969,19 @@ class SGE_Admin {
     public function ajax_import_settings() {
         check_ajax_referer( 'sge_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+            wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
         if ( ! isset( $_POST['data'] ) ) {
             wp_send_json_error( array( 'message' => 'データが送信されていません。' ) );
         }
 
+        // インポートデータをサニタイズ（JSON文字列としてエスケープ処理）
+        $import_data = wp_unslash( $_POST['data'] );
+
         $settings_manager = SGE_Settings::get_instance();
-        $result = $settings_manager->import_settings( $_POST['data'] );
+        $result = $settings_manager->import_settings( $import_data );
 
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( array( 'message' => $result->get_error_message() ) );
@@ -983,8 +996,8 @@ class SGE_Admin {
     public function ajax_clear_cache() {
         check_ajax_referer( 'sge_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+            wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
         $cache = SGE_Cache::get_instance();
@@ -1003,7 +1016,7 @@ class SGE_Admin {
     public function ajax_download_log() {
         check_ajax_referer( 'sge_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'manage_options' ) ) {
+        if ( ! current_user_can( 'sge_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
         }
 
@@ -1150,7 +1163,7 @@ class SGE_Admin {
     public function ajax_cancel_generation() {
         check_ajax_referer( 'sge_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'manage_options' ) ) {
+        if ( ! current_user_can( 'sge_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
         }
 
@@ -1181,8 +1194,8 @@ class SGE_Admin {
     public function ajax_reset_scheduler() {
         check_ajax_referer( 'sge_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+            wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
         try {

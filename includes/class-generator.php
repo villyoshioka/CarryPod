@@ -221,14 +221,17 @@ class SGE_Generator {
             $this->logger->add_log( 'ページ生成完了: ' . $total_urls . '件（キャッシュ: ' . $cache_used_count . '件、新規: ' . $generated_count . '件）' );
 
             // アセットファイルをコピー (80-83%)
+            $this->logger->add_log( 'アセットファイルをコピー中...' );
             $this->logger->update_progress( 81, $total_steps, 'アセットファイルをコピー中...' );
             $this->copy_assets();
 
-            // 巻き込みファイルをコピー (83-86%)
-            $this->logger->update_progress( 84, $total_steps, '巻き込みファイルをコピー中...' );
+            // 追加ファイルをコピー (83-86%)
+            $this->logger->add_log( '追加ファイルをコピー中...' );
+            $this->logger->update_progress( 84, $total_steps, '追加ファイルをコピー中...' );
             $this->copy_included_files();
 
             // 除外ファイルを削除 (86-90%)
+            $this->logger->add_log( '除外パターンを処理中...' );
             $this->logger->update_progress( 87, $total_steps, '除外ファイルを削除中...' );
             $this->remove_excluded_files();
 
@@ -260,6 +263,7 @@ class SGE_Generator {
             if ( ! empty( $this->settings['local_enabled'] ) ) {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
+                $this->logger->add_log( 'ローカルディレクトリに出力中...' );
                 $this->logger->update_progress( $progress, $total_steps, 'ローカルディレクトリに出力中...' );
                 $this->output_to_local();
             }
@@ -268,6 +272,7 @@ class SGE_Generator {
             if ( ! empty( $this->settings['github_enabled'] ) ) {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
+                $this->logger->add_log( 'GitHubに出力中...' );
                 $this->logger->update_progress( $progress, $total_steps, 'GitHubに出力中...' );
                 $this->output_to_github_api();
             }
@@ -276,6 +281,7 @@ class SGE_Generator {
             if ( ! empty( $this->settings['git_local_enabled'] ) ) {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
+                $this->logger->add_log( 'ローカルGitに出力中...' );
                 $this->logger->update_progress( $progress, $total_steps, 'ローカルGitに出力中...' );
                 $this->output_to_git_local();
             }
@@ -284,6 +290,7 @@ class SGE_Generator {
             if ( ! empty( $this->settings['zip_enabled'] ) ) {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
+                $this->logger->add_log( 'ZIPファイルを作成中...' );
                 $this->logger->update_progress( $progress, $total_steps, 'ZIPファイルを作成中...' );
                 $this->output_to_zip();
             }
@@ -292,6 +299,7 @@ class SGE_Generator {
             if ( ! empty( $this->settings['cloudflare_enabled'] ) ) {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
+                $this->logger->add_log( 'Cloudflare Workersにデプロイ中...' );
                 $this->logger->update_progress( $progress, $total_steps, 'Cloudflare Workersにデプロイ中...' );
                 $this->output_to_cloudflare_workers();
             }
@@ -300,6 +308,7 @@ class SGE_Generator {
             if ( ! empty( $this->settings['gitlab_enabled'] ) ) {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
+                $this->logger->add_log( 'GitLabに出力中...' );
                 $this->logger->update_progress( $progress, $total_steps, 'GitLabに出力中...' );
                 $this->output_to_gitlab_api();
             }
@@ -336,6 +345,9 @@ class SGE_Generator {
         // 共通設定を1回だけ取得
         $posts_per_page = (int) get_option( 'posts_per_page' );
         $home_url = home_url( '/' );
+
+        // 進捗更新: 開始
+        $this->logger->update_progress( 0, 100, 'URLを収集中: 投稿を取得中...' );
 
         // トップページ
         $urls[] = $home_url;
@@ -383,6 +395,9 @@ class SGE_Generator {
             }
         }
 
+        // 進捗更新: カテゴリ取得
+        $this->logger->update_progress( 0, 100, 'URLを収集中: カテゴリを取得中...' );
+
         // カテゴリアーカイブ（タームリンクキャッシュを活用）
         $categories = get_categories( array( 'hide_empty' => true ) );
         if ( ! empty( $categories ) ) {
@@ -401,6 +416,9 @@ class SGE_Generator {
                 }
             }
         }
+
+        // 進捗更新: タグ取得
+        $this->logger->update_progress( 0, 100, 'URLを収集中: タグを取得中...' );
 
         // タグアーカイブ
         if ( ! empty( $this->settings['enable_tag_archive'] ) ) {
@@ -422,6 +440,9 @@ class SGE_Generator {
                 }
             }
         }
+
+        // 進捗更新: アーカイブ取得
+        $this->logger->update_progress( 0, 100, 'URLを収集中: アーカイブを取得中...' );
 
         // 日付アーカイブ（1回のクエリで全日付を取得）
         if ( ! empty( $this->settings['enable_date_archive'] ) ) {
@@ -484,6 +505,9 @@ class SGE_Generator {
                 }
             }
         }
+
+        // 進捗更新: その他
+        $this->logger->update_progress( 0, 100, 'URLを収集中: フィード・サイトマップを取得中...' );
 
         // RSSフィード
         if ( ! empty( $this->settings['enable_rss'] ) ) {
@@ -1016,12 +1040,12 @@ class SGE_Generator {
             }
         }
 
-        // wp-includes ディレクトリをコピー
+        // wp-includes ディレクトリから参照されているファイルのみをコピー
         $wp_includes_dir = ABSPATH . 'wp-includes';
         if ( is_dir( $wp_includes_dir ) ) {
-            $result = $this->copy_directory_recursive( $wp_includes_dir, $this->temp_dir . '/wp-includes', false );
+            $result = $this->copy_referenced_wp_includes( $wp_includes_dir, $this->temp_dir . '/wp-includes' );
             if ( $result ) {
-                $copied_dirs[] = 'wp-includes';
+                $copied_dirs[] = 'wp-includes (参照ファイルのみ)';
             } else {
                 $error_dirs[] = 'wp-includes';
                 $success = false;
@@ -1077,7 +1101,317 @@ class SGE_Generator {
     }
 
     /**
-     * 巻き込みファイルをコピー
+     * wp-includes から参照されているファイルのみをコピー
+     *
+     * @param string $source_dir ソースディレクトリ (ABSPATH/wp-includes)
+     * @param string $dest_dir   コピー先ディレクトリ
+     * @return bool 成功したかどうか
+     */
+    private function copy_referenced_wp_includes( $source_dir, $dest_dir ) {
+        // 生成済みHTMLファイルからwp-includesへの参照を収集
+        $referenced_files = $this->collect_wp_includes_references();
+
+        if ( empty( $referenced_files ) ) {
+            $this->logger->debug( 'wp-includes への参照が見つかりませんでした' );
+            return true;
+        }
+
+        $this->logger->debug( 'wp-includes 参照ファイル: ' . count( $referenced_files ) . '件検出' );
+
+        // 参照ファイルをコピー
+        $copied_count = 0;
+        $error_count = 0;
+
+        foreach ( $referenced_files as $relative_path ) {
+            $source_file = $source_dir . '/' . $relative_path;
+            $dest_file = $dest_dir . '/' . $relative_path;
+
+            // ソースファイルが存在するか確認
+            if ( ! file_exists( $source_file ) ) {
+                continue;
+            }
+
+            // ディレクトリを作成
+            $dest_dir_path = dirname( $dest_file );
+            if ( ! is_dir( $dest_dir_path ) ) {
+                if ( ! wp_mkdir_p( $dest_dir_path ) ) {
+                    $error_count++;
+                    continue;
+                }
+            }
+
+            // ファイルをコピー
+            if ( copy( $source_file, $dest_file ) ) {
+                $copied_count++;
+            } else {
+                $error_count++;
+            }
+        }
+
+        $this->logger->debug( 'wp-includes コピー完了: ' . $copied_count . '件' . ( $error_count > 0 ? '、エラー: ' . $error_count . '件' : '' ) );
+
+        return $error_count === 0;
+    }
+
+    /**
+     * 生成済みHTMLとアセットからwp-includesへの参照を収集
+     *
+     * @return array wp-includes内の相対パスの配列
+     */
+    private function collect_wp_includes_references() {
+        $references = array();
+
+        // 1. 生成済みHTMLファイルをスキャン
+        $html_files = $this->find_files_recursive( $this->temp_dir, array( 'html', 'htm' ) );
+        foreach ( $html_files as $html_file ) {
+            $content = file_get_contents( $html_file );
+            if ( $content === false ) {
+                continue;
+            }
+            $refs = $this->extract_wp_includes_refs_from_html( $content );
+            $references = array_merge( $references, $refs );
+        }
+
+        // 2. 検出したJS/CSSファイルから依存ファイルを再帰的に収集
+        $processed = array();
+        $to_process = $references;
+
+        while ( ! empty( $to_process ) ) {
+            $current = array_shift( $to_process );
+
+            if ( isset( $processed[ $current ] ) ) {
+                continue;
+            }
+            $processed[ $current ] = true;
+
+            // JS/CSSファイルの場合は内部の参照も解析
+            $ext = strtolower( pathinfo( $current, PATHINFO_EXTENSION ) );
+            if ( in_array( $ext, array( 'js', 'css' ), true ) ) {
+                $file_path = ABSPATH . 'wp-includes/' . $current;
+                if ( file_exists( $file_path ) ) {
+                    $content = file_get_contents( $file_path );
+                    if ( $content !== false ) {
+                        $deps = $this->extract_deps_from_asset( $content, $current, $ext );
+                        foreach ( $deps as $dep ) {
+                            if ( ! isset( $processed[ $dep ] ) ) {
+                                $to_process[] = $dep;
+                                $references[] = $dep;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 重複を除去してソート
+        $references = array_unique( $references );
+        sort( $references );
+
+        return $references;
+    }
+
+    /**
+     * HTMLコンテンツからwp-includesへの参照を抽出
+     *
+     * @param string $content HTMLコンテンツ
+     * @return array wp-includes内の相対パスの配列
+     */
+    private function extract_wp_includes_refs_from_html( $content ) {
+        $refs = array();
+
+        // script src を抽出
+        if ( preg_match_all( '/<script[^>]+src=["\']([^"\']+)["\']/', $content, $matches ) ) {
+            foreach ( $matches[1] as $src ) {
+                $ref = $this->parse_wp_includes_path( $src );
+                if ( $ref ) {
+                    $refs[] = $ref;
+                }
+            }
+        }
+
+        // link href を抽出 (CSS)
+        if ( preg_match_all( '/<link[^>]+href=["\']([^"\']+)["\']/', $content, $matches ) ) {
+            foreach ( $matches[1] as $href ) {
+                $ref = $this->parse_wp_includes_path( $href );
+                if ( $ref ) {
+                    $refs[] = $ref;
+                }
+            }
+        }
+
+        // img src を抽出
+        if ( preg_match_all( '/<img[^>]+src=["\']([^"\']+)["\']/', $content, $matches ) ) {
+            foreach ( $matches[1] as $src ) {
+                $ref = $this->parse_wp_includes_path( $src );
+                if ( $ref ) {
+                    $refs[] = $ref;
+                }
+            }
+        }
+
+        return $refs;
+    }
+
+    /**
+     * URLからwp-includes内の相対パスを抽出
+     *
+     * @param string $url URL または相対パス
+     * @return string|false wp-includes内の相対パス、またはfalse
+     */
+    private function parse_wp_includes_path( $url ) {
+        // クエリ文字列を除去
+        $url = strtok( $url, '?' );
+
+        // wp-includes を含むかチェック
+        if ( strpos( $url, 'wp-includes/' ) === false ) {
+            return false;
+        }
+
+        // wp-includes/ 以降を抽出
+        if ( preg_match( '#wp-includes/(.+)$#', $url, $matches ) ) {
+            $path = $matches[1];
+            // セキュリティ: ディレクトリトラバーサルを防止
+            if ( strpos( $path, '..' ) !== false ) {
+                return false;
+            }
+            return $path;
+        }
+
+        return false;
+    }
+
+    /**
+     * JS/CSSファイルから依存ファイルを抽出
+     *
+     * @param string $content ファイル内容
+     * @param string $current_path 現在のファイルの相対パス (wp-includes内)
+     * @param string $ext ファイル拡張子 (js/css)
+     * @return array wp-includes内の相対パスの配列
+     */
+    private function extract_deps_from_asset( $content, $current_path, $ext ) {
+        $deps = array();
+        $current_dir = dirname( $current_path );
+
+        if ( $ext === 'css' ) {
+            // url() を抽出
+            if ( preg_match_all( '/url\s*\(\s*["\']?([^"\')]+)["\']?\s*\)/', $content, $matches ) ) {
+                foreach ( $matches[1] as $url ) {
+                    $dep = $this->resolve_relative_path( $url, $current_dir );
+                    if ( $dep ) {
+                        $deps[] = $dep;
+                    }
+                }
+            }
+
+            // @import を抽出
+            if ( preg_match_all( '/@import\s+(?:url\s*\(\s*)?["\']?([^"\');]+)["\']?\s*\)?/', $content, $matches ) ) {
+                foreach ( $matches[1] as $url ) {
+                    $dep = $this->resolve_relative_path( $url, $current_dir );
+                    if ( $dep ) {
+                        $deps[] = $dep;
+                    }
+                }
+            }
+        } elseif ( $ext === 'js' ) {
+            // 動的インポートは複雑なため、よく使われるWordPressパターンのみ対応
+            // 例: wp.i18n, wp.components などの依存関係
+            // ただし、これらは通常HTMLで直接読み込まれるため、ここでは軽量な処理に留める
+        }
+
+        return $deps;
+    }
+
+    /**
+     * 相対パスを解決してwp-includes内のパスに変換
+     *
+     * @param string $url 相対URL
+     * @param string $current_dir 現在のディレクトリ (wp-includes内)
+     * @return string|false 解決されたパス、またはfalse
+     */
+    private function resolve_relative_path( $url, $current_dir ) {
+        // クエリ文字列を除去
+        $url = strtok( $url, '?' );
+        $url = strtok( $url, '#' );
+
+        // data: URL はスキップ
+        if ( strpos( $url, 'data:' ) === 0 ) {
+            return false;
+        }
+
+        // 絶対URLはスキップ
+        if ( preg_match( '#^https?://#', $url ) ) {
+            // wp-includes を含む場合は解析
+            return $this->parse_wp_includes_path( $url );
+        }
+
+        // ルート相対パス
+        if ( strpos( $url, '/wp-includes/' ) === 0 ) {
+            return substr( $url, strlen( '/wp-includes/' ) );
+        }
+
+        // 相対パスを解決
+        if ( strpos( $url, '/' ) === 0 ) {
+            // 他の絶対パス（wp-includes以外）はスキップ
+            return false;
+        }
+
+        // 相対パスを解決
+        $path = $current_dir . '/' . $url;
+
+        // パスを正規化 (../ を解決)
+        $parts = explode( '/', $path );
+        $normalized = array();
+        foreach ( $parts as $part ) {
+            if ( $part === '..' ) {
+                array_pop( $normalized );
+            } elseif ( $part !== '.' && $part !== '' ) {
+                $normalized[] = $part;
+            }
+        }
+
+        $result = implode( '/', $normalized );
+
+        // セキュリティ: wp-includes外への参照を防止
+        if ( strpos( $result, '..' ) !== false ) {
+            return false;
+        }
+
+        return $result;
+    }
+
+    /**
+     * 指定ディレクトリ内のファイルを再帰的に検索
+     *
+     * @param string $dir ディレクトリパス
+     * @param array  $extensions 拡張子の配列
+     * @return array ファイルパスの配列
+     */
+    private function find_files_recursive( $dir, $extensions ) {
+        $files = array();
+
+        if ( ! is_dir( $dir ) ) {
+            return $files;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator( $dir, RecursiveDirectoryIterator::SKIP_DOTS ),
+            RecursiveIteratorIterator::LEAVES_ONLY
+        );
+
+        foreach ( $iterator as $file ) {
+            if ( $file->isFile() ) {
+                $ext = strtolower( $file->getExtension() );
+                if ( in_array( $ext, $extensions, true ) ) {
+                    $files[] = $file->getPathname();
+                }
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * 追加ファイルをコピー
      */
     private function copy_included_files() {
         if ( empty( $this->settings['include_paths'] ) ) {
@@ -1150,7 +1484,7 @@ class SGE_Generator {
         }
 
         if ( $copied_count > 0 || $error_count > 0 ) {
-            $this->logger->add_log( '巻き込みファイル: ' . $copied_count . '件コピー' . ( $error_count > 0 ? '、' . $error_count . '件エラー' : '' ) );
+            $this->logger->debug( '追加ファイル: ' . $copied_count . '件コピー' . ( $error_count > 0 ? '、' . $error_count . '件エラー' : '' ) );
         }
     }
 
