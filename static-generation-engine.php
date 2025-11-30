@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Static Generation Engine
- * Description: WordPressサイトを静的化してGitHubまたはローカルに出力するプラグイン
- * Version: 1.3.1
+ * Version: 1.3.2
+ * Description: WordPressサイトを静的化して出力するプラグイン
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: Vill Yoshioka
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // プラグインの定数を定義
-define( 'SGE_VERSION', '1.3.1' );
+define( 'SGE_VERSION', '1.3.2' );
 define( 'SGE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SGE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'SGE_PLUGIN_FILE', __FILE__ );

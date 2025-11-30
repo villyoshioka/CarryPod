@@ -1090,6 +1090,23 @@ class SGE_Admin {
             if ( ! empty( $settings['local_enabled'] ) ) {
                 $log_text .= "    - 出力先: " . ( $settings['local_output_path'] ?? 'なし' ) . "\n";
             }
+            $log_text .= "  - GitLab出力: " . ( ! empty( $settings['gitlab_enabled'] ) ? '有効' : '無効' ) . "\n";
+            if ( ! empty( $settings['gitlab_enabled'] ) ) {
+                $log_text .= "    - プロジェクト: " . ( $settings['gitlab_project'] ?? 'なし' ) . "\n";
+                $log_text .= "    - ブランチモード: " . ( ( $settings['gitlab_branch_mode'] ?? 'existing' ) === 'existing' ? '既存ブランチ' : '新規ブランチ' ) . "\n";
+                if ( ( $settings['gitlab_branch_mode'] ?? 'existing' ) === 'existing' ) {
+                    $log_text .= "    - ブランチ名: " . ( $settings['gitlab_existing_branch'] ?? 'main' ) . "\n";
+                } else {
+                    $log_text .= "    - 新規ブランチ名: " . ( $settings['gitlab_new_branch'] ?? 'なし' ) . "\n";
+                    $log_text .= "    - 分岐元ブランチ: " . ( $settings['gitlab_base_branch'] ?? 'main' ) . "\n";
+                }
+                $log_text .= "    - API URL: " . ( $settings['gitlab_api_url'] ?? 'https://gitlab.com' ) . "\n";
+            }
+            $log_text .= "  - Cloudflare Workers出力: " . ( ! empty( $settings['cloudflare_enabled'] ) ? '有効' : '無効' ) . "\n";
+            if ( ! empty( $settings['cloudflare_enabled'] ) ) {
+                $log_text .= "    - Worker名: " . ( $settings['cloudflare_script_name'] ?? 'なし' ) . "\n";
+            }
+            $log_text .= "  - ZIP出力: " . ( ! empty( $settings['zip_enabled'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "\n";
 
             $log_text .= "その他の設定:\n";
@@ -1101,6 +1118,13 @@ class SGE_Admin {
                 $log_text .= "    - キャッシュファイル数: " . $cache_stats['count'] . " 個\n";
                 $log_text .= "    - キャッシュサイズ: " . $cache_stats['size_formatted'] . "\n";
             }
+            $log_text .= "  - 出力対象:\n";
+            $log_text .= "    - タグアーカイブ: " . ( ! empty( $settings['enable_tag_archive'] ) ? '有効' : '無効' ) . "\n";
+            $log_text .= "    - 日付アーカイブ: " . ( ! empty( $settings['enable_date_archive'] ) ? '有効' : '無効' ) . "\n";
+            $log_text .= "    - 著者アーカイブ: " . ( ! empty( $settings['enable_author_archive'] ) ? '有効' : '無効' ) . "\n";
+            $log_text .= "    - サイトマップ: " . ( ! empty( $settings['enable_sitemap'] ) ? '有効' : '無効' ) . "\n";
+            $log_text .= "    - robots.txt: " . ( ! empty( $settings['enable_robots_txt'] ) ? '有効' : '無効' ) . "\n";
+            $log_text .= "    - RSS: " . ( ! empty( $settings['enable_rss'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "\n";
 
             // ログメッセージ

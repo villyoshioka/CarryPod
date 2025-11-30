@@ -5,7 +5,7 @@
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue.svg)](https://www.php.net/)
-[![Version](https://img.shields.io/badge/Version-1.3.1-green.svg)](https://github.com/villyoshioka/StaticGenerationEngine/releases)
+[![Version](https://img.shields.io/badge/Version-1.3.2-green.svg)](https://github.com/villyoshioka/StaticGenerationEngine/releases)
 
 > **注意**: **このプラグインについて、コードは公開していますが、サポートは行っていません。使用は自己責任でお願いします。**
 
