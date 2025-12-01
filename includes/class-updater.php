@@ -81,8 +81,9 @@ class SGE_Updater {
         }
 
         if ( in_array( $this->plugin_basename, $plugins, true ) ) {
-            // キャッシュをクリア
+            // キャッシュをクリア（通常キャッシュとベータ用キャッシュ両方）
             delete_transient( $this->cache_key );
+            delete_transient( $this->cache_key . '_beta' );
         }
     }
 
