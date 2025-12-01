@@ -394,6 +394,34 @@ class SGE_Settings {
             }
         }
 
+        // ZIP出力が有効な場合
+        if ( ! empty( $settings['zip_enabled'] ) ) {
+            if ( empty( $settings['zip_output_path'] ) ) {
+                return new WP_Error( 'zip_path_required', 'ZIP出力先パスを入力してください。' );
+            }
+
+            // 絶対パスチェック
+            if ( ! $this->is_absolute_path( $settings['zip_output_path'] ) ) {
+                return new WP_Error( 'zip_path_absolute', 'ZIP出力先パスは絶対パスで指定してください。' );
+            }
+
+            // パストラバーサルチェック（..を含む場合は拒否）
+            if ( strpos( $settings['zip_output_path'], '..' ) !== false ) {
+                return new WP_Error( 'path_traversal', 'パスに".."を含めることはできません。' );
+            }
+
+            // 危険なパスチェック
+            if ( $this->is_dangerous_path( $settings['zip_output_path'] ) ) {
+                return new WP_Error( 'dangerous_path', '指定されたパスは使用できません。' );
+            }
+
+            // パスを正規化して検証
+            $validated_path = $this->validate_safe_path( $settings['zip_output_path'] );
+            if ( is_wp_error( $validated_path ) ) {
+                return $validated_path;
+            }
+        }
+
         // Cloudflare Workers出力が有効な場合
         if ( ! empty( $settings['cloudflare_enabled'] ) ) {
             // APIトークンが必須（既存トークンがある場合はスキップ）
@@ -761,7 +789,8 @@ class SGE_Settings {
             'version' => SGE_VERSION,
             'github_enabled' => false,
             'local_enabled' => false,
-            'zip_enabled' => true, // Ver1.2: デフォルト有効
+            'zip_enabled' => false, // リセット時は無効（パスが空のため）
+            'zip_output_path' => '',
             'github_token' => '', // トークンもクリア
             'github_repo' => '',
             'github_branch_mode' => 'existing',
