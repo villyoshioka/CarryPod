@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Carry Pod
- * Version: 1.4.0
+ * Version: 1.4.1
  * Description: WordPressサイトを静的化してデプロイするプラグイン
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // プラグインの定数を定義
-define( 'SGE_VERSION', '1.4.0' );
+define( 'SGE_VERSION', '1.4.1' );
 define( 'SGE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SGE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'SGE_PLUGIN_FILE', __FILE__ );
@@ -85,7 +85,7 @@ class Carry_Pod {
         register_deactivation_hook( SGE_PLUGIN_FILE, array( $this, 'deactivate' ) );
 
         // プラグイン削除時のフック
-        register_uninstall_hook( SGE_PLUGIN_FILE, array( 'Static_Generation_Engine', 'uninstall' ) );
+        register_uninstall_hook( SGE_PLUGIN_FILE, array( 'Carry_Pod', 'uninstall' ) );
 
         // 管理画面を初期化
         if ( is_admin() ) {
