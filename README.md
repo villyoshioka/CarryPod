@@ -7,7 +7,7 @@
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue.svg)](https://www.php.net/)
 [![Version](https://img.shields.io/badge/Version-1.4.1-green.svg)](https://github.com/villyoshioka/CarryPod/releases)
 
-> **注意**: **このプラグインについて、コードは公開していますが、サポートは行っていません。使用は自己責任でお願いします。**
+> **注意**: **このプラグインについて、コードは公開していますが、サポートは行っていません。**
 
 ---
 
