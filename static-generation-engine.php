@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Carry Pod
- * Version: 1.4.1
+ * Version: 1.4.2
  * Description: WordPressサイトを静的化してデプロイするプラグイン
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // プラグインの定数を定義
-define( 'SGE_VERSION', '1.4.1' );
+define( 'SGE_VERSION', '1.4.2' );
 define( 'SGE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SGE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'SGE_PLUGIN_FILE', __FILE__ );
@@ -141,8 +141,10 @@ class Carry_Pod {
         }
 
         // Gitコマンドチェック（警告のみ）
-        exec( 'git --version 2>&1', $output, $return_var );
-        if ( $return_var !== 0 ) {
+        // ランタイムと同じホワイトリスト方式で検出
+        require_once SGE_PLUGIN_DIR . 'includes/class-generator.php';
+        $git_path = SGE_Generator::find_git_command();
+        if ( $git_path === false ) {
             set_transient( 'sge_git_warning', true, 30 );
         }
 

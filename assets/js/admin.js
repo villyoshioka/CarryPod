@@ -810,4 +810,21 @@ jQuery(document).ready(function($) {
             $('#sge-reset-commit-message').trigger('click');
         }
     }
+
+    // v2.0.0通知の無視ボタン処理（v1.4.2専用、v2.0.0で削除予定）
+    $(document).on('click', '.sge-v2-notification .notice-dismiss', function(e) {
+        e.preventDefault();
+
+        $.ajax({
+            url: sgeData.ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'sge_dismiss_v2_notification',
+                nonce: sgeData.nonce
+            },
+            success: function(response) {
+                // WordPress標準の処理で通知は既に非表示
+            }
+        });
+    });
 });

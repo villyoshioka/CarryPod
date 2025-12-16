@@ -167,6 +167,17 @@ class SGE_Settings {
             'gitlab_new_branch' => '',
             'gitlab_base_branch' => '',
             'gitlab_api_url' => 'https://gitlab.com/api/v4',
+            // ローカルGit設定
+            'git_local_enabled' => false,
+            'git_local_work_dir' => '',
+            'git_local_branch' => 'main',
+            'git_local_push_remote' => false,
+            // Netlify設定
+            'netlify_enabled' => false,
+            'netlify_api_token' => '',
+            'netlify_site_id' => '',
+            // ZIP出力パス
+            'zip_output_path' => '',
         );
 
         // デフォルト値とマージ（既存の設定を優先）

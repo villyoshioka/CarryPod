@@ -118,6 +118,18 @@ class SGE_Updater {
 
         $latest_version = ltrim( $release['tag_name'], 'v' );
 
+        // メジャーバージョンチェック（メジャーバージョンが異なる場合は自動更新を提供しない）
+        $current_parts = explode( '.', $current_version );
+        $latest_parts = explode( '.', $latest_version );
+        $current_major = isset( $current_parts[0] ) ? (int) $current_parts[0] : 0;
+        $latest_major = isset( $latest_parts[0] ) ? (int) $latest_parts[0] : 0;
+
+        if ( $current_major !== $latest_major ) {
+            // メジャーバージョンが異なる場合は自動更新を提供しない
+            // （v2.0.0通知機能が別途表示される）
+            return $transient;
+        }
+
         if ( version_compare( $current_version, $latest_version, '<' ) ) {
             $download_url = $this->get_download_url( $release );
 
@@ -283,6 +295,82 @@ class SGE_Updater {
         set_transient( $cache_key, $body, $this->cache_expiry );
 
         return $body;
+    }
+
+    /**
+     * v2.0.0リリース通知チェック（v1.4.2専用、v2.0.0で削除予定）
+     *
+     * v1.x系列のユーザーに対してv2.0.0リリースを通知する。
+     * 自動更新は行わず、手動ダウンロードを案内する。
+     *
+     * @return array|false v2.0.0以降のリリース情報、または見つからない場合はfalse
+     */
+    public function check_v2_release() {
+        // テスト用：強制的にv2.0.0が存在するように見せかける
+        // URLに &sge_test_v2=on を追加してテストモード有効化
+        // 無効化は &sge_test_v2=off
+        if ( get_transient( 'sge_test_v2_mode' ) ) {
+            return array(
+                'tag_name' => 'v2.0.0',
+                'html_url' => 'https://github.com/villyoshioka/CarryPod/releases/tag/v2.0.0',
+            );
+        }
+
+        // 既存のキャッシュをチェック（通常の更新チェックと同じタイミング）
+        $cached = get_transient( 'sge_v2_release_check' );
+        if ( $cached !== false ) {
+            return $cached;
+        }
+
+        // 全リリースを取得
+        $url = sprintf(
+            'https://api.github.com/repos/%s/%s/releases',
+            $this->github_owner,
+            $this->github_repo
+        );
+
+        $response = wp_remote_get( $url, array(
+            'timeout' => 10,
+            'headers' => array(
+                'Accept'     => 'application/vnd.github.v3+json',
+                'User-Agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url(),
+            ),
+        ) );
+
+        if ( is_wp_error( $response ) ) {
+            return false;
+        }
+
+        $status_code = wp_remote_retrieve_response_code( $response );
+        if ( $status_code !== 200 ) {
+            return false;
+        }
+
+        $releases = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $releases ) ) {
+            return false;
+        }
+
+        // v2.0.0以降のリリースを探す
+        foreach ( $releases as $release ) {
+            if ( ! isset( $release['tag_name'] ) ) {
+                continue;
+            }
+
+            $version = ltrim( $release['tag_name'], 'v' );
+
+            // v2.0.0以降かチェック（メジャーバージョンが2以上）
+            if ( version_compare( $version, '2.0.0', '>=' ) ) {
+                // キャッシュに保存（12時間）
+                set_transient( 'sge_v2_release_check', $release, $this->cache_expiry );
+                return $release;
+            }
+        }
+
+        // v2.0.0が見つからない場合はfalseをキャッシュ
+        set_transient( 'sge_v2_release_check', false, $this->cache_expiry );
+        return false;
     }
 
     /**

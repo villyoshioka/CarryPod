@@ -47,6 +47,7 @@ class SGE_Admin {
         add_action( 'wp_ajax_sge_cancel_generation', array( $this, 'ajax_cancel_generation' ) );
         add_action( 'wp_ajax_sge_reset_scheduler', array( $this, 'ajax_reset_scheduler' ) );
         add_action( 'wp_ajax_sge_check_error_notification', array( $this, 'ajax_check_error_notification' ) );
+        add_action( 'wp_ajax_sge_dismiss_v2_notification', array( $this, 'ajax_dismiss_v2_notification' ) );
     }
 
     /**
@@ -225,6 +226,37 @@ class SGE_Admin {
             </div>
             <?php endif; ?>
 
+            <?php
+            // v2.0.0リリース通知（v1.4.2専用機能、v2.0.0で削除予定）
+            // 管理者のみ表示
+            if ( current_user_can( 'manage_options' ) ) {
+                $user_id = get_current_user_id();
+                $dismissed = get_transient( 'sge_v2_notification_dismissed_' . $user_id );
+                if ( ! $dismissed ) {
+                    require_once SGE_PLUGIN_DIR . 'includes/class-updater.php';
+                    $updater = new SGE_Updater();
+                    $v2_release = $updater->check_v2_release();
+                    if ( $v2_release ) {
+                        $version = ltrim( $v2_release['tag_name'], 'v' );
+                        $release_url = esc_url( $v2_release['html_url'] );
+                        ?>
+                        <div class="notice notice-warning is-dismissible sge-v2-notification">
+                            <p>
+                                <strong>新しいメジャーバージョン v<?php echo esc_html( $version ); ?> がリリースされています。</strong>
+                                <a href="<?php echo $release_url; ?>" target="_blank" rel="noopener noreferrer">ダウンロードはこちら</a>
+                                <br>
+                                <span style="font-size: 0.9em; color: #646970;">
+                                    ※ 新バージョンへは自動更新できません。設定をエクスポート後、旧バージョンをアンインストールして新バージョンをインストールし、設定をインポートしてください。<br>
+                                    　 （注: セキュリティ上、APIトークンはインポートされません。再入力が必要です）
+                                </span>
+                            </p>
+                        </div>
+                        <?php
+                    }
+                }
+            }
+            ?>
+
             <div class="sge-dynamic-sections">
                 <div class="sge-execute-section">
                     <button type="button" id="sge-execute-button" class="button button-primary" <?php echo $is_running ? 'disabled' : ''; ?>>
@@ -302,6 +334,16 @@ class SGE_Admin {
         }
         $is_debug_mode = $logger->is_debug_mode();
 
+        // v2テストモードのURLパラメータ処理（v1.4.2専用、v2.0.0で削除予定）
+        if ( isset( $_GET['sge_test_v2'] ) ) {
+            $test_param = sanitize_text_field( wp_unslash( $_GET['sge_test_v2'] ) );
+            if ( $test_param === 'on' ) {
+                set_transient( 'sge_test_v2_mode', true, HOUR_IN_SECONDS );
+            } elseif ( $test_param === 'off' ) {
+                delete_transient( 'sge_test_v2_mode' );
+            }
+        }
+
         // ベータモードのURLパラメータ処理
         $beta_message = '';
         if ( isset( $_GET['sge_beta'] ) ) {
@@ -345,6 +387,37 @@ class SGE_Admin {
                 <p><strong>ベータモード</strong> - プレリリース版のアップデートが有効です。無効にするには <code>&sge_beta=off</code> を追加してください。</p>
             </div>
             <?php endif; ?>
+
+            <?php
+            // v2.0.0リリース通知（v1.4.2専用機能、v2.0.0で削除予定）
+            // 管理者のみ表示
+            if ( current_user_can( 'manage_options' ) ) {
+                $user_id = get_current_user_id();
+                $dismissed = get_transient( 'sge_v2_notification_dismissed_' . $user_id );
+                if ( ! $dismissed ) {
+                    require_once SGE_PLUGIN_DIR . 'includes/class-updater.php';
+                    $updater = new SGE_Updater();
+                    $v2_release = $updater->check_v2_release();
+                    if ( $v2_release ) {
+                        $version = ltrim( $v2_release['tag_name'], 'v' );
+                        $release_url = esc_url( $v2_release['html_url'] );
+                        ?>
+                        <div class="notice notice-warning is-dismissible sge-v2-notification">
+                            <p>
+                                <strong>新しいメジャーバージョン v<?php echo esc_html( $version ); ?> がリリースされています。</strong>
+                                <a href="<?php echo $release_url; ?>" target="_blank" rel="noopener noreferrer">ダウンロードはこちら</a>
+                                <br>
+                                <span style="font-size: 0.9em; color: #646970;">
+                                    ※ 新バージョンへは自動更新できません。設定をエクスポート後、旧バージョンをアンインストールして新バージョンをインストールし、設定をインポートしてください。<br>
+                                    　 （注: セキュリティ上、APIトークンはインポートされません。再入力が必要です）
+                                </span>
+                            </p>
+                        </div>
+                        <?php
+                    }
+                }
+            }
+            ?>
 
             <?php if ( $beta_message === 'need_password' ) : ?>
             <div class="notice notice-warning">
@@ -1607,5 +1680,24 @@ class SGE_Admin {
         }
 
         return $deleted_total;
+    }
+
+    /**
+     * Ajax: v2.0.0通知を無視
+     *
+     * v1.4.2専用機能、v2.0.0で削除予定
+     */
+    public function ajax_dismiss_v2_notification() {
+        check_ajax_referer( 'sge_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'sge_execute' ) ) {
+            wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        }
+
+        $user_id = get_current_user_id();
+        // 3日間非表示
+        set_transient( 'sge_v2_notification_dismissed_' . $user_id, true, 3 * DAY_IN_SECONDS );
+
+        wp_send_json_success( array( 'message' => '通知を非表示にしました。' ) );
     }
 }

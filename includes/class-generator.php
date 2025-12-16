@@ -2021,7 +2021,7 @@ class SGE_Generator {
         }
 
         // gitコマンドのパスを検出
-        $git_cmd = $this->find_git_command();
+        $git_cmd = self::find_git_command();
         if ( ! $git_cmd ) {
             $this->logger->add_log( 'エラー: gitコマンドが見つかりません', true );
             return;
@@ -2404,7 +2404,7 @@ class SGE_Generator {
      *
      * @return string|false gitコマンドのフルパス、見つからない場合はfalse
      */
-    private function find_git_command() {
+    public static function find_git_command() {
         // ホワイトリスト: 許可されたgitコマンドのパス
         $allowed_paths = array(
             '/usr/bin/git',
