@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class SGE_Cloudflare_Workers {
+class CP_Cloudflare_Workers {
 
     /**
      * Cloudflare APIトークン
@@ -59,7 +59,7 @@ class SGE_Cloudflare_Workers {
         $this->api_token = $api_token;
         $this->account_id = $account_id;
         $this->script_name = $script_name;
-        $this->logger = SGE_Logger::get_instance();
+        $this->logger = CP_Logger::get_instance();
     }
 
     /**

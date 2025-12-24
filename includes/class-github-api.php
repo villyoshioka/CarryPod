@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class SGE_GitHub_API {
+class CP_GitHub_API {
 
     /**
      * GitHubアクセストークン
@@ -40,7 +40,7 @@ class SGE_GitHub_API {
         $this->token = $token;
         $this->repo = $repo;
         $this->branch = $branch;
-        $this->logger = SGE_Logger::get_instance();
+        $this->logger = CP_Logger::get_instance();
     }
 
     /**
@@ -714,7 +714,7 @@ class SGE_GitHub_API {
                     'headers' => array(
                         'Authorization' => 'token ' . $this->token,
                         'Accept' => 'application/vnd.github.v3+json',
-                        'User-Agent' => 'Carry-Pod/' . SGE_VERSION,
+                        'User-Agent' => 'Carry-Pod/' . CP_VERSION,
                         'Content-Type' => 'application/json',
                     ),
                     'data' => wp_json_encode( array(
@@ -1224,7 +1224,7 @@ class SGE_GitHub_API {
             'headers' => array(
                 'Authorization' => 'token ' . $this->token,
                 'Accept' => 'application/vnd.github.v3+json',
-                'User-Agent' => 'Carry-Pod/' . SGE_VERSION,
+                'User-Agent' => 'Carry-Pod/' . CP_VERSION,
             ),
             'timeout' => 300, // 大量のファイル処理に対応（5分）
         );

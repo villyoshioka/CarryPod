@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-interface SGE_Git_Provider_Interface {
+interface CP_Git_Provider_Interface {
 
     /**
      * リポジトリが存在するかチェック

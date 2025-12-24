@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Carry Pod
- * Version: 1.4.2
+ * Version: 2.0.0
  * Description: WordPressサイトを静的化してデプロイするプラグイン
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -17,14 +17,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // プラグインの定数を定義
-define( 'SGE_VERSION', '1.4.2' );
-define( 'SGE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
-define( 'SGE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SGE_PLUGIN_FILE', __FILE__ );
+define( 'CP_VERSION', '2.0.0' );
+define( 'CP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'CP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'CP_PLUGIN_FILE', __FILE__ );
 
 // Action Schedulerを先に読み込み（他のプラグインより前に読み込む必要がある）
-if ( file_exists( SGE_PLUGIN_DIR . 'lib/action-scheduler/action-scheduler.php' ) ) {
-    require_once SGE_PLUGIN_DIR . 'lib/action-scheduler/action-scheduler.php';
+if ( file_exists( CP_PLUGIN_DIR . 'lib/action-scheduler/action-scheduler.php' ) ) {
+    require_once CP_PLUGIN_DIR . 'lib/action-scheduler/action-scheduler.php';
 }
 
 /**
@@ -61,19 +61,19 @@ class Carry_Pod {
      */
     private function load_dependencies() {
         // クラスファイルを読み込み
-        require_once SGE_PLUGIN_DIR . 'includes/class-logger.php';
-        require_once SGE_PLUGIN_DIR . 'includes/class-settings.php';
-        require_once SGE_PLUGIN_DIR . 'includes/class-cache.php';
-        require_once SGE_PLUGIN_DIR . 'includes/interface-git-provider.php';
-        require_once SGE_PLUGIN_DIR . 'includes/class-github-api.php';
-        require_once SGE_PLUGIN_DIR . 'includes/class-gitlab-api.php';
-        require_once SGE_PLUGIN_DIR . 'includes/class-parallel-crawler.php';
-        require_once SGE_PLUGIN_DIR . 'includes/class-asset-detector.php';
-        require_once SGE_PLUGIN_DIR . 'includes/class-generator.php';
-        require_once SGE_PLUGIN_DIR . 'includes/class-cloudflare-workers.php';
-        require_once SGE_PLUGIN_DIR . 'includes/class-netlify-api.php';
-        require_once SGE_PLUGIN_DIR . 'includes/class-admin.php';
-        require_once SGE_PLUGIN_DIR . 'includes/class-updater.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-logger.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-settings.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-cache.php';
+        require_once CP_PLUGIN_DIR . 'includes/interface-git-provider.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-github-api.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-gitlab-api.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-parallel-crawler.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-asset-detector.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-generator.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-cloudflare-workers.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-netlify-api.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-admin.php';
+        require_once CP_PLUGIN_DIR . 'includes/class-updater.php';
     }
 
     /**
@@ -81,21 +81,21 @@ class Carry_Pod {
      */
     private function init_hooks() {
         // 有効化/無効化フック
-        register_activation_hook( SGE_PLUGIN_FILE, array( $this, 'activate' ) );
-        register_deactivation_hook( SGE_PLUGIN_FILE, array( $this, 'deactivate' ) );
+        register_activation_hook( CP_PLUGIN_FILE, array( $this, 'activate' ) );
+        register_deactivation_hook( CP_PLUGIN_FILE, array( $this, 'deactivate' ) );
 
         // プラグイン削除時のフック
-        register_uninstall_hook( SGE_PLUGIN_FILE, array( 'Carry_Pod', 'uninstall' ) );
+        register_uninstall_hook( CP_PLUGIN_FILE, array( 'Carry_Pod', 'uninstall' ) );
 
         // 管理画面を初期化
         if ( is_admin() ) {
             // 権限が未登録の場合は登録
             add_action( 'admin_init', array( $this, 'ensure_capabilities' ) );
-            SGE_Admin::get_instance();
+            CP_Admin::get_instance();
         }
 
         // 自動更新を初期化
-        new SGE_Updater();
+        new CP_Updater();
 
         // Action Schedulerが初期化された後にフック登録
         add_action( 'action_scheduler_init', array( $this, 'init_action_scheduler_hooks' ) );
@@ -110,7 +110,7 @@ class Carry_Pod {
         add_action( 'transition_post_status', array( $this, 'auto_generate_on_post_change' ), 10, 3 );
 
         // Action Schedulerアクション
-        add_action( 'sge_static_generation', array( $this, 'process_static_generation' ) );
+        add_action( 'cp_static_generation', array( $this, 'process_static_generation' ) );
 
         // Action Scheduler時間制限の延長（タイムアウト対策）
         add_filter( 'action_scheduler_queue_runner_time_limit', array( $this, 'extend_action_scheduler_time_limit' ) );
@@ -125,27 +125,27 @@ class Carry_Pod {
         // WordPressバージョンチェック
         global $wp_version;
         if ( version_compare( $wp_version, '6.0', '<' ) ) {
-            deactivate_plugins( plugin_basename( SGE_PLUGIN_FILE ) );
+            deactivate_plugins( plugin_basename( CP_PLUGIN_FILE ) );
             wp_die( 'このプラグインにはWordPress 6.0以上が必要です。' );
         }
 
         // PHPバージョンチェック
         if ( version_compare( PHP_VERSION, '7.4', '<' ) ) {
-            deactivate_plugins( plugin_basename( SGE_PLUGIN_FILE ) );
+            deactivate_plugins( plugin_basename( CP_PLUGIN_FILE ) );
             wp_die( 'このプラグインにはPHP 7.4以上が必要です。' );
         }
 
         // WP2static / Simply Static競合チェック（警告のみ）
         if ( is_plugin_active( 'wp2static/wp2static.php' ) || is_plugin_active( 'simply-static/simply-static.php' ) ) {
-            set_transient( 'sge_plugin_conflict_warning', true, 30 );
+            set_transient( 'cp_plugin_conflict_warning', true, 30 );
         }
 
         // Gitコマンドチェック（警告のみ）
         // ランタイムと同じホワイトリスト方式で検出
-        require_once SGE_PLUGIN_DIR . 'includes/class-generator.php';
-        $git_path = SGE_Generator::find_git_command();
+        require_once CP_PLUGIN_DIR . 'includes/class-generator.php';
+        $git_path = CP_Generator::find_git_command();
         if ( $git_path === false ) {
-            set_transient( 'sge_git_warning', true, 30 );
+            set_transient( 'cp_git_warning', true, 30 );
         }
 
         // カスタム権限を登録
@@ -153,7 +153,7 @@ class Carry_Pod {
 
         // デフォルト設定を保存
         $default_settings = array(
-            'version' => SGE_VERSION,
+            'version' => CP_VERSION,
             'github_enabled' => false,
             'local_enabled' => false,
             'github_token' => '',
@@ -183,13 +183,13 @@ class Carry_Pod {
             'enable_rss' => true,
         );
 
-        if ( ! get_option( 'sge_settings' ) ) {
-            add_option( 'sge_settings', $default_settings );
+        if ( ! get_option( 'cp_settings' ) ) {
+            add_option( 'cp_settings', $default_settings );
         }
 
         // ログテーブル用オプションを初期化
-        if ( ! get_option( 'sge_logs' ) ) {
-            add_option( 'sge_logs', array() );
+        if ( ! get_option( 'cp_logs' ) ) {
+            add_option( 'cp_logs', array() );
         }
     }
 
@@ -200,14 +200,14 @@ class Carry_Pod {
         // 管理者: 両方の権限
         $admin = get_role( 'administrator' );
         if ( $admin ) {
-            $admin->add_cap( 'sge_execute' );
-            $admin->add_cap( 'sge_manage_settings' );
+            $admin->add_cap( 'cp_execute' );
+            $admin->add_cap( 'cp_manage_settings' );
         }
 
         // 編集者: 実行権限のみ
         $editor = get_role( 'editor' );
         if ( $editor ) {
-            $editor->add_cap( 'sge_execute' );
+            $editor->add_cap( 'cp_execute' );
         }
     }
 
@@ -216,7 +216,7 @@ class Carry_Pod {
      */
     public function ensure_capabilities() {
         $admin = get_role( 'administrator' );
-        if ( $admin && ! $admin->has_cap( 'sge_execute' ) ) {
+        if ( $admin && ! $admin->has_cap( 'cp_execute' ) ) {
             $this->register_capabilities();
         }
     }
@@ -226,7 +226,7 @@ class Carry_Pod {
      */
     private function remove_capabilities() {
         $roles = array( 'administrator', 'editor' );
-        $caps = array( 'sge_execute', 'sge_manage_settings' );
+        $caps = array( 'cp_execute', 'cp_manage_settings' );
 
         foreach ( $roles as $role_name ) {
             $role = get_role( $role_name );
@@ -252,12 +252,12 @@ class Carry_Pod {
      */
     public static function uninstall() {
         // 設定データ削除
-        delete_option( 'sge_settings' );
-        delete_option( 'sge_logs' );
+        delete_option( 'cp_settings' );
+        delete_option( 'cp_logs' );
 
         // カスタム権限を削除
         $roles = array( 'administrator', 'editor' );
-        $caps = array( 'sge_execute', 'sge_manage_settings' );
+        $caps = array( 'cp_execute', 'cp_manage_settings' );
         foreach ( $roles as $role_name ) {
             $role = get_role( $role_name );
             if ( $role ) {
@@ -269,7 +269,7 @@ class Carry_Pod {
 
         // Action Schedulerのタスク削除
         if ( function_exists( 'as_unschedule_all_actions' ) ) {
-            as_unschedule_all_actions( 'sge_static_generation', array(), 'sge' );
+            as_unschedule_all_actions( 'cp_static_generation', array(), 'cp' );
         }
     }
 
@@ -278,7 +278,7 @@ class Carry_Pod {
      */
     public function auto_generate_on_post_change( $new_status, $old_status, $post ) {
         // 自動実行が無効なら何もしない
-        $settings = get_option( 'sge_settings', array() );
+        $settings = get_option( 'cp_settings', array() );
         if ( empty( $settings['auto_generate'] ) ) {
             return;
         }
@@ -293,19 +293,27 @@ class Carry_Pod {
         $trigger_statuses = array( 'publish', 'trash', 'draft', 'private' );
         if ( in_array( $new_status, $trigger_statuses ) || in_array( $old_status, $trigger_statuses ) ) {
             // 手動実行中フラグをチェック
-            if ( get_transient( 'sge_manual_running' ) ) {
+            if ( get_transient( 'cp_manual_running' ) ) {
                 return; // 手動実行中は自動実行しない
             }
 
             // 既存の未実行/実行中タスクをキャンセル
-            as_unschedule_all_actions( 'sge_static_generation', array(), 'sge' );
+            as_unschedule_all_actions( 'cp_static_generation', array(), 'cp' );
 
             // ログと進捗情報をクリア
-            update_option( 'sge_logs', array() );
-            delete_option( 'sge_progress' );
+            update_option( 'cp_logs', array() );
+            delete_option( 'cp_progress' );
+
+            // 実行中フラグをセット
+            set_transient( 'cp_auto_running', true, 3600 );
+
+            // 初期ログを記録
+            $logger = CP_Logger::get_instance();
+            $logger->add_log( '自動生成を開始します...' );
+            $logger->update_progress( 0, 1, 'バックグラウンド処理を待機中...' );
 
             // 新しいタスクをスケジュール
-            as_enqueue_async_action( 'sge_static_generation', array(), 'sge' );
+            as_enqueue_async_action( 'cp_static_generation', array(), 'cp' );
         }
     }
 
@@ -314,7 +322,7 @@ class Carry_Pod {
      */
     public function process_static_generation() {
         // 静的化処理を実行
-        $generator = new SGE_Generator();
+        $generator = new CP_Generator();
         $generator->generate();
     }
 
@@ -356,25 +364,18 @@ class Carry_Pod {
 
     /**
      * プラグイン更新時の処理
+     * v2.x系同士のマイナーアップデート対応用
      */
     public function on_plugin_loaded() {
-        $current_version = get_option( 'sge_version', '0.0.0' );
+        $current_version = get_option( 'cp_version', '0.0.0' );
 
-        if ( version_compare( $current_version, '1.4.0', '<' ) ) {
-            // 1.4.0へのアップグレード処理
-            $this->upgrade_to_1_4_0();
-            update_option( 'sge_version', '1.4.0' );
+        // 将来のバージョンアップ時に必要な処理をここに追加
+        // 例: if ( version_compare( $current_version, '2.1.0', '<' ) ) { ... }
+
+        // 現在のバージョンを記録
+        if ( version_compare( $current_version, CP_VERSION, '<' ) ) {
+            update_option( 'cp_version', CP_VERSION );
         }
-    }
-
-    /**
-     * 1.4.0へのアップグレード
-     */
-    private function upgrade_to_1_4_0() {
-        // 古いエラー通知をクリア
-        delete_option( 'sge_error_notification' );
-
-        // 必要に応じて他の初期化処理
     }
 }
 

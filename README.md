@@ -5,7 +5,7 @@
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue.svg)](https://www.php.net/)
-[![Version](https://img.shields.io/badge/Version-1.4.2-green.svg)](https://github.com/villyoshioka/CarryPod/releases)
+[![Version](https://img.shields.io/badge/Version-2.0.0-green.svg)](https://github.com/villyoshioka/CarryPod/releases)
 
 > **注意**: **このプラグインについて、コードは公開していますが、サポートは行っていません。**
 
@@ -18,9 +18,9 @@ WordPress で作ったサイトを、静的な HTML や CSS などのファイ�
 ### 主な機能
 
 - WordPress のページや記事を HTML ファイルに変換
-- 画像や CSS なども一緒に出力
-- 変更部分だけ更新する差分検出機能（GitHub / GitLab）
+- GitHub / GitLab / Cloudflare Workers / Netlify など複数の出力先に対応
 - 自動静的化機能
+- wp-includes / wp-content を任意の名称に変更可能
 
 ### 出力先
 
@@ -43,17 +43,19 @@ WordPress で作ったサイトを、静的な HTML や CSS などのファイ�
 3. ダウンロードした ZIP ファイルを選択してインストール
 4. 「有効化」をクリック
 
-### アップグレード（v1.2.0 以前からの場合）
+### v2.0.0へのアップグレード
 
-v1.2.0 以前のバージョンからは自動更新が正しく動作しない場合があります。その場合は以下の手順で手動アップグレードしてください：
+**重要**: v2.0.0は内部名称を大幅に変更した破壊的変更を含むため、v1.x系からの自動アップデートは提供しません。以下の手順で手動アップグレードしてください：
 
-1. 既存のプラグインを無効化（削除は不要）
-2. [Releases](https://github.com/villyoshioka/CarryPod/releases) から最新の ZIP ファイルをダウンロード
-3. 「プラグイン」→「新規追加」→「プラグインのアップロード」で ZIP をアップロード
-4. 「今すぐインストール」→「既存のプラグインと置き換える」を選択
-5. 「有効化」をクリック
+1. **設定のエクスポート**: 現在の設定を「設定のエクスポート」機能でバックアップ
+2. 既存のプラグインを無効化して削除
+3. [Releases](https://github.com/villyoshioka/CarryPod/releases) から v2.0.0 の ZIP ファイルをダウンロード
+4. 「プラグイン」→「新規追加」→「プラグインのアップロード」で ZIP をアップロード
+5. 「今すぐインストール」を選択
+6. 「有効化」をクリック
+7. **設定のインポート**: バックアップした設定をインポート
 
-v1.3.1 以降は自動更新が正常に動作します。
+v2.0.0以降は自動更新が利用できます。
 
 ---
 
@@ -61,9 +63,10 @@ v1.3.1 以降は自動更新が正常に動作します。
 
 プラグインを有効化すると、WordPress 管理画面に「Carry Pod」メニューが追加されます。
 
-1. **設定画面**で出力先を選択します。（GitHub / GitLab / Cloudflare Workers / Netlify / ローカル Git / ZIP / ディレクトリ）
-2. **実行画面**で「静的化を実行」ボタンをクリックします。
-3. 進捗を確認しながら完了を待ちます。結構時間がかかる場合がありますので、その間に水羊羹でもどうぞ。
+1. **設定画面**で出力先を選択します（GitHub / GitLab / Cloudflare Workers / Netlify / ローカル Git / ZIP / ディレクトリ）
+2. 必要に応じて、カスタムフォルダ名、追加・除外ファイル、URL形式などの設定を行います
+3. **実行画面**で「静的化を実行」ボタンをクリックします
+4. 進捗を確認しながら完了を待ちます（時間がかかる場合がありますので、その間に桜餅でもどうぞ）
 
 ### デバッグモード
 
@@ -71,13 +74,11 @@ v1.3.1 以降は自動更新が正常に動作します。
 
 ---
 
-## 使用ライブラリ
-
-- [Action Scheduler](https://actionscheduler.org/)（GPLv3）- バックグラウンド処理に使用
-
-## ライセンス
+## ライセンスと使用モジュール
 
 このプラグインは GPLv3 ライセンスで公開されています。[WP2Static](https://github.com/elementor/wp2static)（Unlicense）からインスパイアされ開発されました。
+
+バックグラウンド処理には [Action Scheduler](https://actionscheduler.org/)（GPLv3）を使用しています。
 
 ---
 
@@ -85,8 +86,8 @@ v1.3.1 以降は自動更新が正常に動作します。
 
 このプラグインは WordPress サイトを静的ファイルに変換する機能のみを提供します。
 
-- ユーザーデータの収集・解析は行っていません
-- トラッキング機能は含まれていません
+- ユーザーデータの収集・解析なし
+- トラッキング機能なし
 
 ---
 

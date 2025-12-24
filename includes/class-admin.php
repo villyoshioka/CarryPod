@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class SGE_Admin {
+class CP_Admin {
 
     /**
      * シングルトンインスタンス
@@ -34,20 +34,19 @@ class SGE_Admin {
         add_action( 'admin_init', array( $this, 'add_security_headers' ) );
 
         // Ajax処理
-        add_action( 'wp_ajax_sge_execute_generation', array( $this, 'ajax_execute_generation' ) );
-        add_action( 'wp_ajax_sge_get_logs', array( $this, 'ajax_get_logs' ) );
-        add_action( 'wp_ajax_sge_get_progress', array( $this, 'ajax_get_progress' ) );
-        add_action( 'wp_ajax_sge_clear_logs', array( $this, 'ajax_clear_logs' ) );
-        add_action( 'wp_ajax_sge_save_settings', array( $this, 'ajax_save_settings' ) );
-        add_action( 'wp_ajax_sge_reset_settings', array( $this, 'ajax_reset_settings' ) );
-        add_action( 'wp_ajax_sge_export_settings', array( $this, 'ajax_export_settings' ) );
-        add_action( 'wp_ajax_sge_import_settings', array( $this, 'ajax_import_settings' ) );
-        add_action( 'wp_ajax_sge_clear_cache', array( $this, 'ajax_clear_cache' ) );
-        add_action( 'wp_ajax_sge_download_log', array( $this, 'ajax_download_log' ) );
-        add_action( 'wp_ajax_sge_cancel_generation', array( $this, 'ajax_cancel_generation' ) );
-        add_action( 'wp_ajax_sge_reset_scheduler', array( $this, 'ajax_reset_scheduler' ) );
-        add_action( 'wp_ajax_sge_check_error_notification', array( $this, 'ajax_check_error_notification' ) );
-        add_action( 'wp_ajax_sge_dismiss_v2_notification', array( $this, 'ajax_dismiss_v2_notification' ) );
+        add_action( 'wp_ajax_cp_execute_generation', array( $this, 'ajax_execute_generation' ) );
+        add_action( 'wp_ajax_cp_get_logs', array( $this, 'ajax_get_logs' ) );
+        add_action( 'wp_ajax_cp_get_progress', array( $this, 'ajax_get_progress' ) );
+        add_action( 'wp_ajax_cp_clear_logs', array( $this, 'ajax_clear_logs' ) );
+        add_action( 'wp_ajax_cp_save_settings', array( $this, 'ajax_save_settings' ) );
+        add_action( 'wp_ajax_cp_reset_settings', array( $this, 'ajax_reset_settings' ) );
+        add_action( 'wp_ajax_cp_export_settings', array( $this, 'ajax_export_settings' ) );
+        add_action( 'wp_ajax_cp_import_settings', array( $this, 'ajax_import_settings' ) );
+        add_action( 'wp_ajax_cp_clear_cache', array( $this, 'ajax_clear_cache' ) );
+        add_action( 'wp_ajax_cp_download_log', array( $this, 'ajax_download_log' ) );
+        add_action( 'wp_ajax_cp_cancel_generation', array( $this, 'ajax_cancel_generation' ) );
+        add_action( 'wp_ajax_cp_reset_scheduler', array( $this, 'ajax_reset_scheduler' ) );
+        add_action( 'wp_ajax_cp_check_error_notification', array( $this, 'ajax_check_error_notification' ) );
     }
 
     /**
@@ -56,7 +55,7 @@ class SGE_Admin {
     public function add_admin_menu() {
         // エラー通知バッジ
         $menu_title = 'Carry Pod';
-        $error_notification = get_option( 'sge_error_notification', false );
+        $error_notification = get_option( 'cp_error_notification', false );
         if ( $error_notification && ! empty( $error_notification['count'] ) ) {
             $menu_title .= ' <span class="awaiting-mod">1</span>';
         }
@@ -65,29 +64,29 @@ class SGE_Admin {
         add_menu_page(
             'Carry Pod',
             $menu_title,
-            'sge_execute',
-            'static-generation-engine',
+            'cp_execute',
+            'carry-pod',
             array( $this, 'render_execute_page' ),
             'dashicons-download',
             4
         );
 
         add_submenu_page(
-            'static-generation-engine',
+            'carry-pod',
             '実行',
             '実行',
-            'sge_execute',
-            'static-generation-engine',
+            'cp_execute',
+            'carry-pod',
             array( $this, 'render_execute_page' )
         );
 
         // 設定ページは管理権限が必要
         add_submenu_page(
-            'static-generation-engine',
+            'carry-pod',
             '設定',
             '設定',
-            'sge_manage_settings',
-            'static-generation-engine-settings',
+            'cp_manage_settings',
+            'carry-pod-settings',
             array( $this, 'render_settings_page' )
         );
     }
@@ -98,49 +97,19 @@ class SGE_Admin {
     public function enqueue_scripts( $hook ) {
         // 実行ページまたは設定ページでのみ読み込む
         // 設定ページのフック名は環境によって変動するため、両方に対応
-        if ( $hook !== 'toplevel_page_static-generation-engine'
-             && $hook !== 'carry-pod_page_static-generation-engine-settings'
-             && $hook !== 'carry-pod-1_page_static-generation-engine-settings' ) {
+        if ( $hook !== 'toplevel_page_carry-pod'
+             && $hook !== 'carry-pod_page_carry-pod-settings'
+             && $hook !== 'carry-pod-1_page_carry-pod-settings' ) {
             return;
         }
 
-        wp_enqueue_style( 'sge-admin-css', SGE_PLUGIN_URL . 'assets/css/admin.css', array(), SGE_VERSION . '.' . filemtime( SGE_PLUGIN_DIR . 'assets/css/admin.css' ) );
-        wp_enqueue_script( 'sge-admin-js', SGE_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery' ), SGE_VERSION . '.' . filemtime( SGE_PLUGIN_DIR . 'assets/js/admin.js' ), true );
-
-        // ユーザーのカラースキームを取得
-        $admin_color = get_user_option( 'admin_color' );
-        if ( ! $admin_color ) {
-            $admin_color = 'fresh'; // デフォルト
-        }
-
-        // カラースキームごとのテーマカラーを定義
-        $color_schemes = array(
-            'fresh'      => '#2271b1',
-            'light'      => '#0085ba',
-            'blue'       => '#096484',
-            'coffee'     => '#59524c',
-            'ectoplasm'  => '#a3b745',
-            'midnight'   => '#e14d43',
-            'ocean'      => '#627c83',
-            'sunrise'    => '#dd823b',
-            'modern'     => '#3858e9',
-        );
-
-        // 選択されたカラースキームの色を取得
-        $theme_color = isset( $color_schemes[ $admin_color ] ) ? $color_schemes[ $admin_color ] : $color_schemes['fresh'];
-
-        // CSS変数を定義するインラインスタイルを追加
-        $custom_css = "
-            .sge-admin-wrap {
-                --wp-admin-theme-color: {$theme_color};
-            }
-        ";
-        wp_add_inline_style( 'sge-admin-css', $custom_css );
+        wp_enqueue_style( 'cp-admin-css', CP_PLUGIN_URL . 'assets/css/admin.css', array(), CP_VERSION . '.' . filemtime( CP_PLUGIN_DIR . 'assets/css/admin.css' ) );
+        wp_enqueue_script( 'cp-admin-js', CP_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery' ), CP_VERSION . '.' . filemtime( CP_PLUGIN_DIR . 'assets/js/admin.js' ), true );
 
         // JavaScriptに渡すデータ
-        wp_localize_script( 'sge-admin-js', 'sgeData', array(
+        wp_localize_script( 'cp-admin-js', 'sgeData', array(
             'ajaxurl' => admin_url( 'admin-ajax.php' ),
-            'nonce' => wp_create_nonce( 'sge_nonce' ),
+            'nonce' => wp_create_nonce( 'cp_nonce' ),
         ) );
     }
 
@@ -149,15 +118,15 @@ class SGE_Admin {
      */
     public function show_notices() {
         // プラグイン競合警告
-        if ( get_transient( 'sge_plugin_conflict_warning' ) ) {
+        if ( get_transient( 'cp_plugin_conflict_warning' ) ) {
             echo '<div class="notice notice-warning is-dismissible"><p>WP2staticまたはSimply Staticと競合する可能性があります。</p></div>';
-            delete_transient( 'sge_plugin_conflict_warning' );
+            delete_transient( 'cp_plugin_conflict_warning' );
         }
 
         // Git警告
-        if ( get_transient( 'sge_git_warning' ) ) {
+        if ( get_transient( 'cp_git_warning' ) ) {
             echo '<div class="notice notice-warning is-dismissible"><p>Gitコマンドが見つかりません。ローカルGit経由でのGitHub出力を使用する場合はGitをインストールしてください。</p></div>';
-            delete_transient( 'sge_git_warning' );
+            delete_transient( 'cp_git_warning' );
         }
     }
 
@@ -165,11 +134,11 @@ class SGE_Admin {
      * 実行画面を表示
      */
     public function render_execute_page() {
-        if ( ! current_user_can( 'sge_execute' ) ) {
+        if ( ! current_user_can( 'cp_execute' ) ) {
             wp_die( '静的化実行の権限がありません。' );
         }
 
-        $settings_manager = SGE_Settings::get_instance();
+        $settings_manager = CP_Settings::get_instance();
         $settings = $settings_manager->get_settings();
 
         // コミットメッセージが空の場合は現在時刻で初期化
@@ -177,7 +146,7 @@ class SGE_Admin {
             $settings['commit_message'] = 'update:' . current_time( 'Ymd_His' );
         }
 
-        $logger = SGE_Logger::get_instance();
+        $logger = CP_Logger::get_instance();
         $is_running = $logger->is_running();
 
         // 実行中でない場合は進捗をリセット
@@ -200,15 +169,15 @@ class SGE_Admin {
         $is_beta_mode = $settings_manager->is_beta_mode_enabled();
 
         ?>
-        <div class="wrap sge-admin-wrap">
+        <div class="wrap cp-admin-wrap">
             <h1>静的化の実行</h1>
 
             <?php
             // エラー通知を表示
-            $error_notification = get_option( 'sge_error_notification', false );
+            $error_notification = get_option( 'cp_error_notification', false );
             if ( $error_notification && ! empty( $error_notification['count'] ) ) {
                 $count = intval( $error_notification['count'] );
-                echo '<div class="notice notice-error is-dismissible sge-error-notification">';
+                echo '<div class="notice notice-error is-dismissible cp-error-notification">';
                 echo '<p><strong>静的化中に' . $count . '件エラーが発生しました。最新のログをダウンロードして確認してください。</strong></p>';
                 echo '</div>';
             }
@@ -222,83 +191,52 @@ class SGE_Admin {
 
             <?php if ( $is_beta_mode ) : ?>
             <div class="notice notice-info">
-                <p><strong>ベータモード</strong> - プレリリース版のアップデートが有効です。無効にするには <code>&sge_beta=off</code> を追加してください。</p>
+                <p><strong>ベータモード</strong> - プレリリース版のアップデートが有効です。無効にするには <code>&cp_beta=off</code> を追加してください。</p>
             </div>
             <?php endif; ?>
 
-            <?php
-            // v2.0.0リリース通知（v1.4.2専用機能、v2.0.0で削除予定）
-            // 管理者のみ表示
-            if ( current_user_can( 'manage_options' ) ) {
-                $user_id = get_current_user_id();
-                $dismissed = get_transient( 'sge_v2_notification_dismissed_' . $user_id );
-                if ( ! $dismissed ) {
-                    require_once SGE_PLUGIN_DIR . 'includes/class-updater.php';
-                    $updater = new SGE_Updater();
-                    $v2_release = $updater->check_v2_release();
-                    if ( $v2_release ) {
-                        $version = ltrim( $v2_release['tag_name'], 'v' );
-                        $release_url = esc_url( $v2_release['html_url'] );
-                        ?>
-                        <div class="notice notice-warning is-dismissible sge-v2-notification">
-                            <p>
-                                <strong>新しいメジャーバージョン v<?php echo esc_html( $version ); ?> がリリースされています。</strong>
-                                <a href="<?php echo $release_url; ?>" target="_blank" rel="noopener noreferrer">ダウンロードはこちら</a>
-                                <br>
-                                <span style="font-size: 0.9em; color: #646970;">
-                                    ※ 新バージョンへは自動更新できません。設定をエクスポート後、旧バージョンをアンインストールして新バージョンをインストールし、設定をインポートしてください。<br>
-                                    　 （注: セキュリティ上、APIトークンはインポートされません。再入力が必要です）
-                                </span>
-                            </p>
-                        </div>
-                        <?php
-                    }
-                }
-            }
-            ?>
-
-            <div class="sge-dynamic-sections">
-                <div class="sge-execute-section">
-                    <button type="button" id="sge-execute-button" class="button button-primary" <?php echo $is_running ? 'disabled' : ''; ?>>
+            <div class="cp-dynamic-sections">
+                <div class="cp-execute-section">
+                    <button type="button" id="cp-execute-button" class="button button-primary" <?php echo $is_running ? 'disabled' : ''; ?>>
                         <?php echo $is_running ? '静的化中...' : '静的化を実行'; ?>
                     </button>
-                    <button type="button" id="sge-cancel-button" class="button" <?php echo ! $is_running ? 'disabled' : ''; ?> style="<?php echo ! $is_running ? 'display:none;' : ''; ?>">
+                    <button type="button" id="cp-cancel-button" class="button" <?php echo ! $is_running ? 'disabled' : ''; ?> style="<?php echo ! $is_running ? 'display:none;' : ''; ?>">
                         実行中止
                     </button>
                 </div>
 
-                <div class="sge-commit-section <?php echo ( ! empty( $settings['github_enabled'] ) || ! empty( $settings['git_local_enabled'] ) ) ? 'active' : ''; ?>">
+                <div class="cp-commit-section <?php echo ( ! empty( $settings['github_enabled'] ) || ! empty( $settings['git_local_enabled'] ) ) ? 'active' : ''; ?>">
                     <h3>コミットメッセージ</h3>
-                    <div class="sge-section-content">
-                        <div class="sge-form-group">
-                            <div class="sge-commit-container">
-                                <input type="text" id="sge-commit-message" class="regular-text" value="<?php echo esc_attr( ! empty( $settings['commit_message'] ) ? $settings['commit_message'] : 'update:' . current_time( 'Ymd_His' ) ); ?>" placeholder="コミットメッセージを入力">
-                                <button type="button" id="sge-reset-commit-message" class="button">リセット</button>
+                    <div class="cp-section-content">
+                        <div class="cp-form-group">
+                            <div class="cp-commit-container">
+                                <input type="text" id="cp-commit-message" class="regular-text" value="<?php echo esc_attr( ! empty( $settings['commit_message'] ) ? $settings['commit_message'] : 'update:' . current_time( 'Ymd_His' ) ); ?>" placeholder="コミットメッセージを入力">
+                                <button type="button" id="cp-reset-commit-message" class="button">リセット</button>
                             </div>
-                            <p class="description">デフォルト形式: update:YYYYMMDD_HHMMSS</p>
+                            <p class="description">デフォルト形式: update:YYYYMMDD_HHMMSS（例: update:20241225_143052）<br>分かりやすいメッセージにすることで、後から履歴を見返す時に何の更新だったか分かりやすくなります</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="sge-progress-section">
+                <div class="cp-progress-section">
                     <h3>進捗状況</h3>
-                    <div class="sge-progress-container">
-                        <div class="sge-progress-header">
-                            <div class="sge-progress-bar-wrapper">
-                                <div id="sge-progress-bar" class="sge-progress-bar" style="width: 0%"></div>
+                    <div class="cp-progress-container">
+                        <div class="cp-progress-header">
+                            <div class="cp-progress-bar-wrapper">
+                                <div id="cp-progress-bar" class="cp-progress-bar" style="width: 0%"></div>
                             </div>
-                            <span id="sge-progress-percentage" class="sge-progress-percentage">0%</span>
+                            <span id="cp-progress-percentage" class="cp-progress-percentage">0%</span>
                         </div>
-                        <div id="sge-progress-status" class="sge-progress-status">待機中...</div>
+                        <div id="cp-progress-status" class="cp-progress-status">待機中...</div>
                         <div style="margin-top: 15px;">
-                            <button type="button" id="sge-download-log" class="button" <?php echo $is_running ? 'disabled' : ''; ?>>最新のログをダウンロード</button>
+                            <button type="button" id="cp-download-log" class="button" <?php echo $is_running ? 'disabled' : ''; ?>>最新のログをダウンロード</button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="sge-version-info">
-                Carry Pod <a href="https://github.com/villyoshioka/CarryPod/releases/tag/v<?php echo esc_attr( SGE_VERSION ); ?>" target="_blank" rel="noopener noreferrer">v<?php echo esc_html( SGE_VERSION ); ?></a>
+            <div class="cp-version-info">
+                Carry Pod <a href="https://github.com/villyoshioka/CarryPod/releases/tag/v<?php echo esc_attr( CP_VERSION ); ?>" target="_blank" rel="noopener noreferrer">v<?php echo esc_html( CP_VERSION ); ?></a>
             </div>
         </div>
         <?php
@@ -308,11 +246,11 @@ class SGE_Admin {
      * 設定画面を表示
      */
     public function render_settings_page() {
-        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+        if ( ! current_user_can( 'cp_manage_settings' ) ) {
             wp_die( '設定変更の権限がありません。' );
         }
 
-        $settings_manager = SGE_Settings::get_instance();
+        $settings_manager = CP_Settings::get_instance();
         $settings = $settings_manager->get_settings();
 
         // コミットメッセージが空の場合は現在時刻で初期化（表示用のみ、保存はしない）
@@ -320,7 +258,7 @@ class SGE_Admin {
             $settings['commit_message'] = 'update:' . current_time( 'Ymd_His' );
         }
 
-        $logger = SGE_Logger::get_instance();
+        $logger = CP_Logger::get_instance();
         $is_running = $logger->is_running();
 
         // デバッグモードのURLパラメータ処理（サニタイズ後に厳密比較）
@@ -335,28 +273,31 @@ class SGE_Admin {
         $is_debug_mode = $logger->is_debug_mode();
 
         // v2テストモードのURLパラメータ処理（v1.4.2専用、v2.0.0で削除予定）
-        if ( isset( $_GET['sge_test_v2'] ) ) {
-            $test_param = sanitize_text_field( wp_unslash( $_GET['sge_test_v2'] ) );
+        if ( isset( $_GET['cp_test_v2'] ) ) {
+            $test_param = sanitize_text_field( wp_unslash( $_GET['cp_test_v2'] ) );
             if ( $test_param === 'on' ) {
-                set_transient( 'sge_test_v2_mode', true, HOUR_IN_SECONDS );
+                set_transient( 'cp_test_v2_mode', true, HOUR_IN_SECONDS );
             } elseif ( $test_param === 'off' ) {
-                delete_transient( 'sge_test_v2_mode' );
+                delete_transient( 'cp_test_v2_mode' );
             }
         }
 
         // ベータモードのURLパラメータ処理
         $beta_message = '';
-        if ( isset( $_GET['sge_beta'] ) ) {
-            $beta_param = sanitize_text_field( wp_unslash( $_GET['sge_beta'] ) );
+        if ( isset( $_GET['cp_beta'] ) ) {
+            $beta_param = sanitize_text_field( wp_unslash( $_GET['cp_beta'] ) );
             if ( $beta_param === 'on' ) {
                 // 既にベータモードが有効な場合はスキップ
                 if ( $settings_manager->is_beta_mode_enabled() ) {
                     // 既に有効、何もしない
-                } elseif ( isset( $_POST['sge_beta_password'] ) && isset( $_POST['sge_beta_nonce'] ) ) {
+                } elseif ( isset( $_POST['cp_beta_password'] ) && isset( $_POST['cp_beta_nonce'] ) ) {
                     // パスワード認証処理
-                    if ( wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sge_beta_nonce'] ) ), 'sge_beta_auth' ) ) {
-                        $password = sanitize_text_field( wp_unslash( $_POST['sge_beta_password'] ) );
-                        if ( $settings_manager->enable_beta_mode( $password ) ) {
+                    if ( wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['cp_beta_nonce'] ) ), 'cp_beta_auth' ) ) {
+                        $password = sanitize_text_field( wp_unslash( $_POST['cp_beta_password'] ) );
+                        $result = $settings_manager->enable_beta_mode( $password );
+                        if ( is_wp_error( $result ) ) {
+                            $beta_message = 'rate_limit';
+                        } elseif ( $result === true ) {
                             $beta_message = 'activated';
                         } else {
                             $beta_message = 'wrong_password';
@@ -373,7 +314,7 @@ class SGE_Admin {
         $is_beta_mode = $settings_manager->is_beta_mode_enabled();
 
         ?>
-        <div class="wrap sge-admin-wrap">
+        <div class="wrap cp-admin-wrap">
             <h1>設定</h1>
 
             <?php if ( $is_debug_mode ) : ?>
@@ -384,49 +325,25 @@ class SGE_Admin {
 
             <?php if ( $is_beta_mode ) : ?>
             <div class="notice notice-info">
-                <p><strong>ベータモード</strong> - プレリリース版のアップデートが有効です。無効にするには <code>&sge_beta=off</code> を追加してください。</p>
+                <p><strong>ベータモード</strong> - プレリリース版のアップデートが有効です。無効にするには <code>&cp_beta=off</code> を追加してください。</p>
             </div>
             <?php endif; ?>
 
             <?php
-            // v2.0.0リリース通知（v1.4.2専用機能、v2.0.0で削除予定）
-            // 管理者のみ表示
-            if ( current_user_can( 'manage_options' ) ) {
-                $user_id = get_current_user_id();
-                $dismissed = get_transient( 'sge_v2_notification_dismissed_' . $user_id );
-                if ( ! $dismissed ) {
-                    require_once SGE_PLUGIN_DIR . 'includes/class-updater.php';
-                    $updater = new SGE_Updater();
-                    $v2_release = $updater->check_v2_release();
-                    if ( $v2_release ) {
-                        $version = ltrim( $v2_release['tag_name'], 'v' );
-                        $release_url = esc_url( $v2_release['html_url'] );
-                        ?>
-                        <div class="notice notice-warning is-dismissible sge-v2-notification">
-                            <p>
-                                <strong>新しいメジャーバージョン v<?php echo esc_html( $version ); ?> がリリースされています。</strong>
-                                <a href="<?php echo $release_url; ?>" target="_blank" rel="noopener noreferrer">ダウンロードはこちら</a>
-                                <br>
-                                <span style="font-size: 0.9em; color: #646970;">
-                                    ※ 新バージョンへは自動更新できません。設定をエクスポート後、旧バージョンをアンインストールして新バージョンをインストールし、設定をインポートしてください。<br>
-                                    　 （注: セキュリティ上、APIトークンはインポートされません。再入力が必要です）
-                                </span>
-                            </p>
-                        </div>
-                        <?php
-                    }
-                }
-            }
             ?>
 
             <?php if ( $beta_message === 'need_password' ) : ?>
             <div class="notice notice-warning">
                 <p><strong>ベータモード認証</strong></p>
                 <form method="post" style="margin: 10px 0;">
-                    <?php wp_nonce_field( 'sge_beta_auth', 'sge_beta_nonce' ); ?>
-                    <input type="password" name="sge_beta_password" placeholder="パスワードを入力" style="width: 200px;" />
+                    <?php wp_nonce_field( 'cp_beta_auth', 'cp_beta_nonce' ); ?>
+                    <input type="password" name="cp_beta_password" placeholder="パスワードを入力" style="width: 200px;" />
                     <input type="submit" class="button" value="認証" />
                 </form>
+            </div>
+            <?php elseif ( $beta_message === 'rate_limit' ) : ?>
+            <div class="notice notice-error">
+                <p>ログイン試行回数が超過しました。10分後に再試行してください。</p>
             </div>
             <?php elseif ( $beta_message === 'wrong_password' ) : ?>
             <div class="notice notice-error">
@@ -435,8 +352,8 @@ class SGE_Admin {
             <div class="notice notice-warning">
                 <p><strong>ベータモード認証</strong></p>
                 <form method="post" style="margin: 10px 0;">
-                    <?php wp_nonce_field( 'sge_beta_auth', 'sge_beta_nonce' ); ?>
-                    <input type="password" name="sge_beta_password" placeholder="パスワードを入力" style="width: 200px;" />
+                    <?php wp_nonce_field( 'cp_beta_auth', 'cp_beta_nonce' ); ?>
+                    <input type="password" name="cp_beta_password" placeholder="パスワードを入力" style="width: 200px;" />
                     <input type="submit" class="button" value="認証" />
                 </form>
             </div>
@@ -450,127 +367,150 @@ class SGE_Admin {
             </div>
             <?php endif; ?>
 
-            <form id="sge-settings-form">
-                <?php wp_nonce_field( 'sge_save_settings', 'sge_settings_nonce' ); ?>
+            <form id="cp-settings-form">
+                <?php wp_nonce_field( 'cp_save_settings', 'cp_settings_nonce' ); ?>
 
-                    <h3>出力先設定</h3>
+                    <!-- 配信先設定アコーディオン -->
+                    <div class="cp-accordion-section" data-section="output-destinations">
+                        <button type="button" class="cp-accordion-header"
+                                id="header-output-destinations"
+                                aria-expanded="true"
+                                aria-controls="accordion-output-destinations">
+                            <span class="cp-accordion-title">配信先設定</span>
+                            <span class="cp-accordion-icon" aria-hidden="true"></span>
+                        </button>
+                        <div id="accordion-output-destinations"
+                             class="cp-accordion-content"
+                             role="region"
+                             aria-labelledby="header-output-destinations"
+                             aria-hidden="false">
 
                     <!-- 1. Cloudflare Workers -->
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
-                            <input type="checkbox" id="sge-cloudflare-enabled" name="cloudflare_enabled" value="1" <?php checked( ! empty( $settings['cloudflare_enabled'] ) ); ?>>
+                            <input type="checkbox" id="cp-cloudflare-enabled" name="cloudflare_enabled" value="1" <?php checked( ! empty( $settings['cloudflare_enabled'] ) ); ?>>
                             Cloudflare Workersに出力
                         </label>
                     </div>
 
-                    <div id="sge-cloudflare-settings" class="sge-subsection" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="sge-form-group">
-                            <label for="sge-cloudflare-api-token">Cloudflare API Token <span class="required">*</span></label>
+                    <div id="cp-cloudflare-settings" class="cp-subsection" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="cp-form-group">
+                            <label for="cp-cloudflare-api-token">Cloudflare API Token <span class="required">*</span></label>
                             <?php
                             $has_cf_token = ! empty( $settings['cloudflare_api_token'] );
                             $cf_placeholder = $has_cf_token ? '設定済み（変更する場合は新しいトークンを入力）' : 'APIトークンを入力してください';
                             ?>
-                            <input type="password" id="sge-cloudflare-api-token" name="cloudflare_api_token" class="regular-text" value="" placeholder="<?php echo esc_attr( $cf_placeholder ); ?>">
+                            <input type="password" id="cp-cloudflare-api-token" name="cloudflare_api_token" class="regular-text" value="" placeholder="<?php echo esc_attr( $cf_placeholder ); ?>">
                             <?php if ( $has_cf_token ) : ?>
-                                <span class="sge-token-status sge-token-set">✓ トークン設定済み</span>
+                                <span class="cp-token-status cp-token-set">✓ トークン設定済み</span>
                             <?php endif; ?>
-                            <p class="description">必要権限: Account > Workers Scripts > Edit</p>
+                            <p class="description">
+                                <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener noreferrer">API Tokenを作成</a><br>
+                                必要権限: Account > Workers Scripts > Edit<br>
+                                ※ セキュリティのため、トークンは暗号化されてWordPressデータベースに保存されます
+                            </p>
                         </div>
 
-                        <div class="sge-form-group">
-                            <label for="sge-cloudflare-account-id">Account ID <span class="required">*</span></label>
-                            <input type="text" id="sge-cloudflare-account-id" name="cloudflare_account_id" class="regular-text" value="<?php echo esc_attr( $settings['cloudflare_account_id'] ?? '' ); ?>" placeholder="例: 1234567890abcdef1234567890abcdef">
-                            <p class="description">Cloudflareダッシュボード > Workers & Pages > 右側のサイドバーで確認できます</p>
+                        <div class="cp-form-group">
+                            <label for="cp-cloudflare-account-id">Account ID <span class="required">*</span></label>
+                            <input type="text" id="cp-cloudflare-account-id" name="cloudflare_account_id" class="regular-text" value="<?php echo esc_attr( $settings['cloudflare_account_id'] ?? '' ); ?>" placeholder="例: 1234567890abcdef1234567890abcdef">
+                            <p class="description">Cloudflareダッシュボード > Workers & Pages > 右側のサイドバーで確認できます<br>形式: 32文字の英数字（例: 1234567890abcdef1234567890abcdef）</p>
                         </div>
 
-                        <div class="sge-form-group">
-                            <label for="sge-cloudflare-script-name">Worker名 <span class="required">*</span></label>
-                            <input type="text" id="sge-cloudflare-script-name" name="cloudflare_script_name" class="regular-text" value="<?php echo esc_attr( $settings['cloudflare_script_name'] ?? '' ); ?>" placeholder="例: my-static-site">
-                            <p class="description">デプロイ先のWorker名（存在しない場合は自動作成されます）</p>
+                        <div class="cp-form-group">
+                            <label for="cp-cloudflare-script-name">Worker名 <span class="required">*</span></label>
+                            <input type="text" id="cp-cloudflare-script-name" name="cloudflare_script_name" class="regular-text" value="<?php echo esc_attr( $settings['cloudflare_script_name'] ?? '' ); ?>" placeholder="例: my-static-site">
+                            <p class="description">デプロイ先のWorker名を自由に決めてください。存在しない場合は自動的に作成されます<br>使用可能な文字: 英数字、ハイフン（-）、アンダースコア（_）のみ<br>例: my-static-site、company-website、blog_2024 など</p>
                         </div>
 
                     </div>
 
                     <!-- 2. Netlify -->
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
-                            <input type="checkbox" id="sge-netlify-enabled" name="netlify_enabled" value="1" <?php checked( ! empty( $settings['netlify_enabled'] ) ); ?>>
+                            <input type="checkbox" id="cp-netlify-enabled" name="netlify_enabled" value="1" <?php checked( ! empty( $settings['netlify_enabled'] ) ); ?>>
                             Netlifyに出力
                         </label>
                     </div>
 
-                    <div id="sge-netlify-settings" class="sge-subsection" <?php echo empty( $settings['netlify_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="sge-form-group">
-                            <label for="sge-netlify-api-token">Netlify Personal Access Token <span class="required">*</span></label>
+                    <div id="cp-netlify-settings" class="cp-subsection" <?php echo empty( $settings['netlify_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="cp-form-group">
+                            <label for="cp-netlify-api-token">Netlify Personal Access Token <span class="required">*</span></label>
                             <?php
                             $has_netlify_token = ! empty( $settings['netlify_api_token'] );
                             $netlify_placeholder = $has_netlify_token ? '設定済み（変更する場合は新しいトークンを入力）' : 'APIトークンを入力してください';
                             ?>
-                            <input type="password" id="sge-netlify-api-token" name="netlify_api_token" class="regular-text" value="" placeholder="<?php echo esc_attr( $netlify_placeholder ); ?>">
+                            <input type="password" id="cp-netlify-api-token" name="netlify_api_token" class="regular-text" value="" placeholder="<?php echo esc_attr( $netlify_placeholder ); ?>">
                             <?php if ( $has_netlify_token ) : ?>
-                                <span class="sge-token-status sge-token-set">✓ トークン設定済み</span>
+                                <span class="cp-token-status cp-token-set">✓ トークン設定済み</span>
                             <?php endif; ?>
                             <p class="description">
-                                <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank" rel="noopener noreferrer">Personal Access Tokenを作成</a>
+                                <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank" rel="noopener noreferrer">Personal Access Tokenを作成</a><br>
+                                ※ セキュリティのため、トークンは暗号化されてWordPressデータベースに保存されます
                             </p>
                         </div>
 
-                        <div class="sge-form-group">
-                            <label for="sge-netlify-site-id">Netlify Site ID <span class="required">*</span></label>
-                            <input type="text" id="sge-netlify-site-id" name="netlify_site_id" class="regular-text" value="<?php echo esc_attr( $settings['netlify_site_id'] ?? '' ); ?>" placeholder="例: 12345678-1234-1234-1234-123456789012">
-                            <p class="description">Site settings → General → Site details → Site information から確認できます</p>
+                        <div class="cp-form-group">
+                            <label for="cp-netlify-site-id">Netlify Site ID <span class="required">*</span></label>
+                            <input type="text" id="cp-netlify-site-id" name="netlify_site_id" class="regular-text" value="<?php echo esc_attr( $settings['netlify_site_id'] ?? '' ); ?>" placeholder="例: 12345678-1234-1234-1234-123456789012">
+                            <p class="description">Netlifyの「Site configuration」→「General」→「Site details」で確認できます<br>形式: UUID（例: 12345678-1234-1234-1234-123456789012）</p>
                         </div>
                     </div>
 
                     <!-- 3. GitHub -->
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
-                            <input type="checkbox" id="sge-github-enabled" name="github_enabled" value="1" <?php checked( ! empty( $settings['github_enabled'] ) ); ?>>
+                            <input type="checkbox" id="cp-github-enabled" name="github_enabled" value="1" <?php checked( ! empty( $settings['github_enabled'] ) ); ?>>
                             GitHubに出力
                         </label>
                     </div>
 
-                    <div id="sge-github-settings" class="sge-subsection" <?php echo empty( $settings['github_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="sge-form-group">
-                            <label for="sge-github-token">GitHub Personal Access Token <span class="required">*</span></label>
+                    <div id="cp-github-settings" class="cp-subsection" <?php echo empty( $settings['github_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="cp-form-group">
+                            <label for="cp-github-token">GitHub Personal Access Token <span class="required">*</span></label>
                             <?php
                             $has_token = ! empty( $settings['github_token'] );
                             $placeholder = $has_token ? '設定済み（変更する場合は新しいトークンを入力）' : 'トークンを入力してください';
                             ?>
-                            <input type="password" id="sge-github-token" name="github_token" class="regular-text" value="" placeholder="<?php echo esc_attr( $placeholder ); ?>">
+                            <input type="password" id="cp-github-token" name="github_token" class="regular-text" value="" placeholder="<?php echo esc_attr( $placeholder ); ?>">
                             <?php if ( $has_token ) : ?>
-                                <span class="sge-token-status sge-token-set">✓ トークン設定済み</span>
+                                <span class="cp-token-status cp-token-set">✓ トークン設定済み</span>
                             <?php endif; ?>
-                            <p class="description">必要権限: repo（フルアクセス）<br>※ wp-config.phpの認証用定数変更時は再入力が必要です</p>
+                            <p class="description">
+                                <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer">Personal Access Tokenを作成</a><br>
+                                必要権限: repo（リポジトリへのフルアクセス）<br>
+                                ※ セキュリティのため、トークンは暗号化されてデータベースに保存されます<br>
+                                ※ wp-config.phpのAUTH_KEY等を変更した場合、トークンの再入力が必要です
+                            </p>
                         </div>
 
-                        <div class="sge-form-group">
-                            <label for="sge-github-repo">リポジトリ名 <span class="required">*</span></label>
-                            <input type="text" id="sge-github-repo" name="github_repo" class="regular-text" value="<?php echo esc_attr( $settings['github_repo'] ?? '' ); ?>" placeholder="owner/repo">
-                            <p class="description">形式: owner/repo</p>
+                        <div class="cp-form-group">
+                            <label for="cp-github-repo">リポジトリ名 <span class="required">*</span></label>
+                            <input type="text" id="cp-github-repo" name="github_repo" class="regular-text" value="<?php echo esc_attr( $settings['github_repo'] ?? '' ); ?>" placeholder="owner/repo">
+                            <p class="description">形式: owner/repo（例: username/my-website）<br>GitHubリポジトリのURLが https://github.com/username/my-website なら「username/my-website」と入力</p>
                         </div>
 
-                        <div class="sge-form-group sge-branch-settings">
+                        <div class="cp-form-group cp-branch-settings">
                             <label>ブランチ設定</label>
-                            <div class="sge-branch-option">
-                                <label class="sge-radio-label">
+                            <div class="cp-branch-option">
+                                <label class="cp-radio-label">
                                     <input type="radio" name="github_branch_mode" value="existing" <?php checked( $settings['github_branch_mode'] ?? 'existing', 'existing' ); ?>>
                                     既存ブランチを使用
                                 </label>
-                                <div class="sge-branch-input">
-                                    <input type="text" id="sge-github-existing-branch" name="github_existing_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_existing_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'existing' ? 'disabled' : ''; ?>>
+                                <div class="cp-branch-input">
+                                    <input type="text" id="cp-github-existing-branch" name="github_existing_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_existing_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'existing' ? 'disabled' : ''; ?>>
                                 </div>
                             </div>
-                            <div class="sge-branch-option" style="margin-top: 10px;">
-                                <label class="sge-radio-label">
+                            <div class="cp-branch-option" style="margin-top: 10px;">
+                                <label class="cp-radio-label">
                                     <input type="radio" name="github_branch_mode" value="new" <?php checked( $settings['github_branch_mode'] ?? 'existing', 'new' ); ?>>
                                     新規ブランチを作成
                                 </label>
-                                <div class="sge-branch-input sge-branch-nested">
-                                    <label>分岐元ブランチ名</label>
-                                    <input type="text" id="sge-github-base-branch" name="github_base_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_base_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
-                                    <label>新規ブランチ名</label>
-                                    <input type="text" id="sge-github-new-branch" name="github_new_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_new_branch'] ?? '' ); ?>" placeholder="static-site" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
+                                <div class="cp-branch-input cp-branch-nested">
+                                    <span class="cp-field-label">分岐元ブランチ名</span>
+                                    <input type="text" id="cp-github-base-branch" name="github_base_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_base_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
+                                    <span class="cp-field-label">新規ブランチ名</span>
+                                    <input type="text" id="cp-github-new-branch" name="github_new_branch" class="regular-text" value="<?php echo esc_attr( $settings['github_new_branch'] ?? '' ); ?>" placeholder="static-site" <?php echo ( $settings['github_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
                                 </div>
                             </div>
                         </div>
@@ -578,217 +518,272 @@ class SGE_Admin {
                     </div>
 
                     <!-- 3. GitLab -->
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
-                            <input type="checkbox" id="sge-gitlab-enabled" name="gitlab_enabled" value="1" <?php checked( ! empty( $settings['gitlab_enabled'] ) ); ?>>
+                            <input type="checkbox" id="cp-gitlab-enabled" name="gitlab_enabled" value="1" <?php checked( ! empty( $settings['gitlab_enabled'] ) ); ?>>
                             GitLabに出力
                         </label>
                     </div>
 
-                    <div id="sge-gitlab-settings" class="sge-subsection" <?php echo empty( $settings['gitlab_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="sge-form-group">
-                            <label for="sge-gitlab-token">GitLab Personal Access Token <span class="required">*</span></label>
+                    <div id="cp-gitlab-settings" class="cp-subsection" <?php echo empty( $settings['gitlab_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="cp-form-group">
+                            <label for="cp-gitlab-token">GitLab Personal Access Token <span class="required">*</span></label>
                             <?php
                             $has_gl_token = ! empty( $settings['gitlab_token'] );
                             $gl_placeholder = $has_gl_token ? '設定済み（変更する場合は新しいトークンを入力）' : 'トークンを入力してください';
                             ?>
-                            <input type="password" id="sge-gitlab-token" name="gitlab_token" class="regular-text" value="" placeholder="<?php echo esc_attr( $gl_placeholder ); ?>">
+                            <input type="password" id="cp-gitlab-token" name="gitlab_token" class="regular-text" value="" placeholder="<?php echo esc_attr( $gl_placeholder ); ?>">
                             <?php if ( $has_gl_token ) : ?>
-                                <span class="sge-token-status sge-token-set">✓ トークン設定済み</span>
+                                <span class="cp-token-status cp-token-set">✓ トークン設定済み</span>
                             <?php endif; ?>
-                            <p class="description">必要権限: api（フルアクセス）または write_repository<br>※ wp-config.phpの認証用定数変更時は再入力が必要です</p>
+                            <p class="description">
+                                <a href="https://gitlab.com/-/user_settings/personal_access_tokens" target="_blank" rel="noopener noreferrer">Personal Access Tokenを作成</a><br>
+                                必要権限: api（フルアクセス）または write_repository<br>
+                                ※ セキュリティのため、トークンは暗号化されてデータベースに保存されます<br>
+                                ※ wp-config.phpのAUTH_KEY等を変更した場合、トークンの再入力が必要です
+                            </p>
                         </div>
 
-                        <div class="sge-form-group">
-                            <label for="sge-gitlab-project">プロジェクトパス <span class="required">*</span></label>
-                            <input type="text" id="sge-gitlab-project" name="gitlab_project" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_project'] ?? '' ); ?>" placeholder="username/project">
-                            <p class="description">形式: username/project または group/subgroup/project</p>
+                        <div class="cp-form-group">
+                            <label for="cp-gitlab-project">プロジェクトパス <span class="required">*</span></label>
+                            <input type="text" id="cp-gitlab-project" name="gitlab_project" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_project'] ?? '' ); ?>" placeholder="username/project">
+                            <p class="description">形式: username/project または group/subgroup/project（例: myname/my-website）<br>GitLabプロジェクトのURLが https://gitlab.com/myname/my-website なら「myname/my-website」と入力</p>
                         </div>
 
-                        <div class="sge-form-group sge-branch-settings">
+                        <div class="cp-form-group cp-branch-settings">
                             <label>ブランチ設定</label>
-                            <div class="sge-branch-option">
-                                <label class="sge-radio-label">
+                            <div class="cp-branch-option">
+                                <label class="cp-radio-label">
                                     <input type="radio" name="gitlab_branch_mode" value="existing" <?php checked( $settings['gitlab_branch_mode'] ?? 'existing', 'existing' ); ?>>
                                     既存ブランチを使用
                                 </label>
-                                <div class="sge-branch-input">
-                                    <input type="text" id="sge-gitlab-existing-branch" name="gitlab_existing_branch" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_existing_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['gitlab_branch_mode'] ?? 'existing' ) !== 'existing' ? 'disabled' : ''; ?>>
+                                <div class="cp-branch-input">
+                                    <input type="text" id="cp-gitlab-existing-branch" name="gitlab_existing_branch" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_existing_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['gitlab_branch_mode'] ?? 'existing' ) !== 'existing' ? 'disabled' : ''; ?>>
                                 </div>
                             </div>
-                            <div class="sge-branch-option" style="margin-top: 10px;">
-                                <label class="sge-radio-label">
+                            <div class="cp-branch-option" style="margin-top: 10px;">
+                                <label class="cp-radio-label">
                                     <input type="radio" name="gitlab_branch_mode" value="new" <?php checked( $settings['gitlab_branch_mode'] ?? 'existing', 'new' ); ?>>
                                     新規ブランチを作成
                                 </label>
-                                <div class="sge-branch-input sge-branch-nested">
-                                    <label>分岐元ブランチ名</label>
-                                    <input type="text" id="sge-gitlab-base-branch" name="gitlab_base_branch" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_base_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['gitlab_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
-                                    <label>新規ブランチ名</label>
-                                    <input type="text" id="sge-gitlab-new-branch" name="gitlab_new_branch" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_new_branch'] ?? '' ); ?>" placeholder="static-site" <?php echo ( $settings['gitlab_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
+                                <div class="cp-branch-input cp-branch-nested">
+                                    <span class="cp-field-label">分岐元ブランチ名</span>
+                                    <input type="text" id="cp-gitlab-base-branch" name="gitlab_base_branch" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_base_branch'] ?? '' ); ?>" placeholder="main" <?php echo ( $settings['gitlab_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
+                                    <span class="cp-field-label">新規ブランチ名</span>
+                                    <input type="text" id="cp-gitlab-new-branch" name="gitlab_new_branch" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_new_branch'] ?? '' ); ?>" placeholder="static-site" <?php echo ( $settings['gitlab_branch_mode'] ?? 'existing' ) !== 'new' ? 'disabled' : ''; ?>>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="sge-form-group">
-                            <label for="sge-gitlab-api-url">GitLab API URL</label>
-                            <input type="text" id="sge-gitlab-api-url" name="gitlab_api_url" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_api_url'] ?? 'https://gitlab.com/api/v4' ); ?>" placeholder="https://gitlab.com/api/v4">
-                            <p class="description">セルフホストのGitLabを使用する場合は変更してください<br>例: https://gitlab.example.com/api/v4</p>
+                        <div class="cp-form-group">
+                            <label for="cp-gitlab-api-url">GitLab API URL</label>
+                            <input type="text" id="cp-gitlab-api-url" name="gitlab_api_url" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_api_url'] ?? 'https://gitlab.com/api/v4' ); ?>" placeholder="https://gitlab.com/api/v4">
+                            <p class="description">通常は変更不要です。自分で用意したGitLabサーバーを使う場合のみ変更してください<br>例: https://gitlab.example.com/api/v4</p>
                         </div>
                     </div>
 
                     <!-- 4. ローカルGit -->
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
-                            <input type="checkbox" id="sge-git-local-enabled" name="git_local_enabled" value="1" <?php checked( ! empty( $settings['git_local_enabled'] ) ); ?>>
+                            <input type="checkbox" id="cp-git-local-enabled" name="git_local_enabled" value="1" <?php checked( ! empty( $settings['git_local_enabled'] ) ); ?>>
                             ローカルGitに出力
                         </label>
                     </div>
 
-                    <div id="sge-git-local-settings" class="sge-subsection" <?php echo empty( $settings['git_local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="sge-form-group">
-                            <label for="sge-git-local-work-dir">Git作業ディレクトリ <span class="required">*</span></label>
-                            <input type="text" id="sge-git-local-work-dir" name="git_local_work_dir" class="regular-text" value="<?php echo esc_attr( $settings['git_local_work_dir'] ?? '' ); ?>" placeholder="/path/to/git/repo">
-                            <p class="description">ローカルGitリポジトリのパス（絶対パス）</p>
+                    <div id="cp-git-local-settings" class="cp-subsection" <?php echo empty( $settings['git_local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="cp-form-group">
+                            <label for="cp-git-local-work-dir">Git作業ディレクトリ <span class="required">*</span></label>
+                            <input type="text" id="cp-git-local-work-dir" name="git_local_work_dir" class="regular-text" value="<?php echo esc_attr( $settings['git_local_work_dir'] ?? '' ); ?>" placeholder="/path/to/git/repo">
+                            <p class="description">サーバー上のGitリポジトリのフルパスを指定（例: /home/username/my-repo）<br>相対パスではなく、/（スラッシュ）から始まる絶対パスで入力してください</p>
                         </div>
 
-                        <div class="sge-form-group">
-                            <label for="sge-git-local-branch">ブランチ名 <span class="required">*</span></label>
-                            <input type="text" id="sge-git-local-branch" name="git_local_branch" class="regular-text" value="<?php echo esc_attr( $settings['git_local_branch'] ?? 'main' ); ?>" placeholder="main">
-                            <p class="description">コミット先のブランチ名</p>
+                        <div class="cp-form-group">
+                            <label for="cp-git-local-branch">ブランチ名 <span class="required">*</span></label>
+                            <input type="text" id="cp-git-local-branch" name="git_local_branch" class="regular-text" value="<?php echo esc_attr( $settings['git_local_branch'] ?? 'main' ); ?>" placeholder="main">
+                            <p class="description">静的ファイルをコミットするブランチ名を指定（例: main、master、gh-pages など）</p>
                         </div>
 
-                        <div class="sge-form-group">
+                        <div class="cp-form-group">
                             <label>
-                                <input type="checkbox" id="sge-git-local-push-remote" name="git_local_push_remote" value="1" <?php checked( ! empty( $settings['git_local_push_remote'] ) ); ?>>
+                                <input type="checkbox" id="cp-git-local-push-remote" name="git_local_push_remote" value="1" <?php checked( ! empty( $settings['git_local_push_remote'] ) ); ?>>
                                 リモートにプッシュする
                             </label>
-                            <p class="description">チェックを入れると、コミット後にリモート（origin）にプッシュします</p>
+                            <p class="description">チェックを入れると、ローカルリポジトリにコミットした後、自動的にリモートリポジトリ（origin）にプッシュします<br>GitHub、GitLabなどのリモートリポジトリと連携している場合に便利です</p>
                         </div>
                     </div>
 
                     <!-- 5. ローカルディレクトリ -->
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
-                            <input type="checkbox" id="sge-local-enabled" name="local_enabled" value="1" <?php checked( ! empty( $settings['local_enabled'] ) ); ?>>
+                            <input type="checkbox" id="cp-local-enabled" name="local_enabled" value="1" <?php checked( ! empty( $settings['local_enabled'] ) ); ?>>
                             ローカルディレクトリに出力
                         </label>
                     </div>
 
-                    <div id="sge-local-settings" class="sge-subsection" <?php echo empty( $settings['local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="sge-form-group">
-                            <label for="sge-local-output-path">静的ファイル出力先パス <span class="required">*</span></label>
-                            <input type="text" id="sge-local-output-path" name="local_output_path" class="regular-text" value="<?php echo esc_attr( $settings['local_output_path'] ?? '' ); ?>" placeholder="<?php echo esc_attr( ( PHP_OS === 'WINNT' ? 'C:/output' : '/Users/username/output' ) ); ?>">
+                    <div id="cp-local-settings" class="cp-subsection" <?php echo empty( $settings['local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="cp-form-group">
+                            <label for="cp-local-output-path">静的ファイル出力先パス <span class="required">*</span></label>
+                            <input type="text" id="cp-local-output-path" name="local_output_path" class="regular-text" value="<?php echo esc_attr( $settings['local_output_path'] ?? '' ); ?>" placeholder="<?php echo esc_attr( ( PHP_OS === 'WINNT' ? 'C:/output' : '/Users/username/output' ) ); ?>">
                             <p class="description">
-                                例：<br>
-                                Windows: C:\output または C:/output<br>
-                                Mac/Linux: /Users/username/output
+                                静的HTMLファイルを保存する場所を指定します。必ず絶対パス（フルパス）で入力してください<br>
+                                Windows: C:\output または C:/output（どちらでも可）<br>
+                                Mac/Linux: /Users/username/output または /home/username/output
                             </p>
                         </div>
                     </div>
 
                     <!-- 6. ZIP -->
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
-                            <input type="checkbox" id="sge-zip-enabled" name="zip_enabled" value="1" <?php checked( ! empty( $settings['zip_enabled'] ) ); ?>>
+                            <input type="checkbox" id="cp-zip-enabled" name="zip_enabled" value="1" <?php checked( ! empty( $settings['zip_enabled'] ) ); ?>>
                             ZIPファイルとして出力
                         </label>
                     </div>
 
-                    <div id="sge-zip-settings" class="sge-subsection" <?php echo empty( $settings['zip_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="sge-form-group">
-                            <label for="sge-zip-output-path">ZIP出力先パス <span class="required">*</span></label>
-                            <input type="text" id="sge-zip-output-path" name="zip_output_path" class="regular-text" value="<?php echo esc_attr( $settings['zip_output_path'] ?? '' ); ?>">
+                    <div id="cp-zip-settings" class="cp-subsection" <?php echo empty( $settings['zip_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="cp-form-group">
+                            <label for="cp-zip-output-path">ZIP出力先パス <span class="required">*</span></label>
+                            <input type="text" id="cp-zip-output-path" name="zip_output_path" class="regular-text" value="<?php echo esc_attr( $settings['zip_output_path'] ?? '' ); ?>">
                             <p class="description">
-                                ZIPファイルを保存するディレクトリを指定します。<br>
-                                ファイル名: static-output-YYYYMMDD_HHMMSS.zip
+                                ZIPファイルを保存する場所（ディレクトリ）を指定します<br>
+                                ファイル名は自動的に static-output-YYYYMMDD_HHMMSS.zip の形式で作成されます（例: static-output-20241225_143052.zip）
                             </p>
                         </div>
                     </div>
 
-                    <h3>ファイル設定</h3>
+                        </div><!-- .cp-accordion-content -->
+                    </div><!-- .cp-accordion-section -->
 
-                    <div class="sge-form-group">
-                        <label for="sge-include-paths">追加したいファイル/フォルダのパス指定</label>
-                        <textarea id="sge-include-paths" name="include_paths" class="large-text" rows="5"><?php echo esc_textarea( $settings['include_paths'] ?? '' ); ?></textarea>
+                    <!-- 追加/除外ファイル設定アコーディオン -->
+                    <div class="cp-accordion-section" data-section="file-settings">
+                        <button type="button" class="cp-accordion-header"
+                                id="header-file-settings"
+                                aria-expanded="false"
+                                aria-controls="accordion-file-settings">
+                            <span class="cp-accordion-title">追加/除外ファイル設定</span>
+                            <span class="cp-accordion-icon" aria-hidden="true"></span>
+                        </button>
+                        <div id="accordion-file-settings"
+                             class="cp-accordion-content"
+                             role="region"
+                             aria-labelledby="header-file-settings"
+                             aria-hidden="true">
+
+                    <div class="cp-form-group">
+                        <label for="cp-include-paths">追加したいファイル/フォルダのパス指定</label>
+                        <textarea id="cp-include-paths" name="include_paths" class="large-text" rows="5"><?php echo esc_textarea( $settings['include_paths'] ?? '' ); ?></textarea>
                         <p class="description">
+                            WordPressに含まれないファイル（画像、PDF、動画など）を静的サイトに追加したい場合に指定します<br>
+                            各ファイル/フォルダのフルパスを1行に1つずつ記載してください<br>
                             記載例：<br>
                             /home/username/Desktop/logo.png<br>
-                            /Users/username/Documents/manual.pdf
+                            /home/username/videos/intro.mp4
                         </p>
                     </div>
 
-                    <div class="sge-form-group">
-                        <label for="sge-exclude-patterns">除外したいファイル/フォルダのパス指定</label>
-                        <textarea id="sge-exclude-patterns" name="exclude_patterns" class="large-text" rows="5"><?php echo esc_textarea( $settings['exclude_patterns'] ?? '' ); ?></textarea>
+                    <div class="cp-form-group">
+                        <label for="cp-exclude-patterns">除外したいファイル/フォルダのパス指定</label>
+                        <textarea id="cp-exclude-patterns" name="exclude_patterns" class="large-text" rows="5"><?php echo esc_textarea( $settings['exclude_patterns'] ?? '' ); ?></textarea>
                         <p class="description">
-                            記載例：<br>
-                            *.log<br>
-                            wp-content/cache/*
+                            静的サイトに含めたくないファイルやフォルダを指定します<br>
+                            ワイルドカード（*）を使ったパターン指定が可能です。1行に1つずつ記載してください<br>
+                            ※ HTMLから参照されていないファイルは自動的に除外されます
                         </p>
                     </div>
 
-                    <h3>出力設定</h3>
+                        </div><!-- .cp-accordion-content -->
+                    </div><!-- .cp-accordion-section -->
 
-                    <div class="sge-form-group">
+                    <!-- コンテンツ設定アコーディオン -->
+                    <div class="cp-accordion-section" data-section="output-settings">
+                        <button type="button" class="cp-accordion-header"
+                                id="header-output-settings"
+                                aria-expanded="true"
+                                aria-controls="accordion-output-settings">
+                            <span class="cp-accordion-title">コンテンツ設定</span>
+                            <span class="cp-accordion-icon" aria-hidden="true"></span>
+                        </button>
+                        <div id="accordion-output-settings"
+                             class="cp-accordion-content"
+                             role="region"
+                             aria-labelledby="header-output-settings"
+                             aria-hidden="false">
+
+                    <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_tag_archive" value="1" <?php checked( $settings['enable_tag_archive'] ?? false ); ?>>
                             タグアーカイブを出力
                         </label>
-                        <p class="description">無効にするとタグアーカイブページを出力せず、投稿ページ内のタグも非表示になります</p>
+                        <p class="description">タグアーカイブ = タグごとの記事一覧ページ（例: /tag/wordpress/）<br>無効にすると、タグアーカイブページを出力せず、投稿ページ内のタグリンクも非表示になります</p>
                     </div>
 
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_date_archive" value="1" <?php checked( $settings['enable_date_archive'] ?? false ); ?>>
                             日付アーカイブを出力
                         </label>
-                        <p class="description">無効にすると日付アーカイブページを出力せず、投稿ページ内の日付はリンクなしで表示されます</p>
+                        <p class="description">日付アーカイブ = 年月日ごとの記事一覧ページ（例: /2024/12/、/2024/12/25/）<br>無効にすると、日付アーカイブページを出力せず、投稿ページ内の日付はリンクなしのテキストで表示されます</p>
                     </div>
 
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_author_archive" value="1" <?php checked( $settings['enable_author_archive'] ?? false ); ?>>
                             著者アーカイブを出力
                         </label>
-                        <p class="description">無効にすると著者アーカイブページを出力せず、投稿ページ内の著者名はリンクなしで表示されます</p>
+                        <p class="description">著者アーカイブ = 著者ごとの記事一覧ページ（例: /author/john/）<br>無効にすると、著者アーカイブページを出力せず、投稿ページ内の著者名はリンクなしのテキストで表示されます</p>
                     </div>
 
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_post_format_archive" value="1" <?php checked( $settings['enable_post_format_archive'] ?? false ); ?>>
                             投稿フォーマットアーカイブを出力
                         </label>
-                        <p class="description">無効にすると投稿フォーマットアーカイブ（/type/image/、/type/video/など）を出力しません</p>
+                        <p class="description">投稿フォーマットアーカイブ = 投稿の種類ごとの記事一覧ページ（例: /type/image/、/type/video/）<br>無効にすると、これらのページを出力しません。通常のブログでは使わないことが多いです</p>
                     </div>
 
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_sitemap" value="1" <?php checked( $settings['enable_sitemap'] ?? true ); ?>>
                             サイトマップ（sitemap.xml）を出力
                         </label>
-                        <p class="description">無効にするとサイトマップファイルを出力しません</p>
+                        <p class="description">サイトマップ（sitemap.xml） = サイト内の全ページURLをリストアップしたXMLファイル<br>Google検索などの検索エンジンがサイトを見つけやすくなります。通常は有効にすることを推奨します</p>
                     </div>
 
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
-                            <input type="checkbox" name="enable_robots_txt" value="1" <?php checked( $settings['enable_robots_txt'] ?? false ); ?>>
+                            <input type="checkbox" name="enable_robots_txt" value="1" <?php checked( $settings['enable_robots_txt'] ?? true ); ?>>
                             robots.txtを出力
                         </label>
-                        <p class="description">無効にするとrobots.txtファイルを出力しません</p>
+                        <p class="description">robots.txt = 検索エンジンやBot（Googleボットなど）に対して、サイトのどの部分をクロールして良いかを指示するファイル<br>有効にすると、主要な検索エンジンのみを許可し、AIクローラーなど他のBotをブロックする設定のファイルを出力します<br>検索エンジンに正しくサイトを認識してもらうため、基本的には有効にすることを推奨します<br>※ 出力先に「ローカルディレクトリ」を選択している場合は、生成後にファイルを直接編集してカスタマイズすることも可能です</p>
                     </div>
 
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_rss" value="1" <?php checked( $settings['enable_rss'] ?? true ); ?>>
                             RSSフィードを出力
                         </label>
-                        <p class="description">無効にするとRSSフィードファイルを出力しません</p>
+                        <p class="description">RSSフィード = サイトの新着記事情報を配信するXMLファイル（/feed/など）<br>読者がRSSリーダーでサイトの更新を購読できるようになります。通常は有効にすることを推奨します</p>
                     </div>
 
-                    <h3>その他設定</h3>
+                        </div><!-- .cp-accordion-content -->
+                    </div><!-- .cp-accordion-section -->
 
-                    <div class="sge-form-group">
+                    <!-- 詳細設定アコーディオン -->
+                    <div class="cp-accordion-section" data-section="other-settings">
+                        <button type="button" class="cp-accordion-header"
+                                id="header-other-settings"
+                                aria-expanded="false"
+                                aria-controls="accordion-other-settings">
+                            <span class="cp-accordion-title">詳細設定</span>
+                            <span class="cp-accordion-icon" aria-hidden="true"></span>
+                        </button>
+                        <div id="accordion-other-settings"
+                             class="cp-accordion-content"
+                             role="region"
+                             aria-labelledby="header-other-settings"
+                             aria-hidden="true">
+
+                    <div class="cp-form-group">
                         <label>URL形式</label>
                         <div>
                             <label>
@@ -802,43 +797,77 @@ class SGE_Admin {
                                 絶対パス
                             </label>
                         </div>
+                        <p class="description">
+                            <strong>相対パス:</strong> /about/ の形式。どのドメインでも動作するため、サブディレクトリやテスト環境でも使えます（推奨）<br>
+                            <strong>絶対パス:</strong> https://example.com/about/ の形式。特定のドメインに固定したい場合に選択します
+                        </p>
+
+                        <div class="cp-base-url-field" style="display: none; margin-top: 16px;">
+                            <label for="cp-base-url">URL <span class="required">*</span></label>
+                            <input type="url" id="cp-base-url" name="base_url" class="regular-text" value="<?php echo esc_attr( $settings['base_url'] ?? '' ); ?>" placeholder="https://example.com">
+                            <p class="description">絶対パスで使用するベースURLを入力してください（例: https://example.com）<br>このURLをもとに、すべてのリンクが絶対URLに変換されます<br>※ 末尾のスラッシュ（/）は不要です</p>
+                        </div>
                     </div>
 
-                    <div class="sge-form-group">
-                        <label for="sge-timeout">タイムアウト時間（秒）</label>
-                        <input type="number" id="sge-timeout" name="timeout" class="small-text" value="<?php echo esc_attr( $settings['timeout'] ?? 600 ); ?>" min="60" max="18000">
-                        <p class="description">60〜18000秒の範囲で入力してください（デフォルト: 600秒）</p>
+                    <div class="cp-form-group">
+                        <label>フォルダ名のカスタマイズ</label>
+                        <div style="margin-bottom: 12px;">
+                            <label for="cp-custom-wp-includes">wp-includes フォルダ名</label>
+                            <input type="text" id="cp-custom-wp-includes" name="custom_wp_includes" class="regular-text" value="<?php echo esc_attr( $settings['custom_wp_includes'] ?? '' ); ?>" placeholder="wp-includes" maxlength="50">
+                        </div>
+                        <div>
+                            <label for="cp-custom-wp-content">wp-content フォルダ名</label>
+                            <input type="text" id="cp-custom-wp-content" name="custom_wp_content" class="regular-text" value="<?php echo esc_attr( $settings['custom_wp_content'] ?? '' ); ?>" placeholder="wp-content" maxlength="50">
+                        </div>
+                        <p class="description">
+                            静的サイト生成時に wp-includes や wp-content フォルダを別の名前に変更できます<br>
+                            <strong>wp-includes:</strong> WordPress本体のJavaScript、CSSファイルなど<br>
+                            <strong>wp-content:</strong> テーマのCSS/JS、アップロードした画像など<br>
+                            <strong>用途:</strong> ポートフォリオサイトなどで、WordPressで作られたことを隠したい場合に便利です<br>
+                            空欄の場合は元の名前のまま生成されます<br>
+                            使用可能な文字: 英数字、ハイフン（-）、アンダースコア（_）のみ（1-50文字）
+                        </p>
                     </div>
 
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
+                        <label for="cp-timeout">タイムアウト時間（秒）</label>
+                        <input type="number" id="cp-timeout" name="timeout" class="small-text" value="<?php echo esc_attr( $settings['timeout'] ?? 300 ); ?>" min="60" max="18000">
+                        <p class="description">静的化処理の最大実行時間を設定します（デフォルト: 300秒 = 5分）<br>ページ数が多いサイトや画像が多いサイトの場合は、この時間を長く設定してください<br>設定可能範囲: 60〜18000秒（1分〜5時間）</p>
+                    </div>
+
+                    <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="auto_generate" value="1" <?php checked( ! empty( $settings['auto_generate'] ) ); ?>>
                             記事公開時に自動で静的化を実行する
                         </label>
+                        <p class="description">有効にすると、記事を公開または更新した時に自動的に静的化処理が開始されます<br>手動で実行ボタンを押す手間が省けて便利です<br><strong>注意:</strong> 頻繁に記事を更新する場合、処理が重複して実行される可能性があるため、サーバー負荷にご注意ください</p>
                     </div>
 
-                    <div class="sge-form-group">
+                    <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="cache_enabled" value="1" <?php checked( ! empty( $settings['cache_enabled'] ) ); ?>>
                             キャッシュを有効化（生成を高速化）
                         </label>
-                        <p class="description">変更がないページはキャッシュから取得してスキップします</p>
+                        <p class="description">有効にすると、前回から変更がないページはキャッシュから取得してスキップします<br>2回目以降の静的化処理が大幅に高速化されます（推奨）</p>
                     </div>
 
-                    <div class="sge-form-actions">
-                        <button type="submit" class="button button-primary" id="sge-save-settings" <?php echo $is_running ? 'disabled' : ''; ?>>設定を保存</button>
-                        <button type="button" class="button" id="sge-reset-settings" <?php echo $is_running ? 'disabled' : ''; ?>>設定をリセット</button>
-                        <button type="button" class="button" id="sge-clear-cache" <?php echo $is_running ? 'disabled' : ''; ?>>キャッシュをクリア</button>
-                        <button type="button" class="button" id="sge-clear-logs" <?php echo $is_running ? 'disabled' : ''; ?>>ログをクリア</button>
-                        <button type="button" class="button" id="sge-export-settings">設定をエクスポート</button>
-                        <button type="button" class="button" id="sge-import-settings">設定をインポート</button>
-                        <button type="button" class="button" id="sge-reset-scheduler">Scheduled Actionsをリセット</button>
-                        <input type="file" id="sge-import-file" accept=".json" style="display:none;">
+                        </div><!-- .cp-accordion-content -->
+                    </div><!-- .cp-accordion-section -->
+
+                    <div class="cp-form-actions">
+                        <button type="submit" class="button button-primary" id="cp-save-settings" <?php echo $is_running ? 'disabled' : ''; ?>>設定を保存</button>
+                        <button type="button" class="button" id="cp-reset-settings" <?php echo $is_running ? 'disabled' : ''; ?>>設定をリセット</button>
+                        <button type="button" class="button" id="cp-clear-cache" <?php echo $is_running ? 'disabled' : ''; ?>>キャッシュをクリア</button>
+                        <button type="button" class="button" id="cp-clear-logs" <?php echo $is_running ? 'disabled' : ''; ?>>ログをクリア</button>
+                        <button type="button" class="button" id="cp-export-settings">設定をエクスポート</button>
+                        <button type="button" class="button" id="cp-import-settings">設定をインポート</button>
+                        <button type="button" class="button" id="cp-reset-scheduler">Scheduled Actionsをリセット</button>
+                        <input type="file" id="cp-import-file" accept=".json" style="display:none;">
                     </div>
                 </form>
 
-                <div class="sge-version-info">
-                    Carry Pod <a href="https://github.com/villyoshioka/CarryPod/releases/tag/v<?php echo esc_attr( SGE_VERSION ); ?>" target="_blank" rel="noopener noreferrer">v<?php echo esc_html( SGE_VERSION ); ?></a>
+                <div class="cp-version-info">
+                    Carry Pod <a href="https://github.com/villyoshioka/CarryPod/releases/tag/v<?php echo esc_attr( CP_VERSION ); ?>" target="_blank" rel="noopener noreferrer">v<?php echo esc_html( CP_VERSION ); ?></a>
                 </div>
             </div>
         </div>
@@ -849,14 +878,14 @@ class SGE_Admin {
      * Ajax: 静的化を実行
      */
     public function ajax_execute_generation() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
         // レート制限チェック（1分間に3回まで）
         if ( ! $this->check_rate_limit( 'execute_generation', 3, 60 ) ) {
             wp_send_json_error( array( 'message' => 'リクエストが多すぎます。しばらく待ってから再試行してください。' ) );
         }
 
-        if ( ! current_user_can( 'sge_execute' ) ) {
+        if ( ! current_user_can( 'cp_execute' ) ) {
             wp_send_json_error( array( 'message' => '静的化実行の権限がありません。' ) );
         }
 
@@ -865,20 +894,20 @@ class SGE_Admin {
             wp_send_json_error( array( 'message' => 'Action Schedulerが読み込まれていません。プラグインを再度有効化してください。' ) );
         }
 
-        $logger = SGE_Logger::get_instance();
+        $logger = CP_Logger::get_instance();
 
         // コミットメッセージを保存（実行時に動的生成するため、ここでは保存しない）
-        $settings = get_option( 'sge_settings', array() );
+        $settings = get_option( 'cp_settings', array() );
         if ( isset( $_POST['commit_message'] ) && ! empty( trim( $_POST['commit_message'] ) ) ) {
             $settings['commit_message'] = sanitize_text_field( $_POST['commit_message'] );
-            update_option( 'sge_settings', $settings );
+            update_option( 'cp_settings', $settings );
         } elseif ( empty( $settings['commit_message'] ) ) {
             // コミットメッセージが空の場合は実行時に動的生成するため、ここでは何もしない
             // 実行時に最新のタイムスタンプでコミットメッセージが生成される
         }
 
         // アトミックに実行中フラグをチェックして設定（競合状態を防ぐ）
-        $lock_key = 'sge_execution_lock';
+        $lock_key = 'cp_execution_lock';
         $lock_timeout = 3600; // 1時間
         $lock_value = wp_generate_uuid4(); // ユニークなロック識別子
 
@@ -925,25 +954,25 @@ class SGE_Admin {
         }
 
         // 既存の保留中タスクをキャンセル
-        as_unschedule_all_actions( 'sge_static_generation', array(), 'sge' );
+        as_unschedule_all_actions( 'cp_static_generation', array(), 'sge' );
 
         // 実行中フラグをクリア（前回のクラッシュで残っている場合に備えて）
-        delete_transient( 'sge_manual_running' );
-        delete_transient( 'sge_auto_running' );
+        delete_transient( 'cp_manual_running' );
+        delete_transient( 'cp_auto_running' );
 
         // 進捗情報をクリア
         $logger->clear_progress();
 
         // ログを強制的にクリア（実行中フラグをチェックせずに直接クリア）
-        update_option( 'sge_logs', array() );
+        update_option( 'cp_logs', array() );
         // クリア後に初期ログを記録（ログがクリアされたことを確認するため）
         $logger->add_log( '新しい実行を開始します...' );
 
         // 実行中フラグをセット（タスクをキューに入れる前にセット）
-        set_transient( 'sge_manual_running', true, 3600 );
+        set_transient( 'cp_manual_running', true, 3600 );
 
         // Action Schedulerで非同期実行
-        as_enqueue_async_action( 'sge_static_generation', array(), 'sge' );
+        as_enqueue_async_action( 'cp_static_generation', array(), 'sge' );
 
         // ロックを解除（タスクがキューに入ったら）
         delete_option( $lock_key );
@@ -958,13 +987,13 @@ class SGE_Admin {
      * Ajax: ログを取得
      */
     public function ajax_get_logs() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'sge_execute' ) ) {
+        if ( ! current_user_can( 'cp_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
         }
 
-        $logger = SGE_Logger::get_instance();
+        $logger = CP_Logger::get_instance();
         $offset = isset( $_POST['offset'] ) ? intval( $_POST['offset'] ) : 0;
 
         $logs = $logger->get_logs_from_offset( $offset );
@@ -981,13 +1010,13 @@ class SGE_Admin {
      * Ajax: 進捗を取得
      */
     public function ajax_get_progress() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'sge_execute' ) ) {
+        if ( ! current_user_can( 'cp_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
         }
 
-        $logger = SGE_Logger::get_instance();
+        $logger = CP_Logger::get_instance();
         $progress = $logger->get_progress();
         $is_running = $logger->is_running();
 
@@ -1001,23 +1030,23 @@ class SGE_Admin {
      * Ajax: ログをクリア
      */
     public function ajax_clear_logs() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'sge_execute' ) ) {
+        if ( ! current_user_can( 'cp_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
         }
 
         // 実行中かチェック
-        $logger = SGE_Logger::get_instance();
+        $logger = CP_Logger::get_instance();
         if ( $logger->is_running() ) {
             wp_send_json_error( array( 'message' => '静的化実行中はログをクリアできません。' ) );
         }
 
         // ログをクリア
-        update_option( 'sge_logs', array() );
+        update_option( 'cp_logs', array() );
 
         // エラー通知をクリア
-        delete_option( 'sge_error_notification' );
+        delete_option( 'cp_error_notification' );
 
         wp_send_json_success( array( 'message' => 'ログをクリアしました。' ) );
     }
@@ -1026,7 +1055,7 @@ class SGE_Admin {
      * Ajax: 設定を保存
      */
     public function ajax_save_settings() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
         // レート制限チェック（1分間に10回まで）
         if ( ! $this->check_rate_limit( 'save_settings', 10, 60 ) ) {
@@ -1034,11 +1063,11 @@ class SGE_Admin {
         }
 
         // フォームのnonceも検証
-        if ( isset( $_POST['sge_settings_nonce'] ) && ! wp_verify_nonce( $_POST['sge_settings_nonce'], 'sge_save_settings' ) ) {
+        if ( isset( $_POST['cp_settings_nonce'] ) && ! wp_verify_nonce( $_POST['cp_settings_nonce'], 'cp_save_settings' ) ) {
             wp_send_json_error( array( 'message' => 'セキュリティチェックに失敗しました。' ) );
         }
 
-        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+        if ( ! current_user_can( 'cp_manage_settings' ) ) {
             wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
@@ -1090,6 +1119,11 @@ class SGE_Admin {
             // Textarea fields
             'include_paths' => 'textarea',
             'exclude_patterns' => 'textarea',
+            // URL fields
+            'base_url' => 'url',
+            // Folder name fields
+            'custom_wp_includes' => 'folder_name',
+            'custom_wp_content' => 'folder_name',
             // Integer fields
             'timeout' => 'integer',
         );
@@ -1102,6 +1136,33 @@ class SGE_Admin {
                 $settings[ $field ] = isset( $_POST[ $field ] ) ? sanitize_text_field( wp_unslash( $_POST[ $field ] ) ) : '';
             } elseif ( $type === 'textarea' ) {
                 $settings[ $field ] = isset( $_POST[ $field ] ) ? sanitize_textarea_field( wp_unslash( $_POST[ $field ] ) ) : '';
+            } elseif ( $type === 'url' ) {
+                $settings[ $field ] = isset( $_POST[ $field ] ) ? esc_url_raw( wp_unslash( $_POST[ $field ] ) ) : '';
+            } elseif ( $type === 'folder_name' ) {
+                // フォルダ名専用のバリデーション
+                $value = isset( $_POST[ $field ] ) ? sanitize_text_field( wp_unslash( $_POST[ $field ] ) ) : '';
+                // 空の場合はそのまま許可
+                if ( empty( $value ) ) {
+                    $settings[ $field ] = '';
+                } else {
+                    // 予約語チェック（システムディレクトリ名との衝突防止）
+                    $reserved_names = array(
+                        'wp-admin', 'wp-includes', 'wp-content',
+                        'system', 'windows', 'winnt', 'etc', 'bin', 'usr', 'var', 'tmp',
+                        'program files', 'programdata',
+                    );
+                    $value_lower = strtolower( $value );
+
+                    if ( in_array( $value_lower, $reserved_names, true ) ) {
+                        $settings[ $field ] = '';
+                    } elseif ( preg_match( '/^[a-zA-Z0-9_-]{1,50}$/', $value ) && strpos( $value, '..' ) === false ) {
+                        // 英数字、ハイフン、アンダースコアのみ許可
+                        // 1-50文字、パストラバーサル防止（..を含まない）
+                        $settings[ $field ] = $value;
+                    } else {
+                        $settings[ $field ] = '';
+                    }
+                }
             } elseif ( $type === 'integer' ) {
                 $settings[ $field ] = isset( $_POST[ $field ] ) ? intval( $_POST[ $field ] ) : 0;
             }
@@ -1118,7 +1179,7 @@ class SGE_Admin {
             $settings['url_mode'] = 'relative';
         }
         if ( empty( $settings['timeout'] ) || $settings['timeout'] < 60 ) {
-            $settings['timeout'] = 600;
+            $settings['timeout'] = 300;
         }
         if ( empty( $settings['gitlab_branch_mode'] ) ) {
             $settings['gitlab_branch_mode'] = 'existing';
@@ -1127,12 +1188,48 @@ class SGE_Admin {
             $settings['gitlab_api_url'] = 'https://gitlab.com/api/v4';
         }
 
+        // base_urlのバリデーション
+        if ( ! empty( $settings['base_url'] ) ) {
+            // 末尾のスラッシュを削除
+            $settings['base_url'] = rtrim( $settings['base_url'], '/' );
+
+            // HTTP/HTTPSのみ許可
+            $parsed_url = wp_parse_url( $settings['base_url'] );
+            if ( empty( $parsed_url['scheme'] ) || ! in_array( $parsed_url['scheme'], array( 'http', 'https' ), true ) ) {
+                // 無効なURLの場合は空にする
+                $settings['base_url'] = '';
+            }
+        }
+
+        // 設定を保存前に、キャッシュクリアが必要かチェック
+        $settings_manager = CP_Settings::get_instance();
+        $old_settings = $settings_manager->get_settings();
+
+        // カスタムフォルダ名またはURL形式が変更されたかチェック
+        $should_clear_cache = false;
+        $cache_clear_fields = array( 'custom_wp_includes', 'custom_wp_content', 'url_mode', 'base_url' );
+
+        foreach ( $cache_clear_fields as $field ) {
+            $old_value = isset( $old_settings[ $field ] ) ? $old_settings[ $field ] : '';
+            $new_value = isset( $settings[ $field ] ) ? $settings[ $field ] : '';
+
+            if ( $old_value !== $new_value ) {
+                $should_clear_cache = true;
+                break;
+            }
+        }
+
         // 設定を保存
-        $settings_manager = SGE_Settings::get_instance();
         $result = $settings_manager->save_settings( $settings );
 
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+        }
+
+        // キャッシュクリアが必要な場合は実行
+        if ( $should_clear_cache ) {
+            $cache = CP_Cache::get_instance();
+            $cache->clear_all();
         }
 
         wp_send_json_success( array( 'message' => '設定を保存しました。' ) );
@@ -1142,13 +1239,13 @@ class SGE_Admin {
      * Ajax: 設定をリセット
      */
     public function ajax_reset_settings() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+        if ( ! current_user_can( 'cp_manage_settings' ) ) {
             wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
-        $settings_manager = SGE_Settings::get_instance();
+        $settings_manager = CP_Settings::get_instance();
         $settings_manager->reset_settings();
 
         wp_send_json_success( array( 'message' => '設定をリセットしました。' ) );
@@ -1158,13 +1255,13 @@ class SGE_Admin {
      * Ajax: 設定をエクスポート
      */
     public function ajax_export_settings() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+        if ( ! current_user_can( 'cp_manage_settings' ) ) {
             wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
-        $settings_manager = SGE_Settings::get_instance();
+        $settings_manager = CP_Settings::get_instance();
         $json = $settings_manager->export_settings();
 
         wp_send_json_success( array( 'data' => $json ) );
@@ -1174,9 +1271,9 @@ class SGE_Admin {
      * Ajax: 設定をインポート
      */
     public function ajax_import_settings() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+        if ( ! current_user_can( 'cp_manage_settings' ) ) {
             wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
@@ -1187,7 +1284,7 @@ class SGE_Admin {
         // インポートデータをサニタイズ（JSON文字列としてエスケープ処理）
         $import_data = wp_unslash( $_POST['data'] );
 
-        $settings_manager = SGE_Settings::get_instance();
+        $settings_manager = CP_Settings::get_instance();
         $result = $settings_manager->import_settings( $import_data );
 
         if ( is_wp_error( $result ) ) {
@@ -1201,13 +1298,13 @@ class SGE_Admin {
      * Ajax: キャッシュをクリア
      */
     public function ajax_clear_cache() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+        if ( ! current_user_can( 'cp_manage_settings' ) ) {
             wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
-        $cache = SGE_Cache::get_instance();
+        $cache = CP_Cache::get_instance();
         $stats = $cache->get_stats();
         $deleted = $cache->clear_all();
 
@@ -1221,14 +1318,14 @@ class SGE_Admin {
      * Ajax: 最新のログをダウンロード
      */
     public function ajax_download_log() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'sge_execute' ) ) {
+        if ( ! current_user_can( 'cp_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
         }
 
         try {
-            $logger = SGE_Logger::get_instance();
+            $logger = CP_Logger::get_instance();
             $logs = $logger->get_logs();
 
             if ( empty( $logs ) ) {
@@ -1252,11 +1349,11 @@ class SGE_Admin {
             }
 
             // 設定情報を取得
-            $settings_manager = SGE_Settings::get_instance();
+            $settings_manager = CP_Settings::get_instance();
             $settings = $settings_manager->get_settings();
 
             // キャッシュ情報を取得
-            $cache = SGE_Cache::get_instance();
+            $cache = CP_Cache::get_instance();
             $cache_stats = $cache->get_stats();
 
             // ログをテキスト形式に変換
@@ -1268,7 +1365,7 @@ class SGE_Admin {
             $log_text .= "【基本情報】\n";
             $log_text .= "生成日時: " . $timestamp . "\n";
             $log_text .= "ステータス: " . ( $has_error ? 'エラー' : '成功' ) . "\n";
-            $log_text .= "プラグインバージョン: " . SGE_VERSION . "\n";
+            $log_text .= "プラグインバージョン: " . CP_VERSION . "\n";
             $log_text .= "WordPress バージョン: " . get_bloginfo( 'version' ) . "\n";
             $log_text .= "PHP バージョン: " . PHP_VERSION . "\n";
             $log_text .= "\n";
@@ -1322,7 +1419,10 @@ class SGE_Admin {
 
             $log_text .= "その他の設定:\n";
             $log_text .= "  - URL形式: " . ( $settings['url_mode'] === 'relative' ? '相対パス' : '絶対パス' ) . "\n";
-            $log_text .= "  - タイムアウト: " . ( $settings['timeout'] ?? 600 ) . " 秒\n";
+            if ( $settings['url_mode'] === 'absolute' && ! empty( $settings['base_url'] ) ) {
+                $log_text .= "  - ベースURL: " . $settings['base_url'] . "\n";
+            }
+            $log_text .= "  - タイムアウト: " . ( $settings['timeout'] ?? 300 ) . " 秒\n";
             $log_text .= "  - 自動静的化: " . ( ! empty( $settings['auto_generate'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "  - キャッシュ: " . ( ! empty( $settings['cache_enabled'] ) ? '有効' : '無効' ) . "\n";
             if ( ! empty( $settings['cache_enabled'] ) ) {
@@ -1377,11 +1477,11 @@ class SGE_Admin {
             $log_text .= "=====================================\n";
 
             // エラー通知をクリア
-            delete_option( 'sge_error_notification' );
+            delete_option( 'cp_error_notification' );
 
             wp_send_json_success( array(
                 'log' => $log_text,
-                'filename' => 'sge-log-' . date( 'Ymd-His', strtotime( $timestamp ) ) . '.txt',
+                'filename' => 'cp-log-' . date( 'Ymd-His', strtotime( $timestamp ) ) . '.txt',
             ) );
 
         } catch ( Exception $e ) {
@@ -1399,25 +1499,25 @@ class SGE_Admin {
      * Ajax: 静的化を中止
      */
     public function ajax_cancel_generation() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'sge_execute' ) ) {
+        if ( ! current_user_can( 'cp_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
         }
 
         try {
             // Action Schedulerのタスクをキャンセル
             if ( function_exists( 'as_unschedule_all_actions' ) ) {
-                as_unschedule_all_actions( 'sge_static_generation', array(), 'sge' );
+                as_unschedule_all_actions( 'cp_static_generation', array(), 'sge' );
             }
 
             // 実行中フラグをクリア
-            delete_transient( 'sge_manual_running' );
-            delete_transient( 'sge_auto_running' );
+            delete_transient( 'cp_manual_running' );
+            delete_transient( 'cp_auto_running' );
 
             // ログと進捗情報をクリア
-            update_option( 'sge_logs', array() );
-            delete_option( 'sge_progress' );
+            update_option( 'cp_logs', array() );
+            delete_option( 'cp_progress' );
 
             wp_send_json_success( array( 'message' => '実行を中止しました。' ) );
 
@@ -1430,9 +1530,9 @@ class SGE_Admin {
      * Ajax: Scheduled Actionsをリセット
      */
     public function ajax_reset_scheduler() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
+        check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        if ( ! current_user_can( 'sge_manage_settings' ) ) {
+        if ( ! current_user_can( 'cp_manage_settings' ) ) {
             wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
         }
 
@@ -1441,15 +1541,15 @@ class SGE_Admin {
 
             // Action Schedulerのすべてのタスクをキャンセル
             if ( function_exists( 'as_unschedule_all_actions' ) ) {
-                as_unschedule_all_actions( 'sge_static_generation', array(), 'sge' );
+                as_unschedule_all_actions( 'cp_static_generation', array(), 'sge' );
             }
 
             // 実行中フラグをクリア
-            delete_transient( 'sge_manual_running' );
-            delete_transient( 'sge_auto_running' );
+            delete_transient( 'cp_manual_running' );
+            delete_transient( 'cp_auto_running' );
 
             // 進捗情報をクリア
-            delete_option( 'sge_progress' );
+            delete_option( 'cp_progress' );
 
             // Action Schedulerのテーブルから直接削除
             $tables = array(
@@ -1486,7 +1586,7 @@ class SGE_Admin {
                         $deleted = $this->safe_delete_records(
                             $table,
                             "DELETE FROM {$table} WHERE action_id IN (SELECT action_id FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s)",
-                            array( 'sge_static_generation' ),
+                            array( 'cp_static_generation' ),
                             60
                         );
                     }
@@ -1516,7 +1616,7 @@ class SGE_Admin {
      * Ajax: エラー通知チェック
      */
     public function ajax_check_error_notification() {
-        $error_notification = get_option( 'sge_error_notification', false );
+        $error_notification = get_option( 'cp_error_notification', false );
         $has_error = $error_notification && ! empty( $error_notification['count'] );
 
         wp_send_json_success( array(
@@ -1535,7 +1635,7 @@ class SGE_Admin {
      */
     private function check_rate_limit( $action, $limit = 10, $period = 60 ) {
         $user_id = get_current_user_id();
-        $key = 'sge_rate_limit_' . $action . '_' . $user_id;
+        $key = 'cp_rate_limit_' . $action . '_' . $user_id;
         $attempts = get_transient( $key );
 
         if ( $attempts === false ) {
@@ -1589,10 +1689,10 @@ class SGE_Admin {
         );
 
         // セキュリティログをオプションに保存（最大100件）
-        $security_logs = get_option( 'sge_security_logs', array() );
+        $security_logs = get_option( 'cp_security_logs', array() );
         array_unshift( $security_logs, $log_entry );
         $security_logs = array_slice( $security_logs, 0, 100 );
-        update_option( 'sge_security_logs', $security_logs, false );
+        update_option( 'cp_security_logs', $security_logs, false );
 
         // 重要なイベントはerror_logにも記録
         if ( in_array( $event_type, array( 'rate_limit_exceeded', 'auth_failed', 'invalid_nonce' ) ) ) {
@@ -1680,24 +1780,5 @@ class SGE_Admin {
         }
 
         return $deleted_total;
-    }
-
-    /**
-     * Ajax: v2.0.0通知を無視
-     *
-     * v1.4.2専用機能、v2.0.0で削除予定
-     */
-    public function ajax_dismiss_v2_notification() {
-        check_ajax_referer( 'sge_nonce', 'nonce' );
-
-        if ( ! current_user_can( 'sge_execute' ) ) {
-            wp_send_json_error( array( 'message' => '権限がありません。' ) );
-        }
-
-        $user_id = get_current_user_id();
-        // 3日間非表示
-        set_transient( 'sge_v2_notification_dismissed_' . $user_id, true, 3 * DAY_IN_SECONDS );
-
-        wp_send_json_success( array( 'message' => '通知を非表示にしました。' ) );
     }
 }

@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class SGE_GitLab_API implements SGE_Git_Provider_Interface {
+class CP_GitLab_API implements CP_Git_Provider_Interface {
 
     /**
      * GitLab API URL
@@ -53,7 +53,7 @@ class SGE_GitLab_API implements SGE_Git_Provider_Interface {
         $this->project_id = rawurlencode( $project_path );
         $this->branch = $branch;
         $this->api_url = rtrim( $api_url, '/' );
-        $this->logger = SGE_Logger::get_instance();
+        $this->logger = CP_Logger::get_instance();
     }
 
     /**

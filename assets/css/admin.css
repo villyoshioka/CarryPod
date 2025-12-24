@@ -1,25 +1,67 @@
 /* Carry Pod 管理画面スタイル */
 
-.sge-admin-wrap {
+/* ========================================
+   WordPress管理画面フッター位置調整
+   ======================================== */
+
+/* Carry Pod設定画面でのみ適用 */
+/* body全体をFlexboxコンテナに */
+body.carry-pod_page_carry-pod-settings {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: calc(100vh - 32px) !important; /* 100vh - admin bar height */
+}
+
+/* wpwrapを拡張して空きスペースを埋める */
+body.carry-pod_page_carry-pod-settings #wpwrap {
+    flex: 1 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important; /* WordPressのデフォルトmin-heightをリセット */
+}
+
+body.carry-pod_page_carry-pod-settings #wpcontent {
+    flex: 1 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important; /* WordPressのデフォルトmin-heightをリセット */
+}
+
+body.carry-pod_page_carry-pod-settings #wpbody {
+    flex: 1 0 auto !important;
+    min-height: 0 !important; /* WordPressのデフォルトmin-heightをリセット */
+}
+
+/* wpfooterは自然なサイズ */
+body.carry-pod_page_carry-pod-settings #wpfooter {
+    flex: 0 0 auto !important;
+}
+
+/* WordPress標準の.wrapクラスの中央揃えを上書き */
+.wrap.cp-admin-wrap {
+    text-align: left !important;
+}
+
+.cp-admin-wrap {
     max-width: 1200px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     margin-bottom: 20px;
     padding-bottom: 0;
 }
 
-.sge-admin-wrap h1 {
+.cp-admin-wrap h1 {
     color: #1d2327;
-    margin: 0 0 30px;
+    margin: 20px 0 30px;
     font-size: 24px;
     font-weight: 400;
 }
 
-.sge-admin-wrap h2 {
+.cp-admin-wrap h2 {
     color: #1d2327;
     font-weight: 400;
 }
 
-.sge-admin-wrap h3 {
+.cp-admin-wrap h3 {
     color: #2c3338;
     font-size: 14px;
     font-weight: 600;
@@ -29,7 +71,7 @@
 }
 
 /* フォームグループ */
-.sge-form-group {
+.cp-form-group {
     margin-bottom: 20px;
     padding: 15px;
     background: #fff;
@@ -37,18 +79,27 @@
     border-radius: 4px;
 }
 
-.sge-form-group label {
-    display: block;
-    margin-bottom: 5px;
+.cp-form-group label {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 8px;
     font-weight: 600;
     color: #1d2327;
     font-size: 14px;
+    line-height: 1.5;
 }
 
-.sge-form-group input[type="text"],
-.sge-form-group input[type="number"],
-.sge-form-group textarea,
-.sge-form-group select {
+/* チェックボックス付きラベル */
+.cp-form-group label input[type="checkbox"] {
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.cp-form-group input[type="text"],
+.cp-form-group input[type="url"],
+.cp-form-group input[type="number"],
+.cp-form-group textarea,
+.cp-form-group select {
     width: 100%;
     max-width: 25em;
     border-radius: 4px;
@@ -59,153 +110,160 @@
 }
 
 /* large-textクラスのテキストエリアは幅を広く */
-.sge-form-group textarea.large-text {
+.cp-form-group textarea.large-text {
     max-width: 100%;
     width: 100%;
 }
 
-.sge-form-group input.regular-text {
+.cp-form-group input.regular-text {
     width: 25em;
     max-width: 100%;
 }
 
-.sge-form-group input[type="text"]:focus,
-.sge-form-group input[type="number"]:focus,
-.sge-form-group textarea:focus,
-.sge-form-group select:focus {
+.cp-form-group input[type="text"]:focus,
+.cp-form-group input[type="url"]:focus,
+.cp-form-group input[type="number"]:focus,
+.cp-form-group textarea:focus,
+.cp-form-group select:focus {
     border-color: var(--wp-admin-theme-color);
     box-shadow: 0 0 0 1px var(--wp-admin-theme-color);
     outline: 2px solid transparent;
 }
 
-.sge-form-group .description {
+.cp-form-group .description {
     font-size: 13px;
     color: #646970;
-    margin-top: 5px;
-    font-style: italic;
+    margin-top: 4px;
+    margin-left: 0;
+    line-height: 1.5;
+}
+
+/* チェックボックス付きラベルの直後のdescriptionのみインデント */
+.cp-form-group label+.description {
+    margin-left: 24px;
 }
 
 /* サブセクション内の説明文を調整 */
-.sge-subsection .sge-form-group .description {
+.cp-subsection .cp-form-group .description {
     margin-left: 0;
-    padding: 8px;
-    background: #f6f7f7;
-    border-left: 2px solid #dcdcde;
-    font-style: normal;
-    border-radius: 2px;
-    margin-top: 8px;
+    padding: 0;
+    background: none;
+    border-left: none;
+    border-radius: 0;
+    margin-top: 4px;
 }
 
-.sge-form-group .required {
+/* サブセクション内のチェックボックス付きラベルの直後のdescription */
+.cp-subsection .cp-form-group label+.description {
+    margin-left: 24px;
+}
+
+.cp-form-group .required {
     color: #d63638;
     font-weight: 600;
 }
 
-/* チェックボックス・ラジオボタン - ブロックエディタ風 */
-.sge-admin-wrap .sge-form-group input[type="checkbox"],
-.sge-admin-wrap .sge-form-group input[type="radio"] {
-    width: 20px !important;
-    height: 20px !important;
-    min-width: 20px !important;
-    min-height: 20px !important;
-    margin: 0 8px 0 0 !important;
-    vertical-align: middle;
-    border: 2px solid #1e1e1e !important;
+/* チェックボックス・ラジオボタン - Gutenberg風 */
+.cp-admin-wrap .cp-form-group input[type="checkbox"],
+.cp-admin-wrap .cp-form-group input[type="radio"] {
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
+    min-height: 16px !important;
+    margin: 2px 8px 0 0 !important;
+    vertical-align: top;
+    border: 1.5px solid #8c8f94 !important;
     background: #fff !important;
     cursor: pointer;
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
     appearance: none !important;
-    transition: all 0.1s ease;
+    transition: all 0.05s ease;
     position: relative;
     flex-shrink: 0;
     box-shadow: none !important;
 }
 
-.sge-admin-wrap .sge-form-group input[type="checkbox"] {
+.cp-admin-wrap .cp-form-group input[type="checkbox"] {
     border-radius: 2px !important;
 }
 
-.sge-admin-wrap .sge-form-group input[type="radio"] {
+.cp-admin-wrap .cp-form-group input[type="radio"] {
     border-radius: 50% !important;
 }
 
 /* WordPressデフォルトの::before擬似要素を無効化 */
-.sge-admin-wrap .sge-form-group input[type="checkbox"]::before,
-.sge-admin-wrap .sge-form-group input[type="radio"]::before {
+.cp-admin-wrap .cp-form-group input[type="checkbox"]::before,
+.cp-admin-wrap .cp-form-group input[type="radio"]::before {
     content: none !important;
     display: none !important;
 }
 
-.sge-admin-wrap .sge-form-group input[type="checkbox"]:hover,
-.sge-admin-wrap .sge-form-group input[type="radio"]:hover {
-    border-color: #757575 !important;
+.cp-admin-wrap .cp-form-group input[type="checkbox"]:hover,
+.cp-admin-wrap .cp-form-group input[type="radio"]:hover {
+    border-color: #1d2327 !important;
 }
 
-.sge-admin-wrap .sge-form-group input[type="checkbox"]:focus,
-.sge-admin-wrap .sge-form-group input[type="radio"]:focus {
+.cp-admin-wrap .cp-form-group input[type="checkbox"]:focus,
+.cp-admin-wrap .cp-form-group input[type="radio"]:focus {
     outline: none !important;
-    border-color: var(--wp-admin-theme-color, #3858e9) !important;
-    box-shadow: 0 0 0 1px #fff, 0 0 0 3px var(--wp-admin-theme-color, #3858e9) !important;
+    border-color: var(--wp-admin-theme-color, #2271b1) !important;
+    box-shadow: 0 0 0 1px var(--wp-admin-theme-color, #2271b1) !important;
 }
 
-.sge-admin-wrap .sge-form-group input[type="checkbox"]:checked {
-    background: #1e1e1e !important;
-    border-color: #1e1e1e !important;
+/* チェック状態 */
+.cp-admin-wrap .cp-form-group input[type="checkbox"]:checked {
+    background: var(--wp-admin-theme-color, #2271b1) !important;
+    border-color: var(--wp-admin-theme-color, #2271b1) !important;
 }
 
-.sge-admin-wrap .sge-form-group input[type="checkbox"]:checked::after {
+.cp-admin-wrap .cp-form-group input[type="checkbox"]:checked::after {
     content: '' !important;
     display: block !important;
     position: absolute !important;
-    left: 4px !important;
-    top: 1px !important;
-    width: 4px !important;
-    height: 8px !important;
+    left: 4.5px !important;
+    top: 1.5px !important;
+    width: 3.5px !important;
+    height: 7px !important;
     border: solid #fff !important;
-    border-width: 0 2px 2px 0 !important;
+    border-width: 0 1.5px 1.5px 0 !important;
     transform: rotate(45deg) !important;
     background: transparent !important;
     border-radius: 0 !important;
 }
 
-.sge-admin-wrap .sge-form-group input[type="radio"]:checked {
-    background: #1e1e1e !important;
-    border-color: #1e1e1e !important;
-}
-
-.sge-admin-wrap .sge-form-group input[type="radio"]:checked::after {
-    content: '' !important;
-    display: block !important;
-    position: absolute !important;
-    left: 4px !important;
-    top: 4px !important;
-    width: 8px !important;
-    height: 8px !important;
-    border-radius: 50% !important;
+/* ラジオボタンチェック状態 */
+.cp-admin-wrap .cp-form-group input[type="radio"]:checked {
     background: #fff !important;
+    border-color: var(--wp-admin-theme-color, #2271b1) !important;
+    border-width: 5px !important;
 }
 
-.sge-admin-wrap .sge-form-group input[type="checkbox"]:disabled,
-.sge-admin-wrap .sge-form-group input[type="radio"]:disabled {
+.cp-admin-wrap .cp-form-group input[type="radio"]:checked::after {
+    content: none !important;
+    display: none !important;
+}
+
+.cp-admin-wrap .cp-form-group input[type="checkbox"]:disabled,
+.cp-admin-wrap .cp-form-group input[type="radio"]:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     background: #f6f7f7 !important;
     border-color: #8d96a0 !important;
 }
 
-.sge-subsection {
+.cp-subsection {
     margin-left: 20px;
     margin-top: 10px;
     margin-bottom: 20px;
     padding: 20px;
-    background: #f9f9f9;
+    background: #fff;
     border: 1px solid #e2e4e7;
     border-left: 3px solid var(--wp-admin-theme-color);
     border-radius: 2px;
 }
 
-.sge-subsection .sge-form-group {
+.cp-subsection .cp-form-group {
     background: #fff;
     border: 1px solid #e2e4e7;
     padding: 15px;
@@ -213,51 +271,52 @@
     border-radius: 2px;
 }
 
-.sge-subsection .sge-form-group:last-child {
+.cp-subsection .cp-form-group:last-child {
     margin-bottom: 0;
 }
 
 /* 進捗表示エリア */
-.sge-progress-section {
+.cp-progress-section {
     padding: 15px;
     background: #fff;
     border: 1px solid #e2e4e7;
     border-radius: 4px;
     order: 3;
-    display: block; /* 常に表示 */
+    display: block;
+    /* 常に表示 */
     margin: 0;
 }
 
 /* 進捗セクションが表示される時（互換性のため残す） */
-.sge-progress-section.active {
+.cp-progress-section.active {
     display: block;
 }
 
-.sge-progress-section h3 {
+.cp-progress-section h3 {
     display: block;
-    margin: 0 0 15px;
+    margin: 0;
+    padding: 0 0 15px 0;
     font-weight: 600;
     color: #1d2327;
-    font-size: 14px;
-    padding-bottom: 8px;
+    font-size: 16px;
     border-bottom: 1px solid #e2e4e7;
 }
 
-.sge-progress-container {
+.cp-progress-container {
     background: transparent;
     border: none;
     padding: 15px 5px 5px;
     border-radius: 0;
 }
 
-.sge-progress-header {
+.cp-progress-header {
     display: flex;
     align-items: center;
     gap: 15px;
     margin-bottom: 20px;
 }
 
-.sge-progress-bar-wrapper {
+.cp-progress-bar-wrapper {
     background: #f0f0f1;
     height: 20px;
     border-radius: 10px;
@@ -266,14 +325,14 @@
     position: relative;
 }
 
-.sge-progress-bar {
+.cp-progress-bar {
     background: var(--wp-admin-theme-color);
     height: 100%;
     transition: width 0.3s ease;
     position: relative;
 }
 
-.sge-progress-percentage {
+.cp-progress-percentage {
     color: #1d2327;
     font-weight: 600;
     font-size: 14px;
@@ -281,7 +340,7 @@
     text-align: right;
 }
 
-.sge-progress-status {
+.cp-progress-status {
     font-size: 14px;
     font-weight: 600;
     color: #1d2327;
@@ -289,22 +348,27 @@
     line-height: 1.5;
 }
 
-.sge-progress-details {
-    display: none; /* 進捗詳細部分を非表示 */
+.cp-progress-details {
+    display: none;
+    /* 進捗詳細部分を非表示 */
 }
 
-/* ボタンスタイル - ブロックエディタ風 */
-.button {
+/* ボタンスタイル - WordPress管理画面全体に適用 */
+.cp-admin-wrap .button,
+.cp-admin-wrap button.button,
+.cp-admin-wrap input[type="submit"],
+.cp-admin-wrap input[type="button"] {
     border-radius: 2px;
     padding: 0 12px;
     height: 36px;
-    line-height: 2.15384615; /* 28px / 13px */
+    line-height: 2.15384615;
+    /* 28px / 13px */
     font-size: 13px;
     font-weight: 400;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    border: 1px solid #2271b1;
-    background: #2271b1;
-    color: #fff;
+    border: 1px solid #c3c4c7;
+    background: #f6f7f7;
+    color: #2c3338;
     cursor: pointer;
     display: inline-block;
     text-decoration: none;
@@ -314,115 +378,141 @@
     box-sizing: border-box;
     text-align: center;
     vertical-align: middle;
-    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.1);
-}
-
-.button:hover {
-    background: #135e96;
-    border-color: #135e96;
-    color: #fff;
-}
-
-.button:focus {
-    background: #135e96;
-    border-color: #0a4b78;
-    box-shadow: 0 0 0 1px #fff, 0 0 0 3px #2271b1;
-    outline: 2px solid transparent;
-    color: #fff;
-}
-
-.button:active {
-    background: #0a4b78;
-    border-color: #0a4b78;
-    color: #fff;
     box-shadow: none;
 }
 
-.button-primary {
-    background: #2271b1;
-    border-color: #2271b1;
-    color: #fff;
-}
-
-.button-primary:hover {
-    background: #135e96;
-    border-color: #135e96;
-    color: #fff;
-}
-
-.button-primary:focus {
-    background: #135e96;
-    border-color: #0a4b78;
-    box-shadow: 0 0 0 1px #fff, 0 0 0 3px #2271b1;
-    color: #fff;
-}
-
-.button-primary:active {
-    background: #0a4b78;
-    border-color: #0a4b78;
-    color: #fff;
-}
-
-/* セカンダリボタン（デフォルトグレー） - ブロックエディタ風 */
-.button-secondary {
-    background: #f6f7f7;
-    border: 1px solid #2271b1;
-    color: #2271b1;
-    box-shadow: none;
-}
-
-.button-secondary:hover {
+.cp-admin-wrap .button:hover,
+.cp-admin-wrap button.button:hover {
     background: #f0f0f1;
-    border-color: #0a4b78;
-    color: #0a4b78;
+    border-color: #8c8f94;
+    color: #2c3338;
 }
 
-.button-secondary:focus {
+.cp-admin-wrap .button:focus,
+.cp-admin-wrap button.button:focus {
     background: #f6f7f7;
-    border-color: #0a4b78;
-    box-shadow: 0 0 0 1px #fff, 0 0 0 3px #2271b1;
+    border-color: var(--wp-admin-theme-color, #2271b1);
+    box-shadow: 0 0 0 1px var(--wp-admin-theme-color, #2271b1);
     outline: 2px solid transparent;
-    color: #0a4b78;
+    color: #2c3338;
 }
 
-.button-secondary:active {
+.cp-admin-wrap .button:active,
+.cp-admin-wrap button.button:active {
     background: #dcdcde;
-    border-color: #0a4b78;
-    color: #0a4b78;
+    border-color: #8c8f94;
+    color: #2c3338;
 }
 
-/* デンジャーボタン（削除等） - ブロックエディタ風 */
-.button-danger {
-    background: transparent;
-    border: 1px solid #cc1818;
-    color: #cc1818;
-    box-shadow: none;
-}
-
-.button-danger:hover {
-    background: #cc1818;
-    border-color: #cc1818;
+.cp-admin-wrap .button-primary,
+.cp-admin-wrap button.button-primary,
+.cp-admin-wrap input[type="submit"].button-primary {
+    background: var(--wp-admin-theme-color, #2271b1);
+    border-color: var(--wp-admin-theme-color, #2271b1);
     color: #fff;
 }
 
-.button-danger:focus {
-    background: transparent;
-    border-color: #cc1818;
-    box-shadow: 0 0 0 1px #fff, 0 0 0 3px rgba(204, 24, 24, 0.25);
-    outline: 2px solid transparent;
-    color: #cc1818;
+.cp-admin-wrap .button-primary:hover,
+.cp-admin-wrap button.button-primary:hover {
+    background: var(--wp-admin-theme-color-darker-10, #135e96);
+    border-color: var(--wp-admin-theme-color-darker-10, #135e96);
+    color: #fff;
 }
 
-.button-danger:active {
-    background: #a10000;
-    border-color: #a10000;
+.cp-admin-wrap .button-primary:focus,
+.cp-admin-wrap button.button-primary:focus {
+    background: var(--wp-admin-theme-color, #2271b1);
+    border-color: var(--wp-admin-theme-color-darker-20, #0a4b78);
+    box-shadow: 0 0 0 1px #fff, 0 0 0 3px var(--wp-admin-theme-color, #2271b1);
+    color: #fff;
+}
+
+.cp-admin-wrap .button-primary:active,
+.cp-admin-wrap button.button-primary:active {
+    background: var(--wp-admin-theme-color-darker-20, #0a4b78);
+    border-color: var(--wp-admin-theme-color-darker-20, #0a4b78);
+    color: #fff;
+    box-shadow: none;
+}
+
+.cp-admin-wrap .button-primary:disabled,
+.cp-admin-wrap button.button-primary:disabled {
+    background: #7e8993 !important;
+    border-color: #7e8993 !important;
+    color: #fff !important;
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* セカンダリボタン（境界線付きボタン） */
+.cp-admin-wrap .button-secondary,
+.cp-admin-wrap button.button-secondary {
+    background: #fff;
+    border: 1px solid var(--wp-admin-theme-color, #2271b1);
+    color: var(--wp-admin-theme-color, #2271b1);
+    box-shadow: none;
+}
+
+.cp-admin-wrap .button-secondary:hover,
+.cp-admin-wrap button.button-secondary:hover {
+    background: #f6f7f7;
+    border-color: var(--wp-admin-theme-color-darker-10, #135e96);
+    color: var(--wp-admin-theme-color-darker-10, #135e96);
+}
+
+.cp-admin-wrap .button-secondary:focus,
+.cp-admin-wrap button.button-secondary:focus {
+    background: #fff;
+    border-color: var(--wp-admin-theme-color, #2271b1);
+    box-shadow: 0 0 0 1px var(--wp-admin-theme-color, #2271b1);
+    outline: 2px solid transparent;
+    color: var(--wp-admin-theme-color, #2271b1);
+}
+
+.cp-admin-wrap .button-secondary:active,
+.cp-admin-wrap button.button-secondary:active {
+    background: #f0f0f1;
+    border-color: var(--wp-admin-theme-color-darker-20, #0a4b78);
+    color: var(--wp-admin-theme-color-darker-20, #0a4b78);
+}
+
+/* デンジャーボタン（削除・リセット等） */
+.cp-admin-wrap .button-danger,
+.cp-admin-wrap button.button-danger {
+    background: #fff;
+    border: 1px solid #d63638;
+    color: #d63638;
+    box-shadow: none;
+}
+
+.cp-admin-wrap .button-danger:hover,
+.cp-admin-wrap button.button-danger:hover {
+    background: #d63638;
+    border-color: #d63638;
+    color: #fff;
+}
+
+.cp-admin-wrap .button-danger:focus,
+.cp-admin-wrap button.button-danger:focus {
+    background: #fff;
+    border-color: #d63638;
+    box-shadow: 0 0 0 1px #d63638;
+    outline: 2px solid transparent;
+    color: #d63638;
+}
+
+.cp-admin-wrap .button-danger:active,
+.cp-admin-wrap button.button-danger:active {
+    background: #b32d2e;
+    border-color: #b32d2e;
     color: #fff;
 }
 
 /* 小さいボタン - ブロックエディタ風 */
 .button-small {
     height: 30px;
-    line-height: 2.30769231; /* 30px / 13px */
+    line-height: 2.30769231;
+    /* 30px / 13px */
     padding: 0 8px;
     font-size: 13px;
     min-height: 30px;
@@ -431,14 +521,15 @@
 /* 大きいボタン - ブロックエディタ風 */
 .button-large {
     height: 40px;
-    line-height: 2.85714286; /* 40px / 14px */
+    line-height: 2.85714286;
+    /* 40px / 14px */
     padding: 0 16px;
     font-size: 14px;
     min-height: 40px;
 }
 
 /* Dynamic sections container */
-.sge-dynamic-sections {
+.cp-dynamic-sections {
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -446,15 +537,16 @@
 }
 
 /* 実行ボタンコンテナ */
-.sge-execute-section {
-    order: 1;  /* 最初に配置 */
+.cp-execute-section {
+    order: 1;
+    /* 最初に配置 */
     margin: 0;
     display: flex;
     gap: 12px;
     align-items: center;
 }
 
-#sge-execute-button {
+#cp-execute-button {
     font-size: 14px;
     padding: 0 16px;
     height: 40px;
@@ -463,8 +555,8 @@
 }
 
 /* 停止ボタンとScheduled Actionsリセットボタンのスタイル */
-#sge-cancel-button,
-#sge-reset-scheduler {
+#cp-cancel-button,
+#cp-reset-scheduler {
     font-size: 14px;
     padding: 0 16px;
     height: 40px;
@@ -475,15 +567,15 @@
     color: #cc1818;
 }
 
-#sge-cancel-button:hover,
-#sge-reset-scheduler:hover {
+#cp-cancel-button:hover,
+#cp-reset-scheduler:hover {
     background: #cc1818;
     border-color: #cc1818;
     color: #fff;
 }
 
-#sge-cancel-button:focus,
-#sge-reset-scheduler:focus {
+#cp-cancel-button:focus,
+#cp-reset-scheduler:focus {
     background: transparent;
     border-color: #cc1818;
     box-shadow: inset 0 0 0 1px #cc1818;
@@ -491,15 +583,15 @@
     color: #cc1818;
 }
 
-#sge-cancel-button:active,
-#sge-reset-scheduler:active {
+#cp-cancel-button:active,
+#cp-reset-scheduler:active {
     background: #a10000;
     border-color: #a10000;
     color: #fff;
 }
 
-#sge-cancel-button:disabled,
-#sge-reset-scheduler:disabled {
+#cp-cancel-button:disabled,
+#cp-reset-scheduler:disabled {
     opacity: 0.3;
     cursor: not-allowed;
     pointer-events: none;
@@ -509,22 +601,22 @@
 }
 
 /* コミットメッセージが空の時にボタンを無効化するスタイル */
-#sge-execute-button.commit-required:not(.has-commit-message) {
+#cp-execute-button.commit-required:not(.has-commit-message) {
     opacity: 0.5;
     cursor: not-allowed;
     pointer-events: none;
 }
 
 /* アクションボタンエリア */
-.sge-form-actions {
+.cp-form-actions {
     margin-top: 40px;
     padding-top: 30px;
     padding-bottom: 10px;
     border-top: 1px solid #c3c4c7;
 }
 
-.sge-form-actions .button,
-.sge-form-actions button.button {
+.cp-form-actions .button,
+.cp-form-actions button.button {
     margin-right: 10px !important;
     margin-bottom: 10px !important;
     height: 36px !important;
@@ -535,7 +627,7 @@
 }
 
 /* バージョン情報 - 通常配置 */
-.sge-admin-wrap .sge-version-info {
+.cp-admin-wrap .cp-version-info {
     background: transparent;
     color: #646970;
     font-size: 12px;
@@ -592,7 +684,7 @@
 }
 
 /* セクション全体のスタイル */
-form#sge-settings-form {
+form#cp-settings-form {
     background: #fff;
     padding: 20px;
     border: 1px solid #c3c4c7;
@@ -603,7 +695,7 @@ form#sge-settings-form {
 }
 
 /* 動的セクションのコンテナ（順序制御用） */
-.sge-dynamic-sections {
+.cp-dynamic-sections {
     display: flex;
     flex-direction: column;
 }
@@ -632,40 +724,89 @@ form#sge-settings-form {
 
 /* レスポンシブ対応 */
 @media screen and (max-width: 782px) {
-    /* モバイル表示時のバージョン情報 */
-    .sge-admin-wrap .sge-version-info {
-        font-size: 11px;
-        padding: 15px 0;
+
+    /* モバイル表示時の全体を左揃えに */
+    .wrap.cp-admin-wrap {
+        text-align: left !important;
     }
 
-    .sge-subsection {
+    .cp-admin-wrap {
+        text-align: left !important;
+    }
+
+    .cp-admin-wrap * {
+        text-align: left !important;
+    }
+
+    .cp-dynamic-sections {
+        text-align: left !important;
+    }
+
+    .cp-execute-section {
+        text-align: left !important;
+    }
+
+    .cp-commit-section {
+        text-align: left !important;
+    }
+
+    .cp-commit-section h3 {
+        text-align: left !important;
+    }
+
+    .cp-commit-container {
+        text-align: left !important;
+        justify-content: flex-start !important;
+    }
+
+    .cp-commit-container input,
+    .cp-commit-container button {
+        text-align: left !important;
+    }
+
+    .cp-progress-section {
+        text-align: left !important;
+    }
+
+    .cp-progress-section h3 {
+        text-align: left !important;
+    }
+
+    /* モバイル表示時のバージョン情報 */
+    .cp-admin-wrap .cp-version-info {
+        font-size: 11px;
+        padding: 15px 0;
+        text-align: left !important;
+    }
+
+    .cp-subsection {
         margin-left: 0;
         padding: 15px;
     }
 
-    .sge-subsection .sge-form-group {
+    .cp-subsection .cp-form-group {
         padding: 12px;
     }
 
-    .sge-form-group {
+    .cp-form-group {
         padding: 12px;
     }
 
     /* モバイルではテキストフィールドを全幅に */
-    .sge-subsection input[type="text"],
-    .sge-subsection input[type="password"],
-    .sge-subsection input.regular-text,
-    .sge-subsection .sge-form-group input[type="text"],
-    .sge-subsection .sge-form-group input[type="password"],
-    #sge-github-settings input[type="text"],
-    #sge-github-settings input[type="password"],
-    #sge-gitlab-settings input[type="text"],
-    #sge-gitlab-settings input[type="password"],
-    #sge-cloudflare-settings input[type="text"],
-    #sge-cloudflare-settings input[type="password"],
-    #sge-git-local-settings input[type="text"],
-    #sge-local-settings input[type="text"],
-    #sge-zip-settings input[type="text"] {
+    .cp-subsection input[type="text"],
+    .cp-subsection input[type="password"],
+    .cp-subsection input.regular-text,
+    .cp-subsection .cp-form-group input[type="text"],
+    .cp-subsection .cp-form-group input[type="password"],
+    #cp-github-settings input[type="text"],
+    #cp-github-settings input[type="password"],
+    #cp-gitlab-settings input[type="text"],
+    #cp-gitlab-settings input[type="password"],
+    #cp-cloudflare-settings input[type="text"],
+    #cp-cloudflare-settings input[type="password"],
+    #cp-git-local-settings input[type="text"],
+    #cp-local-settings input[type="text"],
+    #cp-zip-settings input[type="text"] {
         display: block !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -675,17 +816,17 @@ form#sge-settings-form {
     }
 
     /* ブランチ設定 */
-    .sge-branch-settings {
+    .cp-branch-settings {
         padding: 12px !important;
     }
 
-    .sge-branch-option {
+    .cp-branch-option {
         display: block !important;
         margin-bottom: 15px !important;
     }
 
     /* ラジオボタン+ラベルは同じ行に */
-    .sge-radio-label {
+    .cp-radio-label {
         display: inline-flex !important;
         align-items: center !important;
         font-weight: normal !important;
@@ -693,19 +834,19 @@ form#sge-settings-form {
         white-space: nowrap !important;
     }
 
-    .sge-radio-label input[type="radio"] {
+    .cp-radio-label input[type="radio"] {
         margin-top: 0 !important;
         margin-right: 8px !important;
     }
 
     /* 入力フィールドは次の行に */
-    .sge-branch-input {
+    .cp-branch-input {
         display: block !important;
         margin-top: 8px !important;
         margin-left: 0 !important;
     }
 
-    .sge-branch-input input[type="text"] {
+    .cp-branch-input input[type="text"] {
         display: block !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -714,24 +855,28 @@ form#sge-settings-form {
     }
 
     /* ネストされた設定（新規ブランチ作成時） */
-    .sge-branch-nested {
+    .cp-branch-nested {
         display: block !important;
         margin-top: 10px !important;
         margin-left: 0 !important;
         padding: 10px !important;
-        background: #f9f9f9 !important;
+        background: none !important;
         border-left: 3px solid #dcdcde !important;
         border-radius: 2px !important;
     }
 
-    .sge-branch-nested label {
+    .cp-branch-nested label,
+    .cp-field-label {
         display: block !important;
         margin-bottom: 5px !important;
         font-weight: normal !important;
         font-size: 13px !important;
+        background: none !important;
+        border: none !important;
+        padding: 0 !important;
     }
 
-    .sge-branch-nested input[type="text"] {
+    .cp-branch-nested input[type="text"] {
         display: block !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -740,21 +885,21 @@ form#sge-settings-form {
     }
 
     /* ネストされた要素のmarginを調整 */
-    .sge-subsection div[style*="margin-left: 20px"],
-    .sge-subsection div[style*="margin-left:20px"] {
+    .cp-subsection div[style*="margin-left: 20px"],
+    .cp-subsection div[style*="margin-left:20px"] {
         margin-left: 0 !important;
         padding: 10px !important;
     }
 
-    .sge-subsection div[style*="margin-left: 20px"] label,
-    .sge-subsection div[style*="margin-left:20px"] label {
+    .cp-subsection div[style*="margin-left: 20px"] label,
+    .cp-subsection div[style*="margin-left:20px"] label {
         display: block !important;
         width: auto !important;
         margin-bottom: 5px !important;
     }
 
-    .sge-subsection div[style*="margin-left: 20px"] input[type="text"],
-    .sge-subsection div[style*="margin-left:20px"] input[type="text"] {
+    .cp-subsection div[style*="margin-left: 20px"] input[type="text"],
+    .cp-subsection div[style*="margin-left:20px"] input[type="text"] {
         display: block !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -762,34 +907,48 @@ form#sge-settings-form {
         box-sizing: border-box !important;
     }
 
-    .sge-subsection .sge-form-group > div {
+    .cp-subsection .cp-form-group>div {
         white-space: normal !important;
     }
 
-    .sge-progress-section {
+    .cp-progress-section {
         padding: 15px;
     }
 
-    .sge-progress-container {
+    .cp-progress-container {
         padding: 10px 5px 5px;
     }
 
-    .sge-commit-section {
+    .cp-commit-section {
         padding: 15px;
+        text-align: left;
     }
 
-    .sge-commit-container {
+    .cp-commit-section h3 {
+        text-align: left;
+    }
+
+    .cp-commit-container {
         flex-direction: column;
-        align-items: stretch;
+        align-items: flex-start;
         gap: 12px;
+        text-align: left;
     }
 
-    #sge-commit-message {
+    .cp-commit-section .cp-form-group {
+        text-align: left;
+    }
+
+    .cp-commit-section .description {
+        text-align: left;
+    }
+
+    #cp-commit-message {
         width: 100%;
         max-width: 100%;
     }
 
-    form#sge-settings-form {
+    form#cp-settings-form {
         padding: 15px;
     }
 
@@ -801,10 +960,11 @@ form#sge-settings-form {
         min-height: 40px;
     }
 
-    .sge-form-group input[type="text"],
-    .sge-form-group input[type="number"],
-    .sge-form-group textarea,
-    .sge-form-group select {
+    .cp-form-group input[type="text"],
+    .cp-form-group input[type="url"],
+    .cp-form-group input[type="number"],
+    .cp-form-group textarea,
+    .cp-form-group select {
         font-size: 16px;
         padding: 10px;
     }
@@ -822,43 +982,43 @@ input[type="text"].regular-text {
 }
 
 /* テーブルスタイル（将来の拡張用） */
-.sge-table {
+.cp-table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 10px;
 }
 
-.sge-table th,
-.sge-table td {
+.cp-table th,
+.cp-table td {
     padding: 8px;
     border: 1px solid #c3c4c7;
     text-align: left;
 }
 
-.sge-table th {
+.cp-table th {
     background: #f6f7f7;
     font-weight: 600;
 }
 
 /* フォームのラジオボタングループ */
-.sge-radio-group {
+.cp-radio-group {
     margin: 10px 0;
 }
 
-.sge-radio-group label {
+.cp-radio-group label {
     display: flex;
     align-items: center;
     margin-bottom: 10px;
     cursor: pointer;
 }
 
-.sge-radio-group label:hover input[type="radio"] {
+.cp-radio-group label:hover input[type="radio"] {
     border-color: #757575;
 }
 
 /* GitHub/ローカル設定のラジオボタンとインプット - ブロックエディタ風 */
-.sge-subsection input[type="radio"],
-.sge-subsection input[type="checkbox"] {
+.cp-subsection input[type="radio"],
+.cp-subsection input[type="checkbox"] {
     width: 20px;
     height: 20px;
     margin: 0 8px 0 0;
@@ -873,32 +1033,29 @@ input[type="text"].regular-text {
     flex-shrink: 0;
 }
 
-.sge-subsection input[type="checkbox"] {
+.cp-subsection input[type="checkbox"] {
     border-radius: 2px;
 }
 
-.sge-subsection input[type="radio"] {
+.cp-subsection input[type="radio"] {
     border-radius: 50%;
 }
 
-.sge-subsection input[type="checkbox"]:hover,
-.sge-subsection input[type="radio"]:hover {
+.cp-subsection input[type="checkbox"]:hover,
+.cp-subsection input[type="radio"]:hover {
     border-color: #757575;
 }
 
-.sge-subsection input[type="checkbox"]:focus,
-.sge-subsection input[type="radio"]:focus {
+.cp-subsection input[type="checkbox"]:focus,
+.cp-subsection input[type="radio"]:focus {
     outline: none;
     border-color: var(--wp-admin-theme-color, #3858e9);
     box-shadow: 0 0 0 1px #fff, 0 0 0 3px var(--wp-admin-theme-color, #3858e9);
 }
 
-.sge-subsection input[type="checkbox"]:checked {
-    background: #1e1e1e;
-    border-color: #1e1e1e;
-}
+/* チェック状態の背景色・ボーダー色はPHPのインラインCSSで動的に設定 */
 
-.sge-subsection input[type="checkbox"]:checked::after {
+.cp-subsection input[type="checkbox"]:checked::after {
     content: '';
     position: absolute;
     left: 4px;
@@ -910,12 +1067,7 @@ input[type="text"].regular-text {
     transform: rotate(45deg);
 }
 
-.sge-subsection input[type="radio"]:checked {
-    background: #1e1e1e;
-    border-color: #1e1e1e;
-}
-
-.sge-subsection input[type="radio"]:checked::after {
+.cp-subsection input[type="radio"]:checked::after {
     content: '';
     position: absolute;
     left: 4px;
@@ -926,8 +1078,8 @@ input[type="text"].regular-text {
     background: #fff;
 }
 
-.sge-subsection input[type="checkbox"]:disabled,
-.sge-subsection input[type="radio"]:disabled {
+.cp-subsection input[type="checkbox"]:disabled,
+.cp-subsection input[type="radio"]:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     background: #f6f7f7;
@@ -935,27 +1087,27 @@ input[type="text"].regular-text {
 }
 
 /* 無効化された入力フィールド */
-.sge-subsection input[type="text"]:disabled {
+.cp-subsection input[type="text"]:disabled {
     background-color: #f0f0f0;
     opacity: 0.6;
     cursor: not-allowed;
 }
 
 /* ブランチ設定（デスクトップ用） */
-.sge-branch-settings {
+.cp-branch-settings {
     padding: 15px;
 }
 
-.sge-branch-option {
+.cp-branch-option {
     display: block;
     margin-bottom: 15px;
 }
 
-.sge-branch-option:last-child {
+.cp-branch-option:last-child {
     margin-bottom: 0;
 }
 
-.sge-radio-label {
+.cp-radio-label {
     display: inline-flex;
     align-items: center;
     font-weight: normal;
@@ -963,52 +1115,56 @@ input[type="text"].regular-text {
     cursor: pointer;
 }
 
-.sge-radio-label input[type="radio"] {
+.cp-radio-label input[type="radio"] {
     margin-right: 8px;
 }
 
-.sge-branch-input {
+.cp-branch-input {
     display: block;
     margin-top: 8px;
     margin-left: 28px;
 }
 
-.sge-branch-input input[type="text"] {
+.cp-branch-input input[type="text"] {
     width: 250px;
     max-width: 100%;
 }
 
-.sge-branch-nested {
+.cp-branch-nested {
     display: block;
     margin-top: 10px;
     margin-left: 28px;
     padding: 12px;
-    background: #f9f9f9;
+    background: none;
     border-left: 3px solid #dcdcde;
     border-radius: 2px;
 }
 
-.sge-branch-nested label {
+.cp-branch-nested label,
+.cp-field-label {
     display: block;
     margin-bottom: 5px;
     font-weight: normal;
     font-size: 13px;
     color: #2c3338;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
 }
 
-.sge-branch-nested input[type="text"] {
+.cp-branch-nested input[type="text"] {
     display: block;
     width: 100%;
     max-width: 300px;
     margin-bottom: 12px;
 }
 
-.sge-branch-nested input[type="text"]:last-child {
+.cp-branch-nested input[type="text"]:last-child {
     margin-bottom: 0;
 }
 
 /* ブランチ設定のコンテナ - 各行を独立させる（旧スタイル：新クラスを持たない要素用） */
-.sge-subsection .sge-form-group:not(.sge-branch-settings) > div {
+.cp-subsection .cp-form-group:not(.cp-branch-settings)>div {
     margin-bottom: 15px;
     display: flex !important;
     flex-wrap: nowrap !important;
@@ -1016,14 +1172,14 @@ input[type="text"].regular-text {
 }
 
 /* 新規ブランチセクションの親divはflexを解除 - style属性で判別（旧スタイル） */
-.sge-subsection .sge-form-group:not(.sge-branch-settings) > div[style*="margin-top: 10px"] {
+.cp-subsection .cp-form-group:not(.cp-branch-settings)>div[style*="margin-top: 10px"] {
     display: block !important;
     flex-wrap: unset !important;
     align-items: unset !important;
 }
 
 /* ラジオボタンを含むラベル（旧スタイル：新クラスを持たない要素用） */
-.sge-subsection .sge-form-group:not(.sge-branch-settings) > div > label {
+.cp-subsection .cp-form-group:not(.cp-branch-settings)>div>label {
     display: inline-flex !important;
     align-items: center !important;
     margin-right: 10px !important;
@@ -1033,7 +1189,7 @@ input[type="text"].regular-text {
 }
 
 /* Git作業ディレクトリ入力欄 */
-#sge-git-work-dir {
+#cp-git-work-dir {
     display: inline-block !important;
     width: 250px !important;
     margin-left: 5px !important;
@@ -1042,7 +1198,7 @@ input[type="text"].regular-text {
 }
 
 /* すべてのregular-textクラスの入力欄（旧スタイル：新クラスを持たない要素用） */
-.sge-subsection .sge-form-group:not(.sge-branch-settings) > div > input[type="text"].regular-text {
+.cp-subsection .cp-form-group:not(.cp-branch-settings)>div>input[type="text"].regular-text {
     display: inline-block !important;
     width: 250px !important;
     margin-left: 5px !important;
@@ -1051,22 +1207,22 @@ input[type="text"].regular-text {
 }
 
 /* 新規ブランチ名・分岐元ブランチ名の個別対応（旧スタイル - 非推奨） */
-#sge-github-base-branch,
-#sge-github-new-branch {
+#cp-github-base-branch,
+#cp-github-new-branch {
     display: block !important;
     width: 100% !important;
     max-width: 400px !important;
 }
 
 /* brタグを非表示にして、代わりにdivでブロックレベルにする */
-.sge-subsection .sge-form-group div[style*="margin-left: 20px"] br {
+.cp-subsection .cp-form-group div[style*="margin-left: 20px"] br {
     display: none !important;
 }
 
 /* ローカルGit経由のテキストフィールド */
 
 /* 確認ダイアログのスタイル */
-.sge-confirm-dialog {
+.cp-confirm-dialog {
     position: fixed;
     top: 0;
     left: 0;
@@ -1075,7 +1231,7 @@ input[type="text"].regular-text {
     z-index: 9999;
 }
 
-.sge-confirm-overlay {
+.cp-confirm-overlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -1084,7 +1240,7 @@ input[type="text"].regular-text {
     background: rgba(0, 0, 0, 0.5);
 }
 
-.sge-confirm-box {
+.cp-confirm-box {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1098,21 +1254,21 @@ input[type="text"].regular-text {
     box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
 }
 
-.sge-confirm-box h3 {
+.cp-confirm-box h3 {
     margin: 0 0 15px;
     color: #1d2327;
     font-size: 18px;
     font-weight: 600;
 }
 
-.sge-confirm-box p {
+.cp-confirm-box p {
     margin: 0 0 20px;
     color: #3c434a;
     font-size: 14px;
     line-height: 1.5;
 }
 
-.sge-confirm-buttons {
+.cp-confirm-buttons {
     text-align: right;
     display: flex;
     justify-content: flex-end;
@@ -1120,8 +1276,8 @@ input[type="text"].regular-text {
     margin-top: 20px;
 }
 
-.sge-confirm-buttons button,
-.sge-confirm-box .sge-confirm-buttons button {
+.cp-confirm-buttons button,
+.cp-confirm-box .cp-confirm-buttons button {
     margin: 0 !important;
     height: 36px;
     line-height: 36px;
@@ -1132,16 +1288,16 @@ input[type="text"].regular-text {
     border-radius: 2px;
 }
 
-.sge-confirm-buttons button:first-child {
+.cp-confirm-buttons button:first-child {
     margin-left: 0 !important;
 }
 
-.sge-confirm-buttons .button {
+.cp-confirm-buttons .button {
     margin: 0 !important;
 }
 
 /* カスタム通知のスタイル */
-.sge-notice {
+.cp-notice {
     animation: slideDown 0.3s ease-out;
 }
 
@@ -1150,12 +1306,14 @@ input[type="text"].regular-text {
         opacity: 0;
         transform: translateY(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
     }
 }
-.sge-subsection .sge-form-group div[style*="margin-top"] label + input[type="text"].regular-text {
+
+.cp-subsection .cp-form-group div[style*="margin-top"] label+input[type="text"].regular-text {
     display: inline-block !important;
     width: 300px !important;
     margin-left: 10px !important;
@@ -1163,54 +1321,56 @@ input[type="text"].regular-text {
 }
 
 /* インライン要素の調整 */
-.sge-inline-group {
+.cp-inline-group {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
-.sge-inline-group input[type="text"] {
+.cp-inline-group input[type="text"] {
     flex: 1;
 }
 
 /* コミットメッセージセクション */
-.sge-commit-section {
+.cp-commit-section {
     padding: 15px;
     background: #fff;
     border: 1px solid #e2e4e7;
     border-radius: 4px;
-    order: 2;  /* 実行ボタンと進捗の間に配置 */
-    display: none; /* デフォルトは非表示 */
+    order: 2;
+    /* 実行ボタンと進捗の間に配置 */
+    display: none;
+    /* デフォルトは非表示 */
     margin: 0;
 }
 
 /* コミットメッセージセクションが表示される時 */
-.sge-commit-section.active {
+.cp-commit-section.active {
     display: block;
 }
 
-.sge-commit-section h3 {
+.cp-commit-section h3 {
     display: block;
-    margin: 0 0 15px;
+    margin: 0;
+    padding: 0 0 15px 0;
     font-weight: 600;
     color: #1d2327;
-    font-size: 14px;
-    padding-bottom: 8px;
+    font-size: 16px;
     border-bottom: 1px solid #e2e4e7;
 }
 
-.sge-commit-section .sge-section-content {
+.cp-commit-section .cp-section-content {
     padding: 0;
 }
 
-.sge-commit-section .sge-form-group {
+.cp-commit-section .cp-form-group {
     background: transparent;
     border: none;
     padding: 0;
     margin: 0;
 }
 
-.sge-commit-container {
+.cp-commit-container {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -1218,18 +1378,17 @@ input[type="text"].regular-text {
     padding: 10px 5px 5px;
 }
 
-.sge-commit-section .description {
+.cp-commit-section .description {
     font-size: 13px;
     color: #646970;
     margin-top: 10px;
-    padding: 8px;
-    background: #f6f7f7;
-    border-left: 2px solid #dcdcde;
-    border-radius: 2px;
+    padding: 0;
+    background: none;
+    border: none;
 }
 
 /* コミットメッセージ入力欄の調整 */
-#sge-commit-message {
+#cp-commit-message {
     flex: 1;
     max-width: 450px;
     height: 36px;
@@ -1239,34 +1398,35 @@ input[type="text"].regular-text {
     border-radius: 4px;
     font-size: 14px;
     background: #fff;
+    text-align: left;
 }
 
-#sge-commit-message:focus {
+#cp-commit-message:focus {
     border-color: var(--wp-admin-theme-color);
     box-shadow: 0 0 0 1px var(--wp-admin-theme-color);
     outline: 2px solid transparent;
 }
 
-#sge-reset-commit-message {
+#cp-reset-commit-message {
     flex-shrink: 0;
 }
 
 /* エラーメッセージ */
-.sge-error-message {
+.cp-error-message {
     color: #d63638;
     margin-top: 5px;
     font-size: 13px;
 }
 
 /* 成功メッセージ */
-.sge-success-message {
+.cp-success-message {
     color: #00a32a;
     margin-top: 5px;
     font-size: 13px;
 }
 
 /* カード風レイアウト（シンプル版） */
-.sge-card {
+.cp-card {
     background: #fff;
     border: 1px solid #c3c4c7;
     border-radius: 2px;
@@ -1274,7 +1434,7 @@ input[type="text"].regular-text {
     margin-bottom: 20px;
 }
 
-.sge-card h4 {
+.cp-card h4 {
     margin: 0 0 15px;
     font-size: 14px;
     font-weight: 600;
@@ -1282,12 +1442,12 @@ input[type="text"].regular-text {
 }
 
 /* タブスタイル（将来の拡張用） */
-.sge-tabs {
+.cp-tabs {
     border-bottom: 1px solid #c3c4c7;
     margin-bottom: 20px;
 }
 
-.sge-tab {
+.cp-tab {
     display: inline-block;
     padding: 10px 15px;
     margin: 0 5px -1px 0;
@@ -1297,13 +1457,13 @@ input[type="text"].regular-text {
     font-size: 14px;
 }
 
-.sge-tab.active {
+.cp-tab.active {
     background: #fff;
     border: 1px solid #c3c4c7;
     border-bottom-color: #fff;
 }
 
-.sge-tab:hover {
+.cp-tab:hover {
     background: #f6f7f7;
 }
 
@@ -1311,34 +1471,80 @@ input[type="text"].regular-text {
    スマホ対応（375px以下 - iPhone SE等）
    ======================================== */
 @media screen and (max-width: 480px) {
+
     /* 管理画面のラップ */
-    .sge-admin-wrap {
+    .wrap.cp-admin-wrap {
+        text-align: left !important;
+    }
+
+    .cp-admin-wrap {
         padding: 10px;
         margin: 0;
+        text-align: left !important;
+    }
+
+    .cp-admin-wrap * {
+        text-align: left !important;
+    }
+
+    .cp-dynamic-sections {
+        text-align: left !important;
+    }
+
+    .cp-execute-section {
+        text-align: left !important;
+    }
+
+    .cp-commit-section {
+        text-align: left !important;
+    }
+
+    .cp-commit-section h3 {
+        text-align: left !important;
+    }
+
+    .cp-commit-container {
+        text-align: left !important;
+        justify-content: flex-start !important;
+    }
+
+    .cp-commit-container input,
+    .cp-commit-container button {
+        text-align: left !important;
+    }
+
+    .cp-progress-section {
+        text-align: left !important;
+    }
+
+    .cp-progress-section h3 {
+        text-align: left !important;
     }
 
     /* フォームグループ */
-    .sge-form-group {
+    .cp-form-group {
         padding: 10px;
     }
 
     /* サブセクション */
-    .sge-subsection {
+    .cp-subsection {
         margin-left: 0;
         padding: 10px;
     }
 
-    .sge-subsection .sge-form-group {
+    .cp-subsection .cp-form-group {
         padding: 8px;
     }
 
     /* 入力フィールド */
-    .sge-form-group input[type="text"],
-    .sge-form-group input[type="password"],
-    .sge-form-group input[type="number"],
-    .sge-form-group textarea,
-    .sge-form-group select,
+    .cp-form-group input[type="text"],
+    .cp-form-group input[type="url"],
+    .cp-form-group input[type="password"],
+    .cp-form-group input[type="number"],
+    .cp-form-group textarea,
+    .cp-form-group select,
     input[type="text"].regular-text,
+    input[type="url"].regular-text,
     input[type="password"].regular-text {
         width: 100% !important;
         max-width: 100% !important;
@@ -1346,47 +1552,47 @@ input[type="text"].regular-text {
     }
 
     /* ラジオボタン・チェックボックスのラベル */
-    .sge-subsection label {
+    .cp-subsection label {
         display: flex;
         flex-wrap: wrap;
         align-items: flex-start;
     }
 
     /* ブランチ設定の入力欄 */
-    .sge-subsection > .sge-form-group > div {
+    .cp-subsection>.cp-form-group>div {
         display: block;
     }
 
-    .sge-subsection > .sge-form-group > div > label {
+    .cp-subsection>.cp-form-group>div>label {
         display: block;
         margin-bottom: 5px;
     }
 
-    .sge-subsection > .sge-form-group > div input[type="text"] {
+    .cp-subsection>.cp-form-group>div input[type="text"] {
         margin-top: 5px;
         margin-left: 0 !important;
     }
 
     /* ネストされたブランチ設定 */
-    .sge-subsection div[style*="margin-left"] {
+    .cp-subsection div[style*="margin-left"] {
         margin-left: 0 !important;
         padding-left: 10px;
     }
 
     /* description */
-    .sge-form-group .description {
+    .cp-form-group .description {
         font-size: 12px;
         line-height: 1.4;
     }
 
     /* トークン設定済み表示 */
-    .sge-token-status {
+    .cp-token-status {
         display: block;
         margin-top: 5px;
     }
 
     /* h3見出し */
-    .sge-admin-wrap h3 {
+    .cp-admin-wrap h3 {
         font-size: 16px;
         margin: 20px 0 10px;
     }
@@ -1396,14 +1602,14 @@ input[type="text"].regular-text {
    ボタン群のレスポンシブ対応（1267px未満）
    ======================================== */
 @media screen and (max-width: 1266px) {
-    .sge-form-actions {
+    .cp-form-actions {
         display: flex;
         flex-direction: column;
         gap: 10px;
     }
 
-    .sge-form-actions .button,
-    .sge-form-actions button.button {
+    .cp-form-actions .button,
+    .cp-form-actions button.button {
         width: 100% !important;
         margin-right: 0 !important;
         margin-bottom: 0 !important;
@@ -1418,7 +1624,7 @@ input[type="text"].regular-text {
 }
 
 /* エラー通知バッジ（WordPressデフォルトスタイル） */
-#adminmenu #toplevel_page_static-generation-engine .awaiting-mod {
+#adminmenu #toplevel_page_carry-pod .awaiting-mod {
     display: inline-block;
     vertical-align: top;
     box-sizing: border-box;
@@ -1435,6 +1641,216 @@ input[type="text"].regular-text {
     z-index: 26;
 }
 
-.sge-error-notification {
+.cp-error-notification {
     border-left-color: #d63638 !important;
+}
+
+/* ========================================
+   Gutenbergカラーパレット定義
+   ======================================== */
+:root {
+    /* Primary Colors */
+    --cp-color-primary: #2271b1;
+    --cp-color-primary-dark: #135e96;
+    --cp-color-primary-darker: #0a4b78;
+
+    /* Text Colors */
+    --cp-color-text: #1d2327;
+    --cp-color-text-secondary: #2c3338;
+    --cp-color-text-tertiary: #646970;
+
+    /* Border Colors */
+    --cp-color-border: #c3c4c7;
+    --cp-color-border-light: #e2e4e7;
+    --cp-color-border-lighter: #dcdcde;
+
+    /* Background Colors */
+    --cp-color-bg-white: #fff;
+    --cp-color-bg-light: #f6f7f7;
+    --cp-color-bg-lighter: #f0f0f1;
+
+    /* Status Colors */
+    --cp-color-success: #00a32a;
+    --cp-color-error: #d63638;
+    --cp-color-warning: #dba617;
+
+    /* Admin Theme Color (動的) */
+    --wp-admin-theme-color: #2271b1;
+}
+
+/* ========================================
+   アコーディオンセクション
+   ======================================== */
+
+.cp-accordion-section {
+    margin-top: 0;
+    margin-bottom: 0;
+    background: #fff;
+    border: none;
+    border-bottom: 1px solid #e2e4e7;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* アコーディオンヘッダー（ボタン） */
+.cp-accordion-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 20px;
+    background: #fff;
+    border: none;
+    border-bottom: 1px solid #e2e4e7;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+    text-align: left;
+    transition: background-color 0.15s ease-in-out;
+    border-radius: 0;
+}
+
+.cp-accordion-header:hover {
+    background: #f6f7f7;
+}
+
+.cp-accordion-header:focus {
+    outline: 2px solid transparent;
+    box-shadow: inset 0 0 0 2px var(--wp-admin-theme-color, #2271b1);
+}
+
+/* 閉じている時もボーダーを表示 */
+.cp-accordion-header[aria-expanded="false"] {
+    border-bottom: 1px solid #e2e4e7;
+    border-radius: 0;
+}
+
+.cp-accordion-title {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+/* アコーディオンアイコン（Chevron） */
+.cp-accordion-icon {
+    width: 24px;
+    height: 24px;
+    position: relative;
+    flex-shrink: 0;
+    margin-left: 12px;
+}
+
+.cp-accordion-icon::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid #1d2327;
+    border-bottom: 2px solid #1d2327;
+    transform: translate(-50%, -70%) rotate(45deg);
+    transition: transform 0.2s ease-in-out;
+}
+
+/* 開いている時: 上向き矢印 */
+.cp-accordion-header[aria-expanded="true"] .cp-accordion-icon::before {
+    transform: translate(-50%, -30%) rotate(-135deg);
+}
+
+/* 閉じている時: 下向き矢印（デフォルト） */
+.cp-accordion-header[aria-expanded="false"] .cp-accordion-icon::before {
+    transform: translate(-50%, -70%) rotate(45deg);
+}
+
+/* アコーディオンコンテンツ */
+.cp-accordion-content {
+    padding: 20px;
+    max-height: 10000px;
+    overflow: visible;
+    transition: max-height 0.2s ease, padding 0.2s ease;
+}
+
+/* 閉じている時 */
+.cp-accordion-content[aria-hidden="true"] {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+}
+
+/* 開いている時 */
+.cp-accordion-content[aria-hidden="false"] {
+    padding-top: 20px;
+    padding-bottom: 20px;
+}
+
+/* トランジション無効化（初期表示時のみ） */
+.cp-accordion-content.cp-no-transition {
+    transition: none !important;
+}
+
+
+/* 最後のアコーディオンセクションの下線を削除 */
+.cp-accordion-section:last-of-type {
+    border-bottom: none !important;
+}
+
+/* ========================================
+   アコーディオンレスポンシブ対応
+   ======================================== */
+
+/* タブレット（782px以下） */
+@media screen and (max-width: 782px) {
+    .cp-accordion-header {
+        padding: 14px 15px;
+    }
+
+    .cp-accordion-title {
+        font-size: 15px;
+    }
+
+    .cp-accordion-content {
+        padding: 0 15px;
+    }
+
+    .cp-accordion-content[aria-hidden="false"] {
+        padding-top: 15px;
+        padding-bottom: 15px;
+    }
+
+    .cp-commit-container {
+        align-items: flex-start !important;
+    }
+}
+
+/* スマートフォン（480px以下） */
+@media screen and (max-width: 480px) {
+    .cp-accordion-header {
+        padding: 12px 10px;
+    }
+
+    .cp-accordion-title {
+        font-size: 14px;
+    }
+
+    .cp-accordion-content {
+        padding: 0 10px;
+    }
+
+    .cp-accordion-content[aria-hidden="false"] {
+        padding-top: 12px;
+        padding-bottom: 12px;
+    }
+
+    .cp-accordion-icon {
+        width: 20px;
+        height: 20px;
+    }
+
+    .cp-commit-container {
+        align-items: flex-start !important;
+    }
 }

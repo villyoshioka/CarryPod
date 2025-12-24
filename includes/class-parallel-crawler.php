@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class SGE_Parallel_Crawler {
+class CP_Parallel_Crawler {
 
     /**
      * 並列処理の同時実行数
@@ -38,8 +38,8 @@ class SGE_Parallel_Crawler {
      * コンストラクタ
      */
     public function __construct() {
-        $this->logger = SGE_Logger::get_instance();
-        $this->cache = SGE_Cache::get_instance();
+        $this->logger = CP_Logger::get_instance();
+        $this->cache = CP_Cache::get_instance();
     }
 
     /**
@@ -79,11 +79,11 @@ class SGE_Parallel_Crawler {
                 curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, $is_localhost ? 0 : 2 );
 
                 // Basic認証が設定されている場合
-                $auth_user = get_option( 'sge_basic_auth_user' );
+                $auth_user = get_option( 'cp_basic_auth_user' );
                 if ( $auth_user ) {
-                    $encrypted_pass = get_option( 'sge_basic_auth_pass' );
+                    $encrypted_pass = get_option( 'cp_basic_auth_pass' );
                     // 暗号化されたパスワードを復号化
-                    $settings_manager = SGE_Settings::get_instance();
+                    $settings_manager = CP_Settings::get_instance();
                     $auth_pass = $settings_manager->decrypt_basic_auth( $encrypted_pass );
                     if ( ! is_wp_error( $auth_pass ) ) {
                         curl_setopt( $ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC );

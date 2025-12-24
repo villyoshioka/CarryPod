@@ -1,11 +1,14 @@
 /**
  * Carry Pod 管理画面JavaScript
+ * Updated: 2025-12-22 - Footer positioning fix
  */
 
 jQuery(document).ready(function($) {
     'use strict';
 
     let progressPollInterval = null;
+    // 未保存の変更フラグ
+    let hasUnsavedChanges = false;
 
     // HTMLエスケープ関数（XSS対策）
     function escapeHtml(text) {
@@ -17,7 +20,7 @@ jQuery(document).ready(function($) {
     // 通知表示用のヘルパー関数
     function showNotice(message, type = 'success') {
         // 既存の通知を削除
-        $('.sge-notice').remove();
+        $('.cp-notice').remove();
 
         // 通知タイプのクラス名を決定
         const noticeClass = type === 'error' ? 'notice-error' : 'notice-success';
@@ -26,7 +29,7 @@ jQuery(document).ready(function($) {
         const safeMessage = escapeHtml(message);
 
         // 通知HTMLを作成
-        const $notice = $('<div class="notice sge-notice ' + noticeClass + ' is-dismissible">' +
+        const $notice = $('<div class="notice cp-notice ' + noticeClass + ' is-dismissible">' +
             '<p>' + safeMessage + '</p>' +
             '<button type="button" class="notice-dismiss">' +
             '<span class="screen-reader-text">この通知を無視</span>' +
@@ -37,7 +40,7 @@ jQuery(document).ready(function($) {
         if ($('.wrap h1').length > 0) {
             $('.wrap h1').first().after($notice);
         } else {
-            $('.sge-admin-wrap').prepend($notice);
+            $('.cp-admin-wrap').prepend($notice);
         }
 
         // 自動的に5秒後にフェードアウト
@@ -61,17 +64,17 @@ jQuery(document).ready(function($) {
     // 確認ダイアログ用の関数
     function showConfirm(message, onConfirm, onCancel) {
         // 既存の確認ダイアログを削除
-        $('.sge-confirm-dialog').remove();
+        $('.cp-confirm-dialog').remove();
 
         // ダイアログHTMLを作成
-        const $dialog = $('<div class="sge-confirm-dialog">' +
-            '<div class="sge-confirm-overlay"></div>' +
-            '<div class="sge-confirm-box">' +
+        const $dialog = $('<div class="cp-confirm-dialog">' +
+            '<div class="cp-confirm-overlay"></div>' +
+            '<div class="cp-confirm-box">' +
             '<h3>確認</h3>' +
             '<p>' + message + '</p>' +
-            '<div class="sge-confirm-buttons">' +
-            '<button class="button button-primary sge-confirm-yes">はい</button>' +
-            '<button class="button sge-confirm-no">いいえ</button>' +
+            '<div class="cp-confirm-buttons">' +
+            '<button class="button button-primary cp-confirm-yes">はい</button>' +
+            '<button class="button cp-confirm-no">いいえ</button>' +
             '</div>' +
             '</div>' +
             '</div>');
@@ -80,7 +83,7 @@ jQuery(document).ready(function($) {
         $('body').append($dialog);
 
         // はいボタンのイベント
-        $dialog.find('.sge-confirm-yes').on('click', function() {
+        $dialog.find('.cp-confirm-yes').on('click', function() {
             $dialog.remove();
             if (typeof onConfirm === 'function') {
                 onConfirm();
@@ -88,7 +91,7 @@ jQuery(document).ready(function($) {
         });
 
         // いいえボタンのイベント
-        $dialog.find('.sge-confirm-no, .sge-confirm-overlay').on('click', function() {
+        $dialog.find('.cp-confirm-no, .cp-confirm-overlay').on('click', function() {
             $dialog.remove();
             if (typeof onCancel === 'function') {
                 onCancel();
@@ -97,69 +100,69 @@ jQuery(document).ready(function($) {
     }
 
     // チェックボックスの連動
-    $('#sge-github-enabled').on('change', function() {
+    $('#cp-github-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#sge-github-settings').slideDown();
+            $('#cp-github-settings').slideDown();
         } else {
-            $('#sge-github-settings').slideUp();
+            $('#cp-github-settings').slideUp();
         }
         updateExecuteButton();
     });
 
-    $('#sge-git-local-enabled').on('change', function() {
+    $('#cp-git-local-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#sge-git-local-settings').slideDown();
+            $('#cp-git-local-settings').slideDown();
         } else {
-            $('#sge-git-local-settings').slideUp();
+            $('#cp-git-local-settings').slideUp();
         }
         updateExecuteButton();
     });
 
-    $('#sge-local-enabled').on('change', function() {
+    $('#cp-local-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#sge-local-settings').slideDown();
+            $('#cp-local-settings').slideDown();
         } else {
-            $('#sge-local-settings').slideUp();
+            $('#cp-local-settings').slideUp();
         }
         updateExecuteButton();
     });
 
     // ZIP出力チェックボックスの連動
-    $('#sge-zip-enabled').on('change', function() {
+    $('#cp-zip-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#sge-zip-settings').slideDown();
+            $('#cp-zip-settings').slideDown();
         } else {
-            $('#sge-zip-settings').slideUp();
+            $('#cp-zip-settings').slideUp();
         }
         updateExecuteButton();
     });
 
     // Cloudflare出力チェックボックスの連動
-    $('#sge-cloudflare-enabled').on('change', function() {
+    $('#cp-cloudflare-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#sge-cloudflare-settings').slideDown();
+            $('#cp-cloudflare-settings').slideDown();
         } else {
-            $('#sge-cloudflare-settings').slideUp();
+            $('#cp-cloudflare-settings').slideUp();
         }
         updateExecuteButton();
     });
 
     // GitLab出力チェックボックスの連動
-    $('#sge-gitlab-enabled').on('change', function() {
+    $('#cp-gitlab-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#sge-gitlab-settings').slideDown();
+            $('#cp-gitlab-settings').slideDown();
         } else {
-            $('#sge-gitlab-settings').slideUp();
+            $('#cp-gitlab-settings').slideUp();
         }
         updateExecuteButton();
     });
 
     // Netlify出力チェックボックスの連動
-    $('#sge-netlify-enabled').on('change', function() {
+    $('#cp-netlify-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#sge-netlify-settings').slideDown();
+            $('#cp-netlify-settings').slideDown();
         } else {
-            $('#sge-netlify-settings').slideUp();
+            $('#cp-netlify-settings').slideUp();
         }
         updateExecuteButton();
     });
@@ -170,11 +173,11 @@ jQuery(document).ready(function($) {
         $branchModeRadio.on('change', function() {
             const mode = $(this).val();
             if (mode === 'existing') {
-                $('#sge-github-existing-branch').prop('disabled', false);
-                $('#sge-github-new-branch, #sge-github-base-branch').prop('disabled', true);
+                $('#cp-github-existing-branch').prop('disabled', false);
+                $('#cp-github-new-branch, #cp-github-base-branch').prop('disabled', true);
             } else {
-                $('#sge-github-existing-branch').prop('disabled', true);
-                $('#sge-github-new-branch, #sge-github-base-branch').prop('disabled', false);
+                $('#cp-github-existing-branch').prop('disabled', true);
+                $('#cp-github-new-branch, #cp-github-base-branch').prop('disabled', false);
             }
         });
     }
@@ -185,24 +188,24 @@ jQuery(document).ready(function($) {
         $gitlabBranchModeRadio.on('change', function() {
             const mode = $(this).val();
             if (mode === 'existing') {
-                $('#sge-gitlab-existing-branch').prop('disabled', false);
-                $('#sge-gitlab-new-branch, #sge-gitlab-base-branch').prop('disabled', true);
+                $('#cp-gitlab-existing-branch').prop('disabled', false);
+                $('#cp-gitlab-new-branch, #cp-gitlab-base-branch').prop('disabled', true);
             } else {
-                $('#sge-gitlab-existing-branch').prop('disabled', true);
-                $('#sge-gitlab-new-branch, #sge-gitlab-base-branch').prop('disabled', false);
+                $('#cp-gitlab-existing-branch').prop('disabled', true);
+                $('#cp-gitlab-new-branch, #cp-gitlab-base-branch').prop('disabled', false);
             }
         });
     }
 
     // 実行ボタンの有効/無効を更新
     function updateExecuteButton() {
-        const $githubCheckbox = $('#sge-github-enabled');
-        const $gitLocalCheckbox = $('#sge-git-local-enabled');
-        const $localCheckbox = $('#sge-local-enabled');
-        const $gitlabCheckbox = $('#sge-gitlab-enabled');
-        const $executeButton = $('#sge-execute-button');
-        const $commitSection = $('.sge-commit-section');
-        const $commitMessage = $('#sge-commit-message');
+        const $githubCheckbox = $('#cp-github-enabled');
+        const $gitLocalCheckbox = $('#cp-git-local-enabled');
+        const $localCheckbox = $('#cp-local-enabled');
+        const $gitlabCheckbox = $('#cp-gitlab-enabled');
+        const $executeButton = $('#cp-execute-button');
+        const $commitSection = $('.cp-commit-section');
+        const $commitMessage = $('#cp-commit-message');
 
         // チェックボックスが存在しない場合（実行画面）は初期状態を維持
         if ($githubCheckbox.length === 0 && $gitLocalCheckbox.length === 0 && $localCheckbox.length === 0) {
@@ -246,11 +249,147 @@ jQuery(document).ready(function($) {
         }
     }
 
+    /**
+     * アコーディオン機能の初期化
+     */
+    function initAccordions() {
+        const accordions = document.querySelectorAll('.cp-accordion-section');
+
+        accordions.forEach(function(accordion) {
+            const header = accordion.querySelector('.cp-accordion-header');
+            const content = accordion.querySelector('.cp-accordion-content');
+            const sectionId = accordion.dataset.section;
+
+            if (!header || !content) return;
+
+            // LocalStorageから状態を取得
+            const savedState = getAccordionState(sectionId);
+            const isExpanded = savedState !== null ? savedState : getDefaultState(sectionId);
+
+            // 初期状態を設定（アニメーションなし）
+            // トランジションを一時的に無効化
+            content.classList.add('cp-no-transition');
+            setAccordionState(header, content, isExpanded, true);
+
+            // 次のフレームでトランジションを再有効化
+            requestAnimationFrame(function() {
+                content.classList.remove('cp-no-transition');
+            });
+
+            // クリックイベント
+            header.addEventListener('click', function() {
+                const currentState = header.getAttribute('aria-expanded') === 'true';
+                const newState = !currentState;
+
+                setAccordionState(header, content, newState);
+                // LocalStorageへの保存はフォーム保存時のみ行う
+            });
+
+            // キーボード操作（Enter/Space）
+            header.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    header.click();
+                }
+            });
+        });
+    }
+
+    /**
+     * アコーディオンの状態を設定
+     * @param {boolean} noTransition - trueの場合、トランジションなしで即座に状態を変更
+     */
+    function setAccordionState(header, content, isExpanded, noTransition) {
+        header.setAttribute('aria-expanded', isExpanded);
+        content.setAttribute('aria-hidden', !isExpanded);
+
+        if (noTransition) {
+            // 初期表示時: トランジションなしで即座に状態を設定
+            if (isExpanded) {
+                content.style.display = 'block';
+            } else {
+                content.style.display = 'none';
+            }
+        } else {
+            // ユーザー操作時: トランジションあり
+            if (isExpanded) {
+                content.style.display = 'block';
+            } else {
+                setTimeout(function() {
+                    if (content.getAttribute('aria-hidden') === 'true') {
+                        content.style.display = 'none';
+                    }
+                }, 200); // トランジション時間と合わせる
+            }
+        }
+    }
+
+    /**
+     * デフォルトの開閉状態を取得
+     */
+    function getDefaultState(sectionId) {
+        const defaultExpanded = ['output-destinations'];
+        return defaultExpanded.includes(sectionId);
+    }
+
+    /**
+     * LocalStorageから状態を取得
+     */
+    function getAccordionState(sectionId) {
+        try {
+            const states = localStorage.getItem('cp_accordion_states');
+            if (!states) return null;
+
+            const parsed = JSON.parse(states);
+            return parsed[sectionId] !== undefined ? parsed[sectionId] : null;
+        } catch (e) {
+            console.error('LocalStorage読み込みエラー:', e);
+            return null;
+        }
+    }
+
+    /**
+     * LocalStorageに状態を保存
+     */
+    function saveAccordionState(sectionId, isExpanded) {
+        try {
+            let states = {};
+            const existing = localStorage.getItem('cp_accordion_states');
+
+            if (existing) {
+                states = JSON.parse(existing);
+            }
+
+            states[sectionId] = isExpanded;
+            localStorage.setItem('cp_accordion_states', JSON.stringify(states));
+        } catch (e) {
+            console.error('LocalStorage保存エラー:', e);
+        }
+    }
+
+    /**
+     * すべてのアコーディオンの現在の状態をLocalStorageに保存
+     */
+    function saveAllAccordionStates() {
+        try {
+            const states = {};
+            $('.cp-accordion-header').each(function() {
+                // data-section属性は親の.cp-accordion-sectionにある
+                const sectionId = $(this).closest('.cp-accordion-section').data('section');
+                const isExpanded = $(this).attr('aria-expanded') === 'true';
+                states[sectionId] = isExpanded;
+            });
+            localStorage.setItem('cp_accordion_states', JSON.stringify(states));
+        } catch (e) {
+            console.error('LocalStorage一括保存エラー:', e);
+        }
+    }
+
     // コミットメッセージ入力欄の監視
-    $('#sge-commit-message').on('input change', function() {
-        const $executeButton = $('#sge-execute-button');
-        const $githubCheckbox = $('#sge-github-enabled');
-        const $commitSection = $('.sge-commit-section');
+    $('#cp-commit-message').on('input change', function() {
+        const $executeButton = $('#cp-execute-button');
+        const $githubCheckbox = $('#cp-github-enabled');
+        const $commitSection = $('.cp-commit-section');
 
         // 実行画面の場合（チェックボックスが存在しない）
         if ($githubCheckbox.length === 0) {
@@ -279,8 +418,8 @@ jQuery(document).ready(function($) {
     });
 
     // コミットメッセージのリセット
-    $('#sge-reset-commit-message').on('click', function() {
-        const $commitMessage = $('#sge-commit-message');
+    $('#cp-reset-commit-message').on('click', function() {
+        const $commitMessage = $('#cp-commit-message');
         if ($commitMessage.length === 0) {
             return;
         }
@@ -299,7 +438,7 @@ jQuery(document).ready(function($) {
     });
 
     // 静的化を中止
-    $('#sge-cancel-button').on('click', function(e) {
+    $('#cp-cancel-button').on('click', function(e) {
         e.preventDefault();
 
         const $button = $(this);
@@ -312,7 +451,7 @@ jQuery(document).ready(function($) {
                 url: sgeData.ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'sge_cancel_generation',
+                    action: 'cp_cancel_generation',
                     nonce: sgeData.nonce
                 },
                 success: function(response) {
@@ -321,14 +460,14 @@ jQuery(document).ready(function($) {
                         showNotice(response.data.message, 'success');
 
                         // ボタンを元に戻す
-                        $('#sge-execute-button').prop('disabled', false).text('静的化を実行');
-                        $('#sge-cancel-button').prop('disabled', true).hide();
-                        $('#sge-download-log').prop('disabled', false);
+                        $('#cp-execute-button').prop('disabled', false).text('静的化を実行');
+                        $('#cp-cancel-button').prop('disabled', true).hide();
+                        $('#cp-download-log').prop('disabled', false);
 
                         // 進捗をリセット
-                        $('#sge-progress-bar').css('width', '0%');
-                        $('#sge-progress-percentage').text('0%');
-                        $('#sge-progress-status').text('待機中...');
+                        $('#cp-progress-bar').css('width', '0%');
+                        $('#cp-progress-percentage').text('0%');
+                        $('#cp-progress-status').text('待機中...');
 
                         // ポーリングを停止
                         stopProgressPolling();
@@ -352,7 +491,7 @@ jQuery(document).ready(function($) {
     });
 
     // 静的化を実行
-    $('#sge-execute-button').on('click', function(e) {
+    $('#cp-execute-button').on('click', function(e) {
         e.preventDefault();
 
         const $button = $(this);
@@ -370,8 +509,8 @@ jQuery(document).ready(function($) {
             return false;
         }
 
-        const $commitMessage = $('#sge-commit-message');
-        const githubEnabled = $('#sge-github-enabled').is(':checked');
+        const $commitMessage = $('#cp-commit-message');
+        const githubEnabled = $('#cp-github-enabled').is(':checked');
         let commitMessage = '';
 
         // GitHub出力が有効な場合のみコミットメッセージを取得（空でもOK、サーバー側でデフォルト値を設定）
@@ -394,7 +533,7 @@ jQuery(document).ready(function($) {
             url: sgeData.ajaxurl,
             type: 'POST',
             data: {
-                action: 'sge_execute_generation',
+                action: 'cp_execute_generation',
                 nonce: sgeData.nonce,
                 commit_message: commitMessage
             },
@@ -402,7 +541,7 @@ jQuery(document).ready(function($) {
                 console.log('AJAX成功:', response);
                 if (response.success) {
                     // 停止ボタンを表示
-                    $('#sge-cancel-button').prop('disabled', false).show();
+                    $('#cp-cancel-button').prop('disabled', false).show();
 
                     // 進捗のポーリングを開始
                     startProgressPolling();
@@ -413,14 +552,14 @@ jQuery(document).ready(function($) {
                 } else {
                     console.error('サーバーエラー:', response.data);
                     showNotice(response.data.message || '静的化の実行に失敗しました。', 'error');
-                    $('#sge-execute-button').prop('disabled', false).text('静的化を実行');
+                    $('#cp-execute-button').prop('disabled', false).text('静的化を実行');
                     updateExecuteButton();
                 }
             },
             error: function(xhr, status, error) {
                 console.error('AJAX エラー:', {xhr: xhr, status: status, error: error});
                 showNotice('エラーが発生しました: ' + error, 'error');
-                $('#sge-execute-button').prop('disabled', false).text('静的化を実行');
+                $('#cp-execute-button').prop('disabled', false).text('静的化を実行');
                 updateExecuteButton();
             }
         });
@@ -432,7 +571,7 @@ jQuery(document).ready(function($) {
             url: sgeData.ajaxurl,
             type: 'POST',
             data: {
-                action: 'sge_get_progress',
+                action: 'cp_get_progress',
                 nonce: sgeData.nonce
             },
             success: function(response) {
@@ -440,7 +579,7 @@ jQuery(document).ready(function($) {
                 if (response.success) {
                     const progress = response.data.progress;
                     const isRunning = response.data.is_running;
-                    const $progressSection = $('.sge-progress-section');
+                    const $progressSection = $('.cp-progress-section');
 
                     console.log('進捗状態:', {
                         isRunning: isRunning,
@@ -456,15 +595,15 @@ jQuery(document).ready(function($) {
                     }
 
                     // プログレスバーを更新
-                    $('#sge-progress-bar').css('width', progress.percentage + '%');
-                    $('#sge-progress-percentage').text(progress.percentage + '%');
+                    $('#cp-progress-bar').css('width', progress.percentage + '%');
+                    $('#cp-progress-percentage').text(progress.percentage + '%');
 
                     // 実行中でなければボタンを有効化
                     if (!isRunning) {
                         console.log('実行中ではないため、ボタンを有効化します');
-                        $('#sge-execute-button').prop('disabled', false).text('静的化を実行');
-                        $('#sge-cancel-button').prop('disabled', true).hide();
-                        $('#sge-download-log').prop('disabled', false);
+                        $('#cp-execute-button').prop('disabled', false).text('静的化を実行');
+                        $('#cp-cancel-button').prop('disabled', true).hide();
+                        $('#cp-download-log').prop('disabled', false);
                         stopProgressPolling();
 
                         // ボタンの状態を更新（GitHub有効時のコミットメッセージチェック含む）
@@ -477,22 +616,22 @@ jQuery(document).ready(function($) {
                                 url: sgeData.ajaxurl,
                                 type: 'POST',
                                 data: {
-                                    action: 'sge_check_error_notification',
+                                    action: 'cp_check_error_notification',
                                     nonce: sgeData.nonce
                                 },
                                 success: function(response) {
                                     if (response.success && response.data.has_error) {
-                                        $('#sge-progress-status')
+                                        $('#cp-progress-status')
                                             .text('エラーが発生しました')
                                             .css('color', '#d63638');
-                                        $('#sge-progress-bar').css('background-color', '#d63638');
+                                        $('#cp-progress-bar').css('background-color', '#d63638');
                                     } else {
-                                        $('#sge-progress-status').text('完了しました！');
+                                        $('#cp-progress-status').text('完了しました！');
                                     }
                                 }
                             });
                         } else {
-                            $('#sge-progress-status').text('待機中...');
+                            $('#cp-progress-status').text('待機中...');
                         }
                     } else {
                         // 実行中の場合は進捗セクションを表示
@@ -503,8 +642,8 @@ jQuery(document).ready(function($) {
                         if (progress.current > 0 && progress.total > 0) {
                             statusMessage += ' (' + progress.current + ' / ' + progress.total + ' 完了)';
                         }
-                        $('#sge-progress-status').text(statusMessage);
-                        $('#sge-download-log').prop('disabled', true);
+                        $('#cp-progress-status').text(statusMessage);
+                        $('#cp-download-log').prop('disabled', true);
                     }
                 }
             }
@@ -528,7 +667,7 @@ jQuery(document).ready(function($) {
     }
 
     // 設定を保存
-    $('#sge-settings-form').on('submit', function(e) {
+    $('#cp-settings-form').on('submit', function(e) {
         e.preventDefault();
 
         const formData = $(this).serialize();
@@ -536,9 +675,14 @@ jQuery(document).ready(function($) {
         $.ajax({
             url: sgeData.ajaxurl,
             type: 'POST',
-            data: formData + '&action=sge_save_settings&nonce=' + sgeData.nonce,
+            data: formData + '&action=cp_save_settings&nonce=' + sgeData.nonce,
             success: function(response) {
                 if (response.success) {
+                    // 保存成功時は未保存フラグをクリア
+                    hasUnsavedChanges = false;
+                    // 設定保存成功時にアコーディオンの状態をLocalStorageに保存
+                    saveAllAccordionStates();
+
                     showNotice(response.data.message, 'success');
                     setTimeout(function() {
                         location.reload();
@@ -554,17 +698,22 @@ jQuery(document).ready(function($) {
     });
 
     // 設定をリセット
-    $('#sge-reset-settings').on('click', function() {
+    $('#cp-reset-settings').on('click', function() {
         showConfirm('設定をリセットしますか？', function() {
             $.ajax({
                 url: sgeData.ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'sge_reset_settings',
+                    action: 'cp_reset_settings',
                     nonce: sgeData.nonce
                 },
                 success: function(response) {
                     if (response.success) {
+                        // リセット成功時は未保存フラグをクリア（リロード前に）
+                        hasUnsavedChanges = false;
+                        // 設定リセット時にアコーディオンの状態もリセット
+                        localStorage.removeItem('cp_accordion_states');
+
                         showNotice(response.data.message, 'success');
                         setTimeout(function() {
                             location.reload();
@@ -581,7 +730,7 @@ jQuery(document).ready(function($) {
     });
 
     // キャッシュをクリア
-    $('#sge-clear-cache').on('click', function() {
+    $('#cp-clear-cache').on('click', function() {
         const $button = $(this);
         showConfirm('キャッシュをクリアしますか？', function() {
             $button.prop('disabled', true);
@@ -590,7 +739,7 @@ jQuery(document).ready(function($) {
                 url: sgeData.ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'sge_clear_cache',
+                    action: 'cp_clear_cache',
                     nonce: sgeData.nonce
                 },
                 success: function(response) {
@@ -610,7 +759,7 @@ jQuery(document).ready(function($) {
     });
 
     // ログをクリア
-    $('#sge-clear-logs').on('click', function() {
+    $('#cp-clear-logs').on('click', function() {
         const $button = $(this);
         showConfirm('ログをクリアしますか？', function() {
             $button.prop('disabled', true);
@@ -619,7 +768,7 @@ jQuery(document).ready(function($) {
                 url: sgeData.ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'sge_clear_logs',
+                    action: 'cp_clear_logs',
                     nonce: sgeData.nonce
                 },
                 success: function(response) {
@@ -639,7 +788,7 @@ jQuery(document).ready(function($) {
     });
 
     // Scheduled Actionsをリセット
-    $('#sge-reset-scheduler').on('click', function() {
+    $('#cp-reset-scheduler').on('click', function() {
         const $button = $(this);
         showConfirm('Scheduled Actionsをリセットしますか？すべてのスケジュールされたタスクが削除されます。', function() {
             $button.prop('disabled', true).text('リセット中...');
@@ -648,7 +797,7 @@ jQuery(document).ready(function($) {
                 url: sgeData.ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'sge_reset_scheduler',
+                    action: 'cp_reset_scheduler',
                     nonce: sgeData.nonce
                 },
                 success: function(response) {
@@ -670,7 +819,7 @@ jQuery(document).ready(function($) {
     });
 
     // ログをダウンロード
-    $('#sge-download-log').on('click', function() {
+    $('#cp-download-log').on('click', function() {
         console.log('ログダウンロードボタンがクリックされました');
 
         const $button = $(this);
@@ -680,7 +829,7 @@ jQuery(document).ready(function($) {
             url: sgeData.ajaxurl,
             type: 'POST',
             data: {
-                action: 'sge_download_log',
+                action: 'cp_download_log',
                 nonce: sgeData.nonce
             },
             success: function(response) {
@@ -718,12 +867,12 @@ jQuery(document).ready(function($) {
     });
 
     // 設定をエクスポート
-    $('#sge-export-settings').on('click', function() {
+    $('#cp-export-settings').on('click', function() {
         $.ajax({
             url: sgeData.ajaxurl,
             type: 'POST',
             data: {
-                action: 'sge_export_settings',
+                action: 'cp_export_settings',
                 nonce: sgeData.nonce
             },
             success: function(response) {
@@ -732,7 +881,7 @@ jQuery(document).ready(function($) {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'sge-settings.json';
+                    a.download = 'cp-settings.json';
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
@@ -748,11 +897,11 @@ jQuery(document).ready(function($) {
     });
 
     // 設定をインポート
-    $('#sge-import-settings').on('click', function() {
-        $('#sge-import-file').click();
+    $('#cp-import-settings').on('click', function() {
+        $('#cp-import-file').click();
     });
 
-    $('#sge-import-file').on('change', function(e) {
+    $('#cp-import-file').on('change', function(e) {
         const file = e.target.files[0];
         if (!file) {
             return;
@@ -770,12 +919,14 @@ jQuery(document).ready(function($) {
                 url: sgeData.ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'sge_import_settings',
+                    action: 'cp_import_settings',
                     nonce: sgeData.nonce,
                     data: data
                 },
                 success: function(response) {
                     if (response.success) {
+                        // インポート成功時は未保存フラグをクリア（リロード前に）
+                        hasUnsavedChanges = false;
                         alert(response.data.message);
                         location.reload();
                     } else {
@@ -794,37 +945,62 @@ jQuery(document).ready(function($) {
     });
 
     // 初期表示時に進捗を読み込み（実行ページの場合）
-    if ($('#sge-progress-bar').length > 0) {
+    if ($('#cp-progress-bar').length > 0) {
         loadProgress();
         startProgressPolling();
     }
+
+    // アコーディオンを初期化
+    initAccordions();
+
+    // ========================================
+    // 設定フォームの変更を監視（離脱確認用）
+    // ========================================
+    $('#cp-settings-form').on('change', 'input, textarea, select', function() {
+        hasUnsavedChanges = true;
+    });
+
+    // ページ離脱時の確認ダイアログ
+    $(window).on('beforeunload', function(e) {
+        if (hasUnsavedChanges) {
+            const message = '変更が保存されていません。このページを離れますか？';
+            e.returnValue = message;
+            return message;
+        }
+    });
 
     // 初期化時に実行ボタンの状態を更新
     updateExecuteButton();
 
     // ページ読み込み時にGitHub設定が有効な場合、コミットメッセージにデフォルト値を設定
-    if ($('#sge-github-enabled').is(':checked') && $('#sge-commit-message').length > 0) {
-        const $commitMessage = $('#sge-commit-message');
+    if ($('#cp-github-enabled').is(':checked') && $('#cp-commit-message').length > 0) {
+        const $commitMessage = $('#cp-commit-message');
         if (!$commitMessage.val()) {
             // デフォルトメッセージを設定
-            $('#sge-reset-commit-message').trigger('click');
+            $('#cp-reset-commit-message').trigger('click');
         }
     }
 
-    // v2.0.0通知の無視ボタン処理（v1.4.2専用、v2.0.0で削除予定）
-    $(document).on('click', '.sge-v2-notification .notice-dismiss', function(e) {
-        e.preventDefault();
+    // ========================================
+    // ベースURL入力欄の表示/非表示制御
+    // ========================================
 
-        $.ajax({
-            url: sgeData.ajaxurl,
-            type: 'POST',
-            data: {
-                action: 'sge_dismiss_v2_notification',
-                nonce: sgeData.nonce
-            },
-            success: function(response) {
-                // WordPress標準の処理で通知は既に非表示
-            }
-        });
+    function toggleBaseUrlField() {
+        const urlMode = $('input[name="url_mode"]:checked').val();
+        const $baseUrlField = $('.cp-base-url-field');
+
+        if (urlMode === 'absolute') {
+            $baseUrlField.slideDown(200);
+        } else {
+            $baseUrlField.slideUp(200);
+        }
+    }
+
+    // 初期表示時の制御
+    toggleBaseUrlField();
+
+    // URL形式の変更を監視
+    $('input[name="url_mode"]').on('change', function() {
+        toggleBaseUrlField();
     });
 });

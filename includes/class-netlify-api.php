@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class SGE_Netlify_API {
+class CP_Netlify_API {
 	/**
 	 * APIトークン
 	 */
@@ -39,7 +39,7 @@ class SGE_Netlify_API {
 	public function __construct( $api_token, $site_id ) {
 		$this->api_token = $api_token;
 		$this->site_id = $site_id;
-		$this->logger = SGE_Logger::get_instance();
+		$this->logger = CP_Logger::get_instance();
 	}
 
 	/**

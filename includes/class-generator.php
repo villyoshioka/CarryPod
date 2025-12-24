@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class SGE_Generator {
+class CP_Generator {
 
     /**
      * ロガーインスタンス
@@ -43,10 +43,10 @@ class SGE_Generator {
      * コンストラクタ
      */
     public function __construct() {
-        $this->logger = SGE_Logger::get_instance();
-        $settings_manager = SGE_Settings::get_instance();
+        $this->logger = CP_Logger::get_instance();
+        $settings_manager = CP_Settings::get_instance();
         $this->settings = $settings_manager->get_settings();
-        $this->cache = SGE_Cache::get_instance();
+        $this->cache = CP_Cache::get_instance();
         $this->temp_dir = sys_get_temp_dir() . '/sge-' . wp_generate_password( 12, false );
 
         // コミットメッセージが空の場合は実行時に動的生成
@@ -69,10 +69,10 @@ class SGE_Generator {
             }
 
             // 実行中フラグをセット
-            set_transient( 'sge_manual_running', true, 3600 );
+            set_transient( 'cp_manual_running', true, 3600 );
 
             // エラー通知をクリア（新規実行開始時）
-            delete_option( 'sge_error_notification' );
+            delete_option( 'cp_error_notification' );
 
             // タイマー開始とログ記録
             $this->logger->start_timer();
@@ -87,7 +87,8 @@ class SGE_Generator {
             // 一時ディレクトリを作成
             if ( ! mkdir( $this->temp_dir, 0700, true ) ) {
                 $this->logger->add_log( '一時ディレクトリの作成に失敗しました', true );
-                delete_transient( 'sge_manual_running' );
+                delete_transient( 'cp_manual_running' );
+                delete_transient( 'cp_auto_running' );
                 return;
             }
 
@@ -111,11 +112,11 @@ class SGE_Generator {
             // 並列クローリングを使用するかどうか
             $use_parallel = ! empty( $this->settings['use_parallel_crawling'] );
 
-            if ( $use_parallel && class_exists( 'SGE_Parallel_Crawler' ) ) {
+            if ( $use_parallel && class_exists( 'CP_Parallel_Crawler' ) ) {
                 // 並列クローラーを使用（WP2Staticスタイル）
                 $this->logger->add_log( '並列クローリングモードで処理を開始' );
 
-                $parallel_crawler = new SGE_Parallel_Crawler();
+                $parallel_crawler = new CP_Parallel_Crawler();
                 $parallel_crawler->set_concurrency( 5 ); // 同時に5つのURLを処理
                 $parallel_crawler->set_timeout( 30 );
 
@@ -153,9 +154,14 @@ class SGE_Generator {
                             $html = $result['content'];
 
                             // URL形式を変換
-                            if ( $this->settings['url_mode'] === 'relative' ) {
+                            if ( $this->settings['url_mode'] === 'absolute' ) {
+                                $html = $this->convert_to_absolute_urls( $html );
+                            } else {
                                 $html = $this->convert_to_relative_urls( $html );
                             }
+
+                            // カスタムフォルダ名に置換
+                            $html = $this->replace_custom_folder_names( $html );
 
                             // WordPress動的要素を削除/置換
                             $html = $this->sanitize_static_html( $html );
@@ -351,7 +357,7 @@ class SGE_Generator {
             }
 
             // エラーがある場合は通知を保存（DBから直接カウント）
-            $logs = get_option( 'sge_logs', array() );
+            $logs = get_option( 'cp_logs', array() );
             $error_count = 0;
             foreach ( $logs as $log ) {
                 if ( ! empty( $log['is_error'] ) ) {
@@ -360,14 +366,15 @@ class SGE_Generator {
             }
 
             if ( $error_count > 0 ) {
-                update_option( 'sge_error_notification', array(
+                update_option( 'cp_error_notification', array(
                     'count' => $error_count,
                     'timestamp' => current_time( 'mysql' ),
                 ), false );
             }
 
             // 必ず実行中フラグを削除
-            delete_transient( 'sge_manual_running' );
+            delete_transient( 'cp_manual_running' );
+            delete_transient( 'cp_auto_running' );
         }
     }
 
@@ -621,7 +628,7 @@ class SGE_Generator {
         $is_localhost = in_array( $parsed_url['host'], array( 'localhost', '127.0.0.1', '::1' ) );
 
         $response = wp_remote_get( $url, array(
-            'timeout' => isset( $this->settings['timeout'] ) ? $this->settings['timeout'] : 600,
+            'timeout' => isset( $this->settings['timeout'] ) ? $this->settings['timeout'] : 300,
             'sslverify' => ! $is_localhost,
             'headers' => array(
                 'User-Agent' => 'Carry Pod/1.0',
@@ -661,9 +668,14 @@ class SGE_Generator {
         // XMLファイルでない場合のみHTML処理を実行
         if ( ! $is_xml ) {
             // URL形式を変換
-            if ( $this->settings['url_mode'] === 'relative' ) {
+            if ( $this->settings['url_mode'] === 'absolute' ) {
+                $html = $this->convert_to_absolute_urls( $html );
+            } else {
                 $html = $this->convert_to_relative_urls( $html );
             }
+
+            // カスタムフォルダ名に置換
+            $html = $this->replace_custom_folder_names( $html );
 
             // WordPress動的要素を削除/置換（最小限の処理に変更済み）
             $html = $this->sanitize_static_html( $html );
@@ -875,6 +887,85 @@ class SGE_Generator {
     }
 
     /**
+     * HTML内の相対URLを絶対URLに変換
+     *
+     * @param string $html HTML内容
+     * @return string 変換後のHTML
+     */
+    private function convert_to_absolute_urls( $html ) {
+        // base_urlが設定されていない場合はget_site_url()を使用
+        $base_url = ! empty( $this->settings['base_url'] ) ? $this->settings['base_url'] : untrailingslashit( get_site_url() );
+
+        // まず相対URLに変換してから絶対URLに変換（統一的な処理のため）
+        $html = $this->convert_to_relative_urls( $html );
+
+        // 相対URLを絶対URLに変換
+        // href="/path" や src="/path" のパターンを置換
+        $html = preg_replace(
+            '/(href|src|srcset|data-src|data-srcset|poster|content)=(["\'])\/([^"\']*)\2/i',
+            '$1=$2' . $base_url . '/$3$2',
+            $html
+        );
+
+        // CSS内のurl(/path)を置換
+        $html = preg_replace_callback(
+            '/<style([^>]*)>(.*?)<\/style>/is',
+            function( $matches ) use ( $base_url ) {
+                $attributes = $matches[1];
+                $css = $matches[2];
+
+                // CSS内のurl()を処理
+                $css = preg_replace(
+                    '/url\s*\(\s*([\'"]?)\/([^\'"\)]+)\1\s*\)/i',
+                    'url($1' . $base_url . '/$2$1)',
+                    $css
+                );
+
+                return '<style' . $attributes . '>' . $css . '</style>';
+            },
+            $html
+        );
+
+        // JSON内のエスケープされたURLも変換（例: "\/path"）
+        $html = str_replace( '\\/"', '\\"' . $base_url . '/"', $html );
+        $html = str_replace( '\\"/', '\\"' . $base_url . '/', $html );
+
+        return $html;
+    }
+
+    /**
+     * カスタムフォルダ名に置換
+     *
+     * @param string $html HTML
+     * @return string 置換後のHTML
+     */
+    private function replace_custom_folder_names( $html ) {
+        // wp-includes の置換
+        if ( ! empty( $this->settings['custom_wp_includes'] ) ) {
+            $custom_includes = $this->settings['custom_wp_includes'];
+            // パス内の wp-includes を置換（スラッシュで区切られているもののみ）
+            $html = preg_replace(
+                '#/wp-includes/#i',
+                '/' . $custom_includes . '/',
+                $html
+            );
+        }
+
+        // wp-content の置換
+        if ( ! empty( $this->settings['custom_wp_content'] ) ) {
+            $custom_content = $this->settings['custom_wp_content'];
+            // パス内の wp-content を置換（スラッシュで区切られているもののみ）
+            $html = preg_replace(
+                '#/wp-content/#i',
+                '/' . $custom_content . '/',
+                $html
+            );
+        }
+
+        return $html;
+    }
+
+    /**
      * HTML内の動的要素を静的化用に処理
      *
      * @param string $html HTML内容
@@ -1034,7 +1125,9 @@ class SGE_Generator {
 
         // wp-content 内の必要なディレクトリのみをコピー
         $wp_content_dir = WP_CONTENT_DIR;
-        $wp_content_dest = $this->temp_dir . '/wp-content';
+        // カスタムフォルダ名が設定されている場合はそれを使用
+        $content_dirname = ! empty( $this->settings['custom_wp_content'] ) ? $this->settings['custom_wp_content'] : 'wp-content';
+        $wp_content_dest = $this->temp_dir . '/' . $content_dirname;
 
         if ( ! is_dir( $wp_content_dir ) ) {
             $this->logger->add_log( 'wp-content ディレクトリが見つかりません', true );
@@ -1085,11 +1178,13 @@ class SGE_Generator {
         // wp-includes ディレクトリから参照されているファイルのみをコピー
         $wp_includes_dir = ABSPATH . 'wp-includes';
         if ( is_dir( $wp_includes_dir ) ) {
-            $result = $this->copy_referenced_wp_includes( $wp_includes_dir, $this->temp_dir . '/wp-includes' );
+            // カスタムフォルダ名が設定されている場合はそれを使用
+            $includes_dirname = ! empty( $this->settings['custom_wp_includes'] ) ? $this->settings['custom_wp_includes'] : 'wp-includes';
+            $result = $this->copy_referenced_wp_includes( $wp_includes_dir, $this->temp_dir . '/' . $includes_dirname );
             if ( $result ) {
-                $copied_dirs[] = 'wp-includes (参照ファイルのみ)';
+                $copied_dirs[] = $includes_dirname . ' (参照ファイルのみ)';
             } else {
-                $error_dirs[] = 'wp-includes';
+                $error_dirs[] = $includes_dirname;
                 $success = false;
             }
         } else {
@@ -1291,7 +1386,36 @@ class SGE_Generator {
             }
         }
 
+        // JSON内のパスを抽出（wp-emoji-settings等）
+        if ( preg_match_all( '/<script[^>]*type=["\']application\/json["\'][^>]*>(.*?)<\/script>/s', $content, $json_matches ) ) {
+            foreach ( $json_matches[1] as $json_content ) {
+                $decoded = json_decode( $json_content, true );
+                if ( $decoded ) {
+                    $this->extract_wp_includes_from_array( $decoded, $refs );
+                }
+            }
+        }
+
         return $refs;
+    }
+
+    /**
+     * 配列から再帰的にwp-includesパスを抽出
+     *
+     * @param array $data 検索対象の配列
+     * @param array &$refs 参照の格納先（参照渡し）
+     */
+    private function extract_wp_includes_from_array( $data, &$refs ) {
+        foreach ( $data as $value ) {
+            if ( is_string( $value ) ) {
+                $ref = $this->parse_wp_includes_path( $value );
+                if ( $ref ) {
+                    $refs[] = $ref;
+                }
+            } elseif ( is_array( $value ) ) {
+                $this->extract_wp_includes_from_array( $value, $refs );
+            }
+        }
     }
 
     /**
@@ -1304,13 +1428,17 @@ class SGE_Generator {
         // クエリ文字列を除去
         $url = strtok( $url, '?' );
 
-        // wp-includes を含むかチェック
-        if ( strpos( $url, 'wp-includes/' ) === false ) {
+        // カスタムフォルダ名が設定されている場合はそれも考慮
+        $includes_dirname = ! empty( $this->settings['custom_wp_includes'] ) ? $this->settings['custom_wp_includes'] : 'wp-includes';
+
+        // wp-includes またはカスタムフォルダ名を含むかチェック
+        $folder_pattern = preg_quote( $includes_dirname, '#' );
+        if ( strpos( $url, $includes_dirname . '/' ) === false && strpos( $url, 'wp-includes/' ) === false ) {
             return false;
         }
 
-        // wp-includes/ 以降を抽出
-        if ( preg_match( '#wp-includes/(.+)$#', $url, $matches ) ) {
+        // wp-includes/ またはカスタムフォルダ名/ 以降を抽出
+        if ( preg_match( '#(?:' . $folder_pattern . '|wp-includes)/(.+)$#', $url, $matches ) ) {
             $path = $matches[1];
             // セキュリティ: ディレクトリトラバーサルを防止
             if ( strpos( $path, '..' ) !== false ) {
@@ -1387,8 +1515,13 @@ class SGE_Generator {
         }
 
         // ルート相対パス
+        // カスタムフォルダ名が設定されている場合はそれも考慮
+        $includes_dirname = ! empty( $this->settings['custom_wp_includes'] ) ? $this->settings['custom_wp_includes'] : 'wp-includes';
+
         if ( strpos( $url, '/wp-includes/' ) === 0 ) {
             return substr( $url, strlen( '/wp-includes/' ) );
+        } elseif ( strpos( $url, '/' . $includes_dirname . '/' ) === 0 ) {
+            return substr( $url, strlen( '/' . $includes_dirname . '/' ) );
         }
 
         // 相対パスを解決
@@ -1469,6 +1602,9 @@ class SGE_Generator {
             if ( empty( $path ) ) {
                 continue;
             }
+
+            // MacOSでコピーした際に付くクォートを削除
+            $path = trim( $path, '\'"' );
 
             // セキュリティ: realpath でシンボリックリンク攻撃を防止
             $real_path = realpath( $path );
@@ -1583,13 +1719,13 @@ class SGE_Generator {
     private function get_force_exclude_patterns() {
         return array(
             // プラグイン内部キャッシュ
-            'wp-content/sge-cache',
-            'wp-content/sge-cache/*',
+            'wp-content/cp-cache',
+            'wp-content/cp-cache/*',
             // wp2staticの出力ファイル
             'wp-content/uploads/wp2static-*',
             // このプラグイン自身
-            'wp-content/plugins/static-generation-engine',
-            'wp-content/plugins/static-generation-engine/*',
+            'wp-content/plugins/carry-pod',
+            'wp-content/plugins/carry-pod/*',
             // wp2static本体
             'wp-content/plugins/wp2static',
             'wp-content/plugins/wp2static/*',
@@ -1629,7 +1765,7 @@ class SGE_Generator {
      * Cloudflare Workers出力
      */
     private function output_to_cloudflare_workers() {
-        $cloudflare = new SGE_Cloudflare_Workers(
+        $cloudflare = new CP_Cloudflare_Workers(
             $this->settings['cloudflare_api_token'],
             $this->settings['cloudflare_account_id'],
             $this->settings['cloudflare_script_name']
@@ -1806,7 +1942,7 @@ class SGE_Generator {
             ? $this->settings['gitlab_existing_branch']
             : $this->settings['gitlab_new_branch'];
 
-        $gitlab_api = new SGE_GitLab_API(
+        $gitlab_api = new CP_GitLab_API(
             $this->settings['gitlab_token'],
             $this->settings['gitlab_project'],
             $branch,
@@ -1958,7 +2094,7 @@ class SGE_Generator {
             ? $this->settings['github_existing_branch']
             : $this->settings['github_new_branch'];
 
-        $github_api = new SGE_GitHub_API(
+        $github_api = new CP_GitHub_API(
             $this->settings['github_token'],
             $this->settings['github_repo'],
             $branch
@@ -2050,7 +2186,9 @@ class SGE_Generator {
         chdir( $work_dir );
 
         // 現在のブランチを取得
-        $current_branch = trim( shell_exec( $git_cmd . ' branch --show-current 2>&1' ) );
+        $branch_output = array();
+        exec( $git_cmd . ' branch --show-current 2>&1', $branch_output, $branch_return );
+        $current_branch = $branch_return === 0 ? trim( implode( "\n", $branch_output ) ) : '';
 
         // ブランチが存在するか確認
         $branch_exists = false;
@@ -2407,10 +2545,16 @@ class SGE_Generator {
     public static function find_git_command() {
         // ホワイトリスト: 許可されたgitコマンドのパス
         $allowed_paths = array(
+            // Unix/Linux/macOS
             '/usr/bin/git',
             '/usr/local/bin/git',
             '/opt/homebrew/bin/git',
             '/opt/local/bin/git',
+            // Windows
+            'C:/Program Files/Git/bin/git.exe',
+            'C:/Program Files (x86)/Git/bin/git.exe',
+            'C:\\Program Files\\Git\\bin\\git.exe',
+            'C:\\Program Files (x86)\\Git\\bin\\git.exe',
         );
 
         foreach ( $allowed_paths as $path ) {
@@ -2424,17 +2568,32 @@ class SGE_Generator {
                 continue;
             }
 
-            // ファイル名が 'git' であることを確認
-            if ( basename( $real_path ) !== 'git' ) {
+            // ファイル名が 'git' または 'git.exe' であることを確認
+            $basename = basename( $real_path );
+            if ( $basename !== 'git' && $basename !== 'git.exe' ) {
                 continue;
             }
 
             // 許可されたディレクトリ内にあることを確認
-            $allowed_dirs = array( '/usr/bin', '/usr/local/bin', '/opt/homebrew/bin', '/opt/local/bin' );
+            $allowed_dirs = array(
+                '/usr/bin',
+                '/usr/local/bin',
+                '/opt/homebrew/bin',
+                '/opt/local/bin',
+                'C:/Program Files/Git/bin',
+                'C:/Program Files (x86)/Git/bin',
+                'C:\\Program Files\\Git\\bin',
+                'C:\\Program Files (x86)\\Git\\bin',
+            );
             $real_dir = dirname( $real_path );
+
+            // Windowsパスの正規化（バックスラッシュをスラッシュに統一）
+            $real_dir_normalized = str_replace( '\\', '/', $real_dir );
+
             $is_allowed = false;
             foreach ( $allowed_dirs as $allowed_dir ) {
-                if ( strpos( $real_dir, $allowed_dir ) === 0 ) {
+                $allowed_dir_normalized = str_replace( '\\', '/', $allowed_dir );
+                if ( strpos( $real_dir_normalized, $allowed_dir_normalized ) === 0 ) {
                     $is_allowed = true;
                     break;
                 }
@@ -2517,8 +2676,24 @@ class SGE_Generator {
     private function generate_robots_txt() {
         $robots_txt_path = $this->temp_dir . '/robots.txt';
 
-        // 空のrobots.txtを生成
-        $robots_content = '';
+        // robots.txt内容を生成（主要な検索エンジンのみ許可）
+        $robots_content = "User-agent: Googlebot\n";
+        $robots_content .= "User-agent: Bingbot\n";
+        $robots_content .= "User-agent: DuckDuckBot\n";
+        $robots_content .= "Allow: /\n\n";
+        $robots_content .= "User-agent: *\n";
+        $robots_content .= "Disallow: /\n";
+
+        // サイトマップがある場合は追加
+        if ( ! empty( $this->settings['enable_sitemap'] ) ) {
+            // 絶対URLモードの場合はbase_urlを使用、相対URLモードの場合は相対パス
+            if ( $this->settings['url_mode'] === 'absolute' ) {
+                $base_url = ! empty( $this->settings['base_url'] ) ? untrailingslashit( $this->settings['base_url'] ) : untrailingslashit( get_site_url() );
+                $robots_content .= "\nSitemap: {$base_url}/sitemap.xml\n";
+            } else {
+                $robots_content .= "\nSitemap: /sitemap.xml\n";
+            }
+        }
 
         // robots.txtを書き込み
         if ( file_put_contents( $robots_txt_path, $robots_content ) === false ) {
@@ -2776,15 +2951,21 @@ class SGE_Generator {
             $all_paths = array_merge( $css_matches[1], $js_matches[1], $url_matches[1] );
 
             foreach ( $all_paths as $path ) {
-                // wp-content/uploads/ を含むパスのみ（ただしメディアライブラリ形式以外）
-                if ( strpos( $path, 'wp-content/uploads/' ) !== false ) {
+                // wp-content/uploads/ またはカスタムフォルダ名/uploads/ を含むパスのみ（ただしメディアライブラリ形式以外）
+                $content_dirname = ! empty( $this->settings['custom_wp_content'] ) ? $this->settings['custom_wp_content'] : 'wp-content';
+
+                $is_uploads_path = ( strpos( $path, 'wp-content/uploads/' ) !== false ) ||
+                                   ( strpos( $path, $content_dirname . '/uploads/' ) !== false );
+
+                if ( $is_uploads_path ) {
                     // 年/月形式のディレクトリ（2025/09/など）以外を対象
                     // プラグイン生成ファイル（loftloader-pro/, wp2static/ など）
                     $normalized = ltrim( $path, '/' );
                     $normalized = preg_replace( '/\?.*$/', '', $normalized ); // クエリ文字列を除去
 
-                    // uploads/以降のパスを取得
-                    if ( preg_match( '/wp-content\/uploads\/(.+)/', $normalized, $matches ) ) {
+                    // uploads/以降のパスを取得（カスタムフォルダ名にも対応）
+                    $pattern = '/(?:wp-content|' . preg_quote( $content_dirname, '/' ) . ')\/uploads\/(.+)/';
+                    if ( preg_match( $pattern, $normalized, $matches ) ) {
                         $upload_relative = $matches[1];
                         // 年月形式（YYYY/MM/）以外のパス
                         if ( ! preg_match( '/^\d{4}\/\d{2}\//', $upload_relative ) ) {
@@ -3039,8 +3220,14 @@ class SGE_Generator {
             }
 
             foreach ( $all_paths as $path ) {
-                // wp-content/plugins/ を含むパスのみ抽出
-                if ( strpos( $path, 'wp-content/plugins/' ) !== false ) {
+                // wp-content/plugins/ またはカスタムフォルダ名/plugins/ を含むパスのみ抽出
+                $content_dirname = ! empty( $this->settings['custom_wp_content'] ) ? $this->settings['custom_wp_content'] : 'wp-content';
+
+                // 両方のパターンをチェック（置換前と置換後）
+                $is_plugin_path = ( strpos( $path, 'wp-content/plugins/' ) !== false ) ||
+                                  ( strpos( $path, $content_dirname . '/plugins/' ) !== false );
+
+                if ( $is_plugin_path ) {
                     $normalized = $this->normalize_plugin_asset_path( $path );
                     if ( ! empty( $normalized ) ) {
                         $referenced_paths[] = $normalized;
@@ -3098,6 +3285,16 @@ class SGE_Generator {
         // wp-content/plugins/ 以降のパスを抽出
         if ( preg_match( '/(wp-content\/plugins\/[^\s"\']+)/', $path, $matches ) ) {
             return $matches[1];
+        }
+
+        // カスタムフォルダ名/plugins/ 以降のパスを抽出
+        $content_dirname = ! empty( $this->settings['custom_wp_content'] ) ? $this->settings['custom_wp_content'] : 'wp-content';
+        if ( $content_dirname !== 'wp-content' ) {
+            $folder_pattern = preg_quote( $content_dirname, '/' );
+            if ( preg_match( '/(' . $folder_pattern . '\/plugins\/[^\s"\']+)/', $path, $matches ) ) {
+                // カスタムフォルダ名を wp-content に置き換えて返す（内部処理用）
+                return str_replace( $content_dirname . '/plugins/', 'wp-content/plugins/', $matches[1] );
+            }
         }
 
         return '';
@@ -3172,13 +3369,19 @@ class SGE_Generator {
             // 相対パスを解決
             $resolved = $this->resolve_css_relative_path( $css_dir, $path );
 
-            // wp-content/plugins/ のパスのみ対象
-            if ( strpos( $resolved, 'wp-content/plugins/' ) !== false ) {
-                $referenced[] = $resolved;
+            // wp-content/plugins/ またはカスタムフォルダ名/plugins/ のパスのみ対象
+            $content_dirname = ! empty( $this->settings['custom_wp_content'] ) ? $this->settings['custom_wp_content'] : 'wp-content';
+            $is_plugin_path = ( strpos( $resolved, 'wp-content/plugins/' ) !== false ) ||
+                              ( strpos( $resolved, $content_dirname . '/plugins/' ) !== false );
+
+            if ( $is_plugin_path ) {
+                // カスタムフォルダ名の場合は wp-content に正規化
+                $normalized = str_replace( $content_dirname . '/plugins/', 'wp-content/plugins/', $resolved );
+                $referenced[] = $normalized;
 
                 // @importされたCSSは再帰的に処理
-                if ( preg_match( '/\.css$/i', $resolved ) ) {
-                    $nested = $this->extract_css_references( $resolved, $processed );
+                if ( preg_match( '/\.css$/i', $normalized ) ) {
+                    $nested = $this->extract_css_references( $normalized, $processed );
                     $referenced = array_merge( $referenced, $nested );
                 }
             }

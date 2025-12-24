@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class SGE_Settings {
+class CP_Settings {
 
     /**
      * シングルトンインスタンス
@@ -21,9 +21,9 @@ class SGE_Settings {
 
     /**
      * ベータモードパスワードハッシュ（SHA-256）
-     * 平文パスワードはソースコードに含めない
+     * セキュリティ: ハッシュ値のみを保存し、平文パスワードはソースコードに含めない
      */
-    private $beta_password_hash = '5feb2e34960dfb4d64c2be90cf71d366ee7732042e7f0cd56169a16f5bb6119d';
+    private $beta_password_hash = 'a6301e803f92a28d1342b9248ecaf0fa01a6c59f8a1e8fb1fdcebb21a97de804';
 
     /**
      * シングルトンインスタンスを取得
@@ -49,20 +49,42 @@ class SGE_Settings {
      * @return bool 有効ならtrue
      */
     public function is_beta_mode_enabled() {
-        return (bool) get_transient( 'sge_beta_channel' );
+        return (bool) get_transient( 'cp_beta_channel' );
     }
 
     /**
      * ベータモードを有効化（パスワード検証付き）
      *
+     * セキュリティ:
+     * - タイミングセーフな比較（hash_equals）でハッシュ値を検証
+     * - パスワードは平文保存せず、SHA-256ハッシュ値のみ保存
+     * - ブルートフォース攻撃対策: レート制限実装済み（5回失敗で10分間ロック）
+     *
      * @param string $password 入力されたパスワード
-     * @return bool 認証成功ならtrue
+     * @return bool|WP_Error 認証成功ならtrue、レート制限超過ならWP_Error
      */
     public function enable_beta_mode( $password ) {
+        $user_id = get_current_user_id();
+        $attempts_key = 'cp_beta_attempts_' . $user_id;
+
+        // レート制限チェック（5回失敗で10分間ロック）
+        $attempts = get_transient( $attempts_key );
+        if ( $attempts >= 5 ) {
+            return new WP_Error( 'rate_limit', 'ログイン試行回数が超過しました。10分後に再試行してください。' );
+        }
+
+        // タイミングセーフなハッシュ比較
         if ( hash_equals( $this->beta_password_hash, hash( 'sha256', $password ) ) ) {
-            set_transient( 'sge_beta_channel', true, DAY_IN_SECONDS );
+            // 成功時は試行回数をクリア
+            delete_transient( $attempts_key );
+            set_transient( 'cp_beta_channel', true, DAY_IN_SECONDS );
             return true;
         }
+
+        // 失敗回数をインクリメント（10分間保持）
+        $new_attempts = $attempts ? $attempts + 1 : 1;
+        set_transient( $attempts_key, $new_attempts, 10 * MINUTE_IN_SECONDS );
+
         return false;
     }
 
@@ -70,9 +92,9 @@ class SGE_Settings {
      * ベータモードを無効化
      */
     public function disable_beta_mode() {
-        delete_transient( 'sge_beta_channel' );
+        delete_transient( 'cp_beta_channel' );
         // ベータ用キャッシュもクリア
-        delete_transient( 'sge_github_release_cache_beta' );
+        delete_transient( 'cp_github_release_cache_beta' );
     }
 
     /**
@@ -82,12 +104,12 @@ class SGE_Settings {
      */
     private function get_or_create_encryption_key() {
         // wp-config.php で定義された専用キーがあればそれを使用
-        if ( defined( 'SGE_ENCRYPTION_KEY' ) && ! empty( SGE_ENCRYPTION_KEY ) ) {
-            return hash( 'sha256', SGE_ENCRYPTION_KEY );
+        if ( defined( 'CP_ENCRYPTION_KEY' ) && ! empty( CP_ENCRYPTION_KEY ) ) {
+            return hash( 'sha256', CP_ENCRYPTION_KEY );
         }
 
         // データベースに保存された専用キーを取得
-        $stored_key = get_option( 'sge_encryption_key' );
+        $stored_key = get_option( 'cp_encryption_key' );
         if ( ! empty( $stored_key ) ) {
             return $stored_key;
         }
@@ -102,7 +124,7 @@ class SGE_Settings {
         }
 
         // キーをデータベースに保存（後で使用するため）
-        update_option( 'sge_encryption_key', $new_key, false );
+        update_option( 'cp_encryption_key', $new_key, false );
 
         return $new_key;
     }
@@ -113,7 +135,7 @@ class SGE_Settings {
      * @return bool wp-config.phpで定義されていればtrue
      */
     public function is_encryption_key_in_config() {
-        return defined( 'SGE_ENCRYPTION_KEY' ) && ! empty( SGE_ENCRYPTION_KEY );
+        return defined( 'CP_ENCRYPTION_KEY' ) && ! empty( CP_ENCRYPTION_KEY );
     }
 
     /**
@@ -122,11 +144,11 @@ class SGE_Settings {
      * @return array 設定の配列
      */
     public function get_settings() {
-        $settings = get_option( 'sge_settings', array() );
+        $settings = get_option( 'cp_settings', array() );
 
         // デフォルト値を定義
         $defaults = array(
-            'version' => SGE_VERSION,
+            'version' => CP_VERSION,
             'github_enabled' => false,
             'local_enabled' => false,
             'zip_enabled' => true, // Ver1.2: デフォルト有効
@@ -142,7 +164,10 @@ class SGE_Settings {
             'include_paths' => '',
             'exclude_patterns' => '',
             'url_mode' => 'relative',
-            'timeout' => 600,
+            'base_url' => '',
+            'custom_wp_includes' => '',
+            'custom_wp_content' => '',
+            'timeout' => 300,
             'auto_generate' => false,
             'cache_enabled' => true,
             'commit_message' => '',
@@ -151,7 +176,7 @@ class SGE_Settings {
             'enable_author_archive' => false,
             'enable_post_format_archive' => false,
             'enable_sitemap' => true,
-            'enable_robots_txt' => false,
+            'enable_robots_txt' => true,
             'enable_rss' => true,
             // Cloudflare Workers設定
             'cloudflare_enabled' => false,
@@ -218,7 +243,7 @@ class SGE_Settings {
      */
     public function save_settings( $settings ) {
         // 現在の設定を取得（暗号化されたトークンを取得するためraw_settingsを使用）
-        $current_raw = get_option( 'sge_settings', array() );
+        $current_raw = get_option( 'cp_settings', array() );
 
         // GitHubトークンが空の場合、既存のトークンを保持
         if ( empty( $settings['github_token'] ) && ! empty( $current_raw['github_token'] ) ) {
@@ -289,10 +314,10 @@ class SGE_Settings {
         }
 
         // バージョン情報を追加
-        $settings['version'] = SGE_VERSION;
+        $settings['version'] = CP_VERSION;
 
         // 設定を保存
-        update_option( 'sge_settings', $settings );
+        update_option( 'cp_settings', $settings );
 
         return true;
     }
@@ -842,7 +867,7 @@ class SGE_Settings {
      */
     public function reset_settings() {
         $default_settings = array(
-            'version' => SGE_VERSION,
+            'version' => CP_VERSION,
             'github_enabled' => false,
             'local_enabled' => false,
             'zip_enabled' => false, // リセット時は無効（パスが空のため）
@@ -859,7 +884,10 @@ class SGE_Settings {
             'include_paths' => '',
             'exclude_patterns' => '',
             'url_mode' => 'relative',
-            'timeout' => 600,
+            'base_url' => '',
+            'custom_wp_includes' => '',
+            'custom_wp_content' => '',
+            'timeout' => 300,
             'auto_generate' => false,
             'cache_enabled' => true,
             'commit_message' => '',
@@ -869,7 +897,7 @@ class SGE_Settings {
             'enable_author_archive' => false,
             'enable_post_format_archive' => false,
             'enable_sitemap' => true,
-            'enable_robots_txt' => false,
+            'enable_robots_txt' => true,
             'enable_rss' => true,
             // Cloudflare Workers設定
             'cloudflare_enabled' => false,
@@ -887,7 +915,7 @@ class SGE_Settings {
             'gitlab_api_url' => 'https://gitlab.com/api/v4',
         );
 
-        update_option( 'sge_settings', $default_settings );
+        update_option( 'cp_settings', $default_settings );
     }
 
     /**
@@ -911,6 +939,11 @@ class SGE_Settings {
      * @return bool|WP_Error 成功ならtrue、失敗ならWP_Error
      */
     public function import_settings( $json ) {
+        // JSONサイズチェック（100KB制限）
+        if ( strlen( $json ) > 100000 ) {
+            return new WP_Error( 'json_too_large', 'JSONデータが大きすぎます（最大100KB）。' );
+        }
+
         $imported = json_decode( $json, true );
 
         if ( json_last_error() !== JSON_ERROR_NONE ) {
@@ -926,24 +959,66 @@ class SGE_Settings {
 
         // トークンは現在の値を保持（インポートからは除外）
         unset( $imported['github_token'] );
+        unset( $imported['cloudflare_api_token'] );
+        unset( $imported['gitlab_token'] );
+        unset( $imported['netlify_api_token'] );
+
+        // v1形式からv2形式へのキー名マッピング
+        $key_migration = array(
+            'local_dir' => 'local_output_path',
+            'github_branch' => 'github_existing_branch',
+            'zip_filename' => 'zip_output_path',
+            'exclude_paths' => 'exclude_patterns',
+        );
+
+        // v1形式のキーをv2形式に変換
+        foreach ( $key_migration as $old_key => $new_key ) {
+            if ( isset( $imported[ $old_key ] ) && ! isset( $imported[ $new_key ] ) ) {
+                $imported[ $new_key ] = $imported[ $old_key ];
+                unset( $imported[ $old_key ] );
+            }
+        }
+
+        // v1形式でgithub_branchが設定されていた場合、branch_modeを'existing'に設定
+        if ( isset( $imported['github_existing_branch'] ) && ! isset( $imported['github_branch_mode'] ) ) {
+            $imported['github_branch_mode'] = 'existing';
+        }
 
         // 許可されたキーのみをインポート（ホワイトリスト方式）
         $allowed_keys = array(
-            'local_enabled', 'local_dir',
-            'github_enabled', 'github_repo', 'github_branch',
+            // v2形式のキー
+            'local_enabled', 'local_output_path',
+            'github_enabled', 'github_repo',
+            'github_branch_mode', 'github_existing_branch', 'github_new_branch', 'github_base_branch',
+            'github_method',
             'git_local_enabled', 'git_local_work_dir', 'git_local_branch', 'git_local_push_remote',
-            'zip_enabled', 'zip_filename',
-            'url_mode', 'include_paths', 'exclude_paths',
-            'use_parallel_crawling', 'cache_enabled', 'timeout',
-            'schedule_enabled', 'schedule_frequency',
+            'git_work_dir',
+            'zip_enabled', 'zip_output_path',
+            'cloudflare_enabled', 'cloudflare_account_id', 'cloudflare_script_name',
+            'gitlab_enabled', 'gitlab_project',
+            'gitlab_branch_mode', 'gitlab_existing_branch', 'gitlab_new_branch', 'gitlab_base_branch',
+            'gitlab_api_url',
+            'netlify_enabled', 'netlify_site_id',
+            'url_mode', 'base_url', 'custom_wp_includes', 'custom_wp_content', 'include_paths', 'exclude_patterns',
+            'cache_enabled', 'timeout',
+            'auto_generate',
             'commit_message',
+            'enable_tag_archive', 'enable_date_archive', 'enable_author_archive',
+            'enable_post_format_archive', 'enable_sitemap', 'enable_robots_txt', 'enable_rss',
         );
 
         $sanitized = array();
         foreach ( $allowed_keys as $key ) {
             if ( isset( $imported[ $key ] ) ) {
                 // 型に応じてサニタイズ
-                if ( is_bool( $current[ $key ] ?? false ) || in_array( $key, array( 'local_enabled', 'github_enabled', 'git_local_enabled', 'zip_enabled', 'git_local_push_remote', 'use_parallel_crawling', 'cache_enabled', 'schedule_enabled' ), true ) ) {
+                $boolean_keys = array(
+                    'local_enabled', 'github_enabled', 'git_local_enabled', 'zip_enabled',
+                    'git_local_push_remote', 'cache_enabled', 'auto_generate',
+                    'cloudflare_enabled', 'gitlab_enabled', 'netlify_enabled',
+                    'enable_tag_archive', 'enable_date_archive', 'enable_author_archive',
+                    'enable_post_format_archive', 'enable_sitemap', 'enable_robots_txt', 'enable_rss',
+                );
+                if ( is_bool( $current[ $key ] ?? false ) || in_array( $key, $boolean_keys, true ) ) {
                     $sanitized[ $key ] = (bool) $imported[ $key ];
                 } elseif ( is_int( $current[ $key ] ?? 0 ) || $key === 'timeout' ) {
                     $sanitized[ $key ] = absint( $imported[ $key ] );
@@ -954,7 +1029,7 @@ class SGE_Settings {
         }
 
         // テキストエリアフィールドは別途サニタイズ
-        $textarea_keys = array( 'include_paths', 'exclude_paths' );
+        $textarea_keys = array( 'include_paths', 'exclude_patterns' );
         foreach ( $textarea_keys as $key ) {
             if ( isset( $imported[ $key ] ) ) {
                 $sanitized[ $key ] = sanitize_textarea_field( $imported[ $key ] );
@@ -965,7 +1040,7 @@ class SGE_Settings {
         $merged = array_merge( $current, $sanitized );
 
         // バージョン情報を更新
-        $merged['version'] = SGE_VERSION;
+        $merged['version'] = CP_VERSION;
 
         // バリデーションを実行
         $validation = $this->validate_settings( $merged );
@@ -973,7 +1048,7 @@ class SGE_Settings {
             return $validation;
         }
 
-        update_option( 'sge_settings', $merged );
+        update_option( 'cp_settings', $merged );
 
         return true;
     }

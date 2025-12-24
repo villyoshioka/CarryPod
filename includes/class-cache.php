@@ -3,7 +3,7 @@
  * キャッシュ管理クラス
  */
 
-class SGE_Cache {
+class CP_Cache {
 
     /**
      * シングルトンインスタンス
@@ -29,7 +29,7 @@ class SGE_Cache {
      * コンストラクタ
      */
     private function __construct() {
-        $this->cache_dir = WP_CONTENT_DIR . '/sge-cache';
+        $this->cache_dir = WP_CONTENT_DIR . '/cp-cache';
         $this->ensure_cache_dir();
     }
 

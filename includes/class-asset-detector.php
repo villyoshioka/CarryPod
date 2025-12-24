@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class SGE_Asset_Detector {
+class CP_Asset_Detector {
 
     /**
      * ロガーインスタンス
@@ -59,7 +59,7 @@ class SGE_Asset_Detector {
      * コンストラクタ
      */
     public function __construct() {
-        $this->logger = SGE_Logger::get_instance();
+        $this->logger = CP_Logger::get_instance();
     }
 
     /**
@@ -152,7 +152,7 @@ class SGE_Asset_Detector {
 
             if ( is_dir( $plugin_dir ) ) {
                 // このプラグイン自体は除外
-                if ( strpos( $plugin_dir, 'static-generation-engine' ) !== false ) {
+                if ( strpos( $plugin_dir, 'carry-pod' ) !== false ) {
                     continue;
                 }
 

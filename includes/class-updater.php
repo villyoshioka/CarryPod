@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class SGE_Updater {
+class CP_Updater {
 
     /**
      * GitHub リポジトリのオーナー
@@ -40,7 +40,7 @@ class SGE_Updater {
     /**
      * キャッシュキー
      */
-    private $cache_key = 'sge_github_release_cache';
+    private $cache_key = 'cp_github_release_cache';
 
     /**
      * キャッシュ有効期間（秒）
@@ -51,9 +51,9 @@ class SGE_Updater {
      * コンストラクタ
      */
     public function __construct() {
-        $this->plugin_basename = plugin_basename( SGE_PLUGIN_DIR . 'static-generation-engine.php' );
+        $this->plugin_basename = plugin_basename( CP_PLUGIN_DIR . 'carry-pod.php' );
         $this->plugin_slug = dirname( $this->plugin_basename );
-        $this->current_version = SGE_VERSION;
+        $this->current_version = CP_VERSION;
 
         // フックを登録
         add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_for_update' ) );
@@ -298,88 +298,12 @@ class SGE_Updater {
     }
 
     /**
-     * v2.0.0リリース通知チェック（v1.4.2専用、v2.0.0で削除予定）
-     *
-     * v1.x系列のユーザーに対してv2.0.0リリースを通知する。
-     * 自動更新は行わず、手動ダウンロードを案内する。
-     *
-     * @return array|false v2.0.0以降のリリース情報、または見つからない場合はfalse
-     */
-    public function check_v2_release() {
-        // テスト用：強制的にv2.0.0が存在するように見せかける
-        // URLに &sge_test_v2=on を追加してテストモード有効化
-        // 無効化は &sge_test_v2=off
-        if ( get_transient( 'sge_test_v2_mode' ) ) {
-            return array(
-                'tag_name' => 'v2.0.0',
-                'html_url' => 'https://github.com/villyoshioka/CarryPod/releases/tag/v2.0.0',
-            );
-        }
-
-        // 既存のキャッシュをチェック（通常の更新チェックと同じタイミング）
-        $cached = get_transient( 'sge_v2_release_check' );
-        if ( $cached !== false ) {
-            return $cached;
-        }
-
-        // 全リリースを取得
-        $url = sprintf(
-            'https://api.github.com/repos/%s/%s/releases',
-            $this->github_owner,
-            $this->github_repo
-        );
-
-        $response = wp_remote_get( $url, array(
-            'timeout' => 10,
-            'headers' => array(
-                'Accept'     => 'application/vnd.github.v3+json',
-                'User-Agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url(),
-            ),
-        ) );
-
-        if ( is_wp_error( $response ) ) {
-            return false;
-        }
-
-        $status_code = wp_remote_retrieve_response_code( $response );
-        if ( $status_code !== 200 ) {
-            return false;
-        }
-
-        $releases = json_decode( wp_remote_retrieve_body( $response ), true );
-
-        if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $releases ) ) {
-            return false;
-        }
-
-        // v2.0.0以降のリリースを探す
-        foreach ( $releases as $release ) {
-            if ( ! isset( $release['tag_name'] ) ) {
-                continue;
-            }
-
-            $version = ltrim( $release['tag_name'], 'v' );
-
-            // v2.0.0以降かチェック（メジャーバージョンが2以上）
-            if ( version_compare( $version, '2.0.0', '>=' ) ) {
-                // キャッシュに保存（12時間）
-                set_transient( 'sge_v2_release_check', $release, $this->cache_expiry );
-                return $release;
-            }
-        }
-
-        // v2.0.0が見つからない場合はfalseをキャッシュ
-        set_transient( 'sge_v2_release_check', false, $this->cache_expiry );
-        return false;
-    }
-
-    /**
      * ベータチャンネルが有効かどうかを確認
      *
      * @return bool 有効ならtrue
      */
     private function is_beta_channel_enabled() {
-        return (bool) get_transient( 'sge_beta_channel' );
+        return (bool) get_transient( 'cp_beta_channel' );
     }
 
     /**
@@ -411,10 +335,10 @@ class SGE_Updater {
      * @return string|false ダウンロードURL
      */
     private function get_download_url( $release ) {
-        // まずリリースアセットからZIPファイルを探す（正しいフォルダ構造）
+        // carry-pod.zip という名前のアセットを探す
         if ( ! empty( $release['assets'] ) && is_array( $release['assets'] ) ) {
             foreach ( $release['assets'] as $asset ) {
-                if ( isset( $asset['name'] ) && preg_match( '/\.zip$/i', $asset['name'] ) ) {
+                if ( isset( $asset['name'] ) && $asset['name'] === 'carry-pod.zip' ) {
                     if ( isset( $asset['browser_download_url'] ) ) {
                         // SSRF対策: URLがGitHubのドメインであることを検証
                         if ( $this->is_valid_github_url( $asset['browser_download_url'] ) ) {
@@ -425,15 +349,7 @@ class SGE_Updater {
             }
         }
 
-        // アセットがない場合はzipball_urlにフォールバック
-        if ( ! empty( $release['zipball_url'] ) ) {
-            // SSRF対策: URLがGitHubのドメインであることを検証
-            if ( ! $this->is_valid_github_url( $release['zipball_url'] ) ) {
-                return false;
-            }
-            return $release['zipball_url'];
-        }
-
+        // carry-pod.zip が見つからない場合はfalse
         return false;
     }
 

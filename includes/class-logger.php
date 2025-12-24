@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class SGE_Logger {
+class CP_Logger {
 
     /**
      * シングルトンインスタンス
@@ -69,7 +69,7 @@ class SGE_Logger {
         }
 
         // まずトランジェントをチェック（非同期処理用・権限チェック不要）
-        if ( get_transient( 'sge_debug_mode' ) ) {
+        if ( get_transient( 'cp_debug_mode' ) ) {
             $this->debug_mode_cache = true;
             return true;
         }
@@ -83,7 +83,7 @@ class SGE_Logger {
      * 管理画面からのみ呼び出し可能
      */
     public function enable_debug_mode() {
-        set_transient( 'sge_debug_mode', true, HOUR_IN_SECONDS );
+        set_transient( 'cp_debug_mode', true, HOUR_IN_SECONDS );
         $this->debug_mode_cache = true;
     }
 
@@ -91,7 +91,7 @@ class SGE_Logger {
      * デバッグモードを無効化
      */
     public function disable_debug_mode() {
-        delete_transient( 'sge_debug_mode' );
+        delete_transient( 'cp_debug_mode' );
         $this->debug_mode_cache = false;
     }
 
@@ -188,7 +188,7 @@ class SGE_Logger {
             return;
         }
 
-        $logs = get_option( 'sge_logs', array() );
+        $logs = get_option( 'cp_logs', array() );
         $logs = array_merge( $logs, $this->log_buffer );
 
         // セッション内のログ数の安全制限（メモリ保護のため1000件まで）
@@ -197,7 +197,7 @@ class SGE_Logger {
         }
 
         // ログを保存
-        update_option( 'sge_logs', $logs );
+        update_option( 'cp_logs', $logs );
 
         // バッファをクリア
         $this->log_buffer = array();
@@ -247,7 +247,7 @@ class SGE_Logger {
     public function get_logs() {
         // まずバッファをフラッシュ
         $this->flush_logs();
-        return get_option( 'sge_logs', array() );
+        return get_option( 'cp_logs', array() );
     }
 
     /**
@@ -255,7 +255,7 @@ class SGE_Logger {
      */
     public function clear_logs() {
         // 実行中フラグをチェック
-        if ( get_transient( 'sge_manual_running' ) || get_transient( 'sge_auto_running' ) ) {
+        if ( get_transient( 'cp_manual_running' ) || get_transient( 'cp_auto_running' ) ) {
             return false; // 実行中の場合はクリアしない
         }
 
@@ -263,7 +263,7 @@ class SGE_Logger {
         $this->log_buffer = array();
 
         // ログをクリア
-        update_option( 'sge_logs', array() );
+        update_option( 'cp_logs', array() );
 
         // タイマーもリセット
         $this->start_time = null;
@@ -301,7 +301,7 @@ class SGE_Logger {
      * @return bool 実行中ならtrue
      */
     public function is_running() {
-        return get_transient( 'sge_manual_running' ) || get_transient( 'sge_auto_running' );
+        return get_transient( 'cp_manual_running' ) || get_transient( 'cp_auto_running' );
     }
 
     /**
@@ -318,7 +318,7 @@ class SGE_Logger {
             'status' => $status,
             'percentage' => $total > 0 ? round( ( $current / $total ) * 100 ) : 0,
         );
-        set_transient( 'sge_progress', $progress, 3600 );
+        set_transient( 'cp_progress', $progress, 3600 );
     }
 
     /**
@@ -327,7 +327,7 @@ class SGE_Logger {
      * @return array 進捗情報
      */
     public function get_progress() {
-        $progress = get_transient( 'sge_progress' );
+        $progress = get_transient( 'cp_progress' );
         if ( ! $progress ) {
             return array(
                 'current' => 0,
@@ -343,7 +343,7 @@ class SGE_Logger {
      * 進捗情報をクリア
      */
     public function clear_progress() {
-        delete_transient( 'sge_progress' );
+        delete_transient( 'cp_progress' );
     }
 
     /**
