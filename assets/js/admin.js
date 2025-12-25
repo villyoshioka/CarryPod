@@ -300,26 +300,25 @@ jQuery(document).ready(function($) {
      * @param {boolean} noTransition - trueの場合、トランジションなしで即座に状態を変更
      */
     function setAccordionState(header, content, isExpanded, noTransition) {
-        header.setAttribute('aria-expanded', isExpanded);
-        content.setAttribute('aria-hidden', !isExpanded);
+        const $header = $(header);
+        const $content = $(content);
+
+        $header.attr('aria-expanded', isExpanded);
+        $content.attr('aria-hidden', !isExpanded);
 
         if (noTransition) {
             // 初期表示時: トランジションなしで即座に状態を設定
             if (isExpanded) {
-                content.style.display = 'block';
+                $content.show();
             } else {
-                content.style.display = 'none';
+                $content.hide();
             }
         } else {
-            // ユーザー操作時: トランジションあり
+            // ユーザー操作時: jQueryのslideアニメーション
             if (isExpanded) {
-                content.style.display = 'block';
+                $content.slideDown(200);
             } else {
-                setTimeout(function() {
-                    if (content.getAttribute('aria-hidden') === 'true') {
-                        content.style.display = 'none';
-                    }
-                }, 200); // トランジション時間と合わせる
+                $content.slideUp(200);
             }
         }
     }
