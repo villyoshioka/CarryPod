@@ -1768,28 +1768,7 @@ input[type="text"].regular-text {
 /* アコーディオンコンテンツ */
 .cp-accordion-content {
     padding: 20px;
-    max-height: 10000px;
     overflow: visible;
-    transition: max-height 0.2s ease, padding 0.2s ease;
-}
-
-/* 閉じている時 */
-.cp-accordion-content[aria-hidden="true"] {
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    overflow: hidden;
-}
-
-/* 開いている時 */
-.cp-accordion-content[aria-hidden="false"] {
-    padding-top: 20px;
-    padding-bottom: 20px;
-}
-
-/* トランジション無効化（初期表示時のみ） */
-.cp-accordion-content.cp-no-transition {
-    transition: none !important;
 }
 
 
