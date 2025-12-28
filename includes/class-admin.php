@@ -315,7 +315,7 @@ class CP_Admin {
 
         ?>
         <div class="wrap cp-admin-wrap">
-            <h1>設定</h1>
+            <h1>CarryPod 設定</h1>
 
             <?php if ( $is_debug_mode ) : ?>
             <div class="notice notice-warning">
@@ -370,13 +370,13 @@ class CP_Admin {
             <form id="cp-settings-form">
                 <?php wp_nonce_field( 'cp_save_settings', 'cp_settings_nonce' ); ?>
 
-                    <!-- 配信先設定アコーディオン -->
+                    <!-- 出力先設定アコーディオン -->
                     <div class="cp-accordion-section" data-section="output-destinations">
                         <button type="button" class="cp-accordion-header"
                                 id="header-output-destinations"
                                 aria-expanded="true"
                                 aria-controls="accordion-output-destinations">
-                            <span class="cp-accordion-title">配信先設定</span>
+                            <span class="cp-accordion-title">出力先設定</span>
                             <span class="cp-accordion-icon" aria-hidden="true"></span>
                         </button>
                         <div id="accordion-output-destinations"
@@ -768,13 +768,13 @@ class CP_Admin {
                         </div><!-- .cp-accordion-content -->
                     </div><!-- .cp-accordion-section -->
 
-                    <!-- 詳細設定アコーディオン -->
+                    <!-- その他の設定アコーディオン -->
                     <div class="cp-accordion-section" data-section="other-settings">
                         <button type="button" class="cp-accordion-header"
                                 id="header-other-settings"
                                 aria-expanded="false"
                                 aria-controls="accordion-other-settings">
-                            <span class="cp-accordion-title">詳細設定</span>
+                            <span class="cp-accordion-title">その他の設定</span>
                             <span class="cp-accordion-icon" aria-hidden="true"></span>
                         </button>
                         <div id="accordion-other-settings"
@@ -802,10 +802,11 @@ class CP_Admin {
                             <strong>絶対パス:</strong> https://example.com/about/ の形式。特定のドメインに固定したい場合に選択します
                         </p>
 
-                        <div class="cp-base-url-field" style="display: none; margin-top: 16px;">
+                        <div class="cp-base-url-field" style="margin-top: 16px;">
                             <label for="cp-base-url">URL <span class="required">*</span></label>
                             <input type="url" id="cp-base-url" name="base_url" class="regular-text" value="<?php echo esc_attr( $settings['base_url'] ?? '' ); ?>" placeholder="https://example.com">
-                            <p class="description">絶対パスで使用するベースURLを入力してください（例: https://example.com）<br>このURLをもとに、すべてのリンクが絶対URLに変換されます<br>※ 末尾のスラッシュ（/）は不要です</p>
+                            <p class="description" id="cp-base-url-description-absolute" style="display: none;">絶対パスで使用するベースURLを入力してください（例: https://example.com）<br>このURLをもとに、すべてのリンクが絶対URLに変換されます<br>※ 末尾のスラッシュ（/）は不要です</p>
+                            <p class="description" id="cp-base-url-description-relative" style="display: none;">サイトマップやrobots.txtで使用するベースURLを入力してください（例: https://example.com）<br>HTMLファイル内のリンクは相対パスのままですが、サイトマップには絶対URLが使用されます<br>※ 末尾のスラッシュ（/）は不要です</p>
                         </div>
                     </div>
 
@@ -1419,8 +1420,8 @@ class CP_Admin {
 
             $log_text .= "その他の設定:\n";
             $log_text .= "  - URL形式: " . ( $settings['url_mode'] === 'relative' ? '相対パス' : '絶対パス' ) . "\n";
-            if ( $settings['url_mode'] === 'absolute' && ! empty( $settings['base_url'] ) ) {
-                $log_text .= "  - ベースURL: " . $settings['base_url'] . "\n";
+            if ( ! empty( $settings['base_url'] ) ) {
+                $log_text .= "  - URL: " . $settings['base_url'] . "\n";
             }
             $log_text .= "  - タイムアウト: " . ( $settings['timeout'] ?? 300 ) . " 秒\n";
             $log_text .= "  - 自動静的化: " . ( ! empty( $settings['auto_generate'] ) ? '有効' : '無効' ) . "\n";

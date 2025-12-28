@@ -981,25 +981,28 @@ jQuery(document).ready(function($) {
     }
 
     // ========================================
-    // ベースURL入力欄の表示/非表示制御
+    // ベースURL説明文の切り替え制御
     // ========================================
 
-    function toggleBaseUrlField() {
+    function toggleBaseUrlDescription() {
         const urlMode = $('input[name="url_mode"]:checked').val();
-        const $baseUrlField = $('.cp-base-url-field');
+        const $descAbsolute = $('#cp-base-url-description-absolute');
+        const $descRelative = $('#cp-base-url-description-relative');
 
         if (urlMode === 'absolute') {
-            $baseUrlField.slideDown(200);
+            $descAbsolute.show();
+            $descRelative.hide();
         } else {
-            $baseUrlField.slideUp(200);
+            $descAbsolute.hide();
+            $descRelative.show();
         }
     }
 
     // 初期表示時の制御
-    toggleBaseUrlField();
+    toggleBaseUrlDescription();
 
     // URL形式の変更を監視
     $('input[name="url_mode"]').on('change', function() {
-        toggleBaseUrlField();
+        toggleBaseUrlDescription();
     });
 });

@@ -40,6 +40,11 @@ class CP_Generator {
     private $url_to_post_id_map = array();
 
     /**
+     * 静的化されたHTMLページのリスト（サイトマップ生成用）
+     */
+    private $generated_html_pages = array();
+
+    /**
      * コンストラクタ
      */
     public function __construct() {
@@ -181,6 +186,14 @@ class CP_Generator {
                             file_put_contents( $file_path, $html );
 
                             $generated_files[ $path ] = $html;
+
+                            // サイトマップ用にHTMLページを記録（URLのパス部分のみ）
+                            $parsed_url = wp_parse_url( $url );
+                            $url_path = isset( $parsed_url['path'] ) ? $parsed_url['path'] : '/';
+                            $this->generated_html_pages[] = array(
+                                'url' => $url_path,
+                                'path' => $path,
+                            );
                         }
                     }
                 }
@@ -215,6 +228,14 @@ class CP_Generator {
                             file_put_contents( $file_path, $html );
 
                             $generated_files[ $path ] = $html;
+
+                            // サイトマップ用にHTMLページを記録（URLのパス部分のみ）
+                            $parsed_url = wp_parse_url( $url );
+                            $url_path = isset( $parsed_url['path'] ) ? $parsed_url['path'] : '/';
+                            $this->generated_html_pages[] = array(
+                                'url' => $url_path,
+                                'path' => $path,
+                            );
                             $cache_used_count++;
                             continue;
                         }
@@ -247,10 +268,15 @@ class CP_Generator {
             $this->logger->update_progress( 84, $total_steps, '追加ファイルをコピー中...' );
             $this->copy_included_files();
 
-            // 除外ファイルを削除 (86-90%)
+            // 除外ファイルを削除 (86-88%)
             $this->logger->add_log( '除外パターンを処理中...' );
             $this->logger->update_progress( 87, $total_steps, '除外ファイルを削除中...' );
             $this->remove_excluded_files();
+
+            // サイトマップを生成 (88-90%)
+            $this->logger->add_log( 'サイトマップを生成中...' );
+            $this->logger->update_progress( 89, $total_steps, 'サイトマップを生成中...' );
+            $this->generate_sitemap();
 
             // 出力処理 (90-100%)
             // 有効な出力方法の数を数える
@@ -562,31 +588,9 @@ class CP_Generator {
             $urls[] = home_url( '/comments/feed/' );
         }
 
-        // サイトマップ（WordPress 5.5以降のネイティブサイトマップ）
-        if ( ! empty( $this->settings['enable_sitemap'] ) ) {
-            $urls[] = home_url( '/sitemap.xml' );
-            $urls[] = home_url( '/wp-sitemap.xml' );
-            $urls[] = home_url( '/wp-sitemap-posts-post-1.xml' );
-            $urls[] = home_url( '/wp-sitemap-posts-page-1.xml' );
-
-            // カテゴリーサイトマップ（カテゴリーアーカイブは常に有効）
-            $urls[] = home_url( '/wp-sitemap-taxonomies-category-1.xml' );
-
-            // タグサイトマップ（タグアーカイブが有効な場合のみ）
-            if ( ! empty( $this->settings['enable_tag_archive'] ) ) {
-                $urls[] = home_url( '/wp-sitemap-taxonomies-post_tag-1.xml' );
-            }
-
-            // 投稿フォーマットサイトマップ（投稿フォーマットアーカイブが有効な場合のみ）
-            if ( ! empty( $this->settings['enable_post_format_archive'] ) ) {
-                $urls[] = home_url( '/wp-sitemap-taxonomies-post_format-1.xml' );
-            }
-
-            // ユーザーサイトマップ（著者アーカイブが有効な場合のみ）
-            if ( ! empty( $this->settings['enable_author_archive'] ) ) {
-                $urls[] = home_url( '/wp-sitemap-users-1.xml' );
-            }
-        }
+        // サイトマップ（カスタム生成に変更）
+        // WordPressネイティブのサイトマップは使用せず、
+        // 静的化後に独自のサイトマップを生成する
 
         return array_unique( $urls );
     }
@@ -733,6 +737,14 @@ class CP_Generator {
             mkdir( $dir, 0755, true );
         }
         file_put_contents( $file_path, $html );
+
+        // サイトマップ用にHTMLページを記録（URLのパス部分のみ）
+        $parsed_url = wp_parse_url( $url );
+        $url_path = isset( $parsed_url['path'] ) ? $parsed_url['path'] : '/';
+        $this->generated_html_pages[] = array(
+            'url' => $url_path,
+            'path' => $path,
+        );
 
         // 個別ページ生成のログは詳細すぎるので出力しない（ログ上限を超えて重要なログが押し出されるのを防ぐ）
         // $this->logger->add_log( "ページを生成しました: {$url}" );
@@ -3477,5 +3489,52 @@ class CP_Generator {
         }
 
         return true;
+    }
+
+    /**
+     * カスタムサイトマップを生成
+     */
+    private function generate_sitemap() {
+        if ( empty( $this->settings['enable_sitemap'] ) ) {
+            return;
+        }
+
+        $this->logger->debug( 'サイトマップ生成開始' );
+
+        // サイトマップ用のベースURLを取得
+        // base_url設定を優先、未設定の場合はWordPressサイトURLを使用
+        $base_url = ! empty( $this->settings['base_url'] )
+            ? untrailingslashit( $this->settings['base_url'] )
+            : untrailingslashit( get_site_url() );
+
+        // メインサイトマップを生成
+        $sitemap_xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        $sitemap_xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+
+        // HTMLページを追加
+        foreach ( $this->generated_html_pages as $page ) {
+            // サイトマップには常に絶対URLを出力
+            $url = $base_url . $page['url'];
+
+            // wp-adminを含むURLを除外（大文字小文字を無視）
+            if ( stripos( $url, '/wp-admin' ) !== false ) {
+                continue;
+            }
+
+            $sitemap_xml .= '  <url>' . "\n";
+            $sitemap_xml .= '    <loc>' . esc_url( $url ) . '</loc>' . "\n";
+            $sitemap_xml .= '    <changefreq>weekly</changefreq>' . "\n";
+            $sitemap_xml .= '    <priority>0.8</priority>' . "\n";
+            $sitemap_xml .= '  </url>' . "\n";
+        }
+
+        $sitemap_xml .= '</urlset>' . "\n";
+
+        // sitemap.xmlを保存
+        $sitemap_path = $this->temp_dir . '/sitemap.xml';
+        file_put_contents( $sitemap_path, $sitemap_xml );
+
+        $page_count = count( $this->generated_html_pages );
+        $this->logger->debug( "サイトマップ生成完了: {$page_count}ページ" );
     }
 }
