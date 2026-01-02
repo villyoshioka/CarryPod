@@ -1,5 +1,9 @@
 # GitHub Release ZIP から除外
 .gitignore export-ignore
 .gitattributes export-ignore
+.claude/ export-ignore
+.vscode/ export-ignore
 AI_POLICY.md export-ignore
 CREDITS.md export-ignore
+DEVELOPMENT.md export-ignore
+VERSIONING.md export-ignore
