@@ -727,6 +727,12 @@ class CP_Generator {
             }
         }
 
+        // HTML圧縮を適用
+        $html = $this->minify_html( $html );
+
+        // インラインCSS圧縮を適用
+        $html = $this->minify_inline_css( $html );
+
         // ファイルパスを生成
         $path = $this->url_to_path( $url );
 
@@ -1907,13 +1913,16 @@ class CP_Generator {
 
             $file_content = file_get_contents( $file_path );
 
+            // ファイルの拡張子に基づいてContent-Typeを決定
+            $content_type = $this->get_content_type( $relative_path );
+
             $upload_response = wp_remote_request(
                 'https://api.netlify.com/api/v1/deploys/' . $deploy_id . '/files/' . $relative_path,
                 array(
                     'method'  => 'PUT',
                     'headers' => array(
                         'Authorization' => 'Bearer ' . $this->settings['netlify_api_token'],
-                        'Content-Type'  => 'application/octet-stream',
+                        'Content-Type'  => $content_type,
                     ),
                     'body' => $file_content,
                     'timeout' => 120,
@@ -3521,10 +3530,13 @@ class CP_Generator {
                 continue;
             }
 
+            // トップページ（/）のみpriority 1.0、それ以外は0.8
+            $priority = ( $page['url'] === '/' || $page['url'] === '' ) ? '1.0' : '0.8';
+
             $sitemap_xml .= '  <url>' . "\n";
             $sitemap_xml .= '    <loc>' . esc_url( $url ) . '</loc>' . "\n";
             $sitemap_xml .= '    <changefreq>weekly</changefreq>' . "\n";
-            $sitemap_xml .= '    <priority>0.8</priority>' . "\n";
+            $sitemap_xml .= '    <priority>' . $priority . '</priority>' . "\n";
             $sitemap_xml .= '  </url>' . "\n";
         }
 
@@ -3536,5 +3548,148 @@ class CP_Generator {
 
         $page_count = count( $this->generated_html_pages );
         $this->logger->debug( "サイトマップ生成完了: {$page_count}ページ" );
+    }
+
+    /**
+     * HTMLを圧縮
+     *
+     * @param string $html HTML内容
+     * @return string 圧縮後のHTML
+     */
+    private function minify_html( $html ) {
+        // 設定が無効な場合は何もしない
+        if ( empty( $this->settings['minify_html'] ) ) {
+            return $html;
+        }
+
+        // 1. <script>, <style>, <noscript>, <pre>, <textarea>タグ内を保護
+        $protected = array();
+        $html = preg_replace_callback(
+            '/<(script|style|noscript|pre|textarea)(\s[^>]*)?>(.*?)<\/\1>/isu',
+            function( $matches ) use ( &$protected ) {
+                $placeholder = '___PROTECTED_' . count( $protected ) . '___';
+                $protected[ $placeholder ] = $matches[0];
+                return $placeholder;
+            },
+            $html
+        );
+
+        // 2. DOCTYPE宣言を保護
+        $html = preg_replace('/(<!DOCTYPE[^>]+>)\s+/i', '$1' . "\n", $html);
+
+        // 3. HTMLコメント削除（条件付きコメント<!--[if]>は保持）
+        $html = preg_replace('/<!--(?!\[if\s)(?!<!)[^\[].*?-->/s', '', $html);
+
+        // 4. 改行・タブ・複数スペースを削除
+        $html = preg_replace('/\s+/u', ' ', $html);
+        $html = preg_replace('/>\s+</u', '><', $html);
+
+        // 5. 保護したタグを復元
+        foreach ( $protected as $placeholder => $content ) {
+            $html = str_replace( $placeholder, $content, $html );
+        }
+
+        return trim( $html );
+    }
+
+    /**
+     * インラインCSSを圧縮
+     *
+     * @param string $html HTML内容
+     * @return string 圧縮後のHTML
+     */
+    private function minify_inline_css( $html ) {
+        // 設定が無効な場合は何もしない
+        if ( empty( $this->settings['minify_css'] ) ) {
+            return $html;
+        }
+
+        // 1. <style>タグ内のCSS圧縮
+        $html = preg_replace_callback(
+            '/<style([^>]*)>(.*?)<\/style>/isu',
+            function( $matches ) {
+                $css = $matches[2];
+                $css = $this->minify_css_content( $css );
+                return '<style' . $matches[1] . '>' . $css . '</style>';
+            },
+            $html
+        );
+
+        // 2. style属性内のCSS圧縮
+        $html = preg_replace_callback(
+            '/\sstyle=(["\'])(.*?)\1/iu',
+            function( $matches ) {
+                $css = $matches[2];
+                $css = $this->minify_css_content( $css );
+                return ' style=' . $matches[1] . $css . $matches[1];
+            },
+            $html
+        );
+
+        return $html;
+    }
+
+    /**
+     * CSS内容を圧縮
+     *
+     * @param string $css CSS内容
+     * @return string 圧縮後のCSS
+     */
+    private function minify_css_content( $css ) {
+        // calc()内のスペースを保護
+        $css = preg_replace_callback(
+            '/calc\s*\([^)]+\)/iu',
+            function( $matches ) {
+                return str_replace( ' ', '___SPACE___', $matches[0] );
+            },
+            $css
+        );
+
+        // CSSコメント削除
+        $css = preg_replace('/\/\*.*?\*\//su', '', $css);
+
+        // 改行・複数スペース削除
+        $css = preg_replace('/\s+/u', ' ', $css);
+
+        // プロパティ周りのスペース削除
+        $css = preg_replace('/\s*:\s*/u', ':', $css);
+        $css = preg_replace('/\s*;\s*/u', ';', $css);
+        $css = preg_replace('/;\s*$/u', '', $css);
+
+        // calc()内のスペースを復元
+        $css = str_replace( '___SPACE___', ' ', $css );
+
+        return trim( $css );
+    }
+
+    /**
+     * ファイルパスから適切なContent-Typeを取得
+     *
+     * @param string $file_path ファイルパス
+     * @return string Content-Type
+     */
+    private function get_content_type( $file_path ) {
+        $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
+
+        $mime_types = array(
+            'xml'  => 'application/xml',
+            'html' => 'text/html',
+            'htm'  => 'text/html',
+            'css'  => 'text/css',
+            'js'   => 'application/javascript',
+            'json' => 'application/json',
+            'jpg'  => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png'  => 'image/png',
+            'gif'  => 'image/gif',
+            'svg'  => 'image/svg+xml',
+            'webp' => 'image/webp',
+            'woff' => 'font/woff',
+            'woff2' => 'font/woff2',
+            'ttf'  => 'font/ttf',
+            'eot'  => 'application/vnd.ms-fontobject',
+        );
+
+        return isset( $mime_types[ $extension ] ) ? $mime_types[ $extension ] : 'application/octet-stream';
     }
 }
