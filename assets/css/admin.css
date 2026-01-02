@@ -1854,12 +1854,12 @@ input[type="text"].regular-text {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: #646970;
-    color: #fff;
+    background: #f0f0f1;
+    color: #646970;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.15s ease-in-out;
+    transition: color 0.15s ease-in-out;
     user-select: none;
     line-height: 1;
     padding: 0;
@@ -1867,11 +1867,16 @@ input[type="text"].regular-text {
 }
 
 .cp-tooltip-trigger:hover {
-    background: #2c3338;
+    color: #1d2327;
 }
 
 .cp-tooltip-trigger:focus {
     outline: none;
+}
+
+.cp-tooltip-trigger:active {
+    background: #f0f0f1;
+    transform: none;
 }
 
 /* ツールチップコンテンツ（吹き出し） */
