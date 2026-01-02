@@ -1005,4 +1005,60 @@ jQuery(document).ready(function($) {
     $('input[name="url_mode"]').on('change', function() {
         toggleBaseUrlDescription();
     });
+
+    // ========================================
+    // ツールチップ機能
+    // ========================================
+
+    // ツールチップトリガーのクリックイベント
+    $(document).on('click', '.cp-tooltip-trigger', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const $wrapper = $(this).closest('.cp-tooltip-wrapper');
+        const isOpen = $wrapper.hasClass('show');
+
+        // 他のツールチップを全て閉じる
+        $('.cp-tooltip-wrapper').removeClass('show');
+        $('.cp-tooltip-trigger').attr('aria-expanded', 'false');
+
+        // このツールチップのトグル
+        if (!isOpen) {
+            $wrapper.addClass('show');
+            $(this).attr('aria-expanded', 'true');
+        }
+    });
+
+    // ツールチップトリガーのキーボードイベント（Enter/Space）
+    $(document).on('keydown', '.cp-tooltip-trigger', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            $(this).trigger('click');
+        } else if (e.key === 'Escape') {
+            const $wrapper = $(this).closest('.cp-tooltip-wrapper');
+            $wrapper.removeClass('show');
+            $(this).attr('aria-expanded', 'false');
+        }
+    });
+
+    // ツールチップの外側をクリックしたら閉じる
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.cp-tooltip-wrapper').length) {
+            $('.cp-tooltip-wrapper').removeClass('show');
+            $('.cp-tooltip-trigger').attr('aria-expanded', 'false');
+        }
+    });
+
+    // ツールチップトリガーのフォーカス喪失時に閉じる
+    $(document).on('blur', '.cp-tooltip-trigger', function(e) {
+        // 少し遅延させて、他の要素へのフォーカス移動を待つ
+        setTimeout(() => {
+            // フォーカスがツールチップ内にない場合のみ閉じる
+            if (!$(document.activeElement).closest('.cp-tooltip-wrapper').length) {
+                const $wrapper = $(this).closest('.cp-tooltip-wrapper');
+                $wrapper.removeClass('show');
+                $(this).attr('aria-expanded', 'false');
+            }
+        }, 100);
+    });
 });

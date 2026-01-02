@@ -203,6 +203,9 @@ class CP_Settings {
             'netlify_site_id' => '',
             // ZIP出力パス
             'zip_output_path' => '',
+            // HTML/CSS圧縮設定
+            'minify_html' => false,
+            'minify_css' => false,
         );
 
         // デフォルト値とマージ（既存の設定を優先）

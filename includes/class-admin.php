@@ -206,14 +206,16 @@ class CP_Admin {
                 </div>
 
                 <div class="cp-commit-section <?php echo ( ! empty( $settings['github_enabled'] ) || ! empty( $settings['git_local_enabled'] ) ) ? 'active' : ''; ?>">
-                    <h3>コミットメッセージ</h3>
+                    <h3>
+                        コミットメッセージ
+                        <?php echo $this->render_tooltip( 'デフォルト形式: update:YYYYMMDD_HHMMSS（例: update:20241225_143052）分かりやすいメッセージにすることで、後から履歴を見返す時に何の更新だったか分かりやすくなります' ); ?>
+                    </h3>
                     <div class="cp-section-content">
                         <div class="cp-form-group">
                             <div class="cp-commit-container">
                                 <input type="text" id="cp-commit-message" class="regular-text" value="<?php echo esc_attr( ! empty( $settings['commit_message'] ) ? $settings['commit_message'] : 'update:' . current_time( 'Ymd_His' ) ); ?>" placeholder="コミットメッセージを入力">
                                 <button type="button" id="cp-reset-commit-message" class="button">リセット</button>
                             </div>
-                            <p class="description">デフォルト形式: update:YYYYMMDD_HHMMSS（例: update:20241225_143052）<br>分かりやすいメッセージにすることで、後から履歴を見返す時に何の更新だったか分かりやすくなります</p>
                         </div>
                     </div>
                 </div>
@@ -412,15 +414,19 @@ class CP_Admin {
                         </div>
 
                         <div class="cp-form-group">
-                            <label for="cp-cloudflare-account-id">Account ID <span class="required">*</span></label>
+                            <label for="cp-cloudflare-account-id">
+                                Account ID <span class="required">*</span>
+                                <?php echo $this->render_tooltip( 'Cloudflareダッシュボード > Workers & Pages > 右側のサイドバーで確認できます。形式: 32文字の英数字（例: 1234567890abcdef1234567890abcdef）' ); ?>
+                            </label>
                             <input type="text" id="cp-cloudflare-account-id" name="cloudflare_account_id" class="regular-text" value="<?php echo esc_attr( $settings['cloudflare_account_id'] ?? '' ); ?>" placeholder="例: 1234567890abcdef1234567890abcdef">
-                            <p class="description">Cloudflareダッシュボード > Workers & Pages > 右側のサイドバーで確認できます<br>形式: 32文字の英数字（例: 1234567890abcdef1234567890abcdef）</p>
                         </div>
 
                         <div class="cp-form-group">
-                            <label for="cp-cloudflare-script-name">Worker名 <span class="required">*</span></label>
+                            <label for="cp-cloudflare-script-name">
+                                Worker名 <span class="required">*</span>
+                                <?php echo $this->render_tooltip( 'デプロイ先のWorker名を自由に決めてください。存在しない場合は自動的に作成されます。使用可能な文字: 英数字、ハイフン（-）、アンダースコア（_）のみ。例: my-static-site、company-website、blog_2024 など' ); ?>
+                            </label>
                             <input type="text" id="cp-cloudflare-script-name" name="cloudflare_script_name" class="regular-text" value="<?php echo esc_attr( $settings['cloudflare_script_name'] ?? '' ); ?>" placeholder="例: my-static-site">
-                            <p class="description">デプロイ先のWorker名を自由に決めてください。存在しない場合は自動的に作成されます<br>使用可能な文字: 英数字、ハイフン（-）、アンダースコア（_）のみ<br>例: my-static-site、company-website、blog_2024 など</p>
                         </div>
 
                     </div>
@@ -451,9 +457,11 @@ class CP_Admin {
                         </div>
 
                         <div class="cp-form-group">
-                            <label for="cp-netlify-site-id">Netlify Site ID <span class="required">*</span></label>
+                            <label for="cp-netlify-site-id">
+                                Netlify Project ID <span class="required">*</span>
+                                <?php echo $this->render_tooltip( 'Netlifyの「Site configuration」→「General」→「Site details」で確認できます 形式: UUID（例: 12345678-1234-1234-1234-123456789012）' ); ?>
+                            </label>
                             <input type="text" id="cp-netlify-site-id" name="netlify_site_id" class="regular-text" value="<?php echo esc_attr( $settings['netlify_site_id'] ?? '' ); ?>" placeholder="例: 12345678-1234-1234-1234-123456789012">
-                            <p class="description">Netlifyの「Site configuration」→「General」→「Site details」で確認できます<br>形式: UUID（例: 12345678-1234-1234-1234-123456789012）</p>
                         </div>
                     </div>
 
@@ -485,9 +493,11 @@ class CP_Admin {
                         </div>
 
                         <div class="cp-form-group">
-                            <label for="cp-github-repo">リポジトリ名 <span class="required">*</span></label>
+                            <label for="cp-github-repo">
+                                リポジトリ名 <span class="required">*</span>
+                                <?php echo $this->render_tooltip( '形式: owner/repo（例: username/my-website） GitHubリポジトリのURLが https://github.com/username/my-website なら「username/my-website」と入力' ); ?>
+                            </label>
                             <input type="text" id="cp-github-repo" name="github_repo" class="regular-text" value="<?php echo esc_attr( $settings['github_repo'] ?? '' ); ?>" placeholder="owner/repo">
-                            <p class="description">形式: owner/repo（例: username/my-website）<br>GitHubリポジトリのURLが https://github.com/username/my-website なら「username/my-website」と入力</p>
                         </div>
 
                         <div class="cp-form-group cp-branch-settings">
@@ -545,9 +555,11 @@ class CP_Admin {
                         </div>
 
                         <div class="cp-form-group">
-                            <label for="cp-gitlab-project">プロジェクトパス <span class="required">*</span></label>
+                            <label for="cp-gitlab-project">
+                                プロジェクトパス <span class="required">*</span>
+                                <?php echo $this->render_tooltip( '形式: username/project または group/subgroup/project（例: myname/my-website） GitLabプロジェクトのURLが https://gitlab.com/myname/my-website なら「myname/my-website」と入力' ); ?>
+                            </label>
                             <input type="text" id="cp-gitlab-project" name="gitlab_project" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_project'] ?? '' ); ?>" placeholder="username/project">
-                            <p class="description">形式: username/project または group/subgroup/project（例: myname/my-website）<br>GitLabプロジェクトのURLが https://gitlab.com/myname/my-website なら「myname/my-website」と入力</p>
                         </div>
 
                         <div class="cp-form-group cp-branch-settings">
@@ -576,9 +588,11 @@ class CP_Admin {
                         </div>
 
                         <div class="cp-form-group">
-                            <label for="cp-gitlab-api-url">GitLab API URL</label>
+                            <label for="cp-gitlab-api-url">
+                                GitLab API URL
+                                <?php echo $this->render_tooltip( '通常は変更不要です。自分で用意したGitLabサーバーを使う場合のみ変更してください 例: https://gitlab.example.com/api/v4' ); ?>
+                            </label>
                             <input type="text" id="cp-gitlab-api-url" name="gitlab_api_url" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_api_url'] ?? 'https://gitlab.com/api/v4' ); ?>" placeholder="https://gitlab.com/api/v4">
-                            <p class="description">通常は変更不要です。自分で用意したGitLabサーバーを使う場合のみ変更してください<br>例: https://gitlab.example.com/api/v4</p>
                         </div>
                     </div>
 
@@ -592,23 +606,27 @@ class CP_Admin {
 
                     <div id="cp-git-local-settings" class="cp-subsection" <?php echo empty( $settings['git_local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
                         <div class="cp-form-group">
-                            <label for="cp-git-local-work-dir">Git作業ディレクトリ <span class="required">*</span></label>
+                            <label for="cp-git-local-work-dir">
+                                Git作業ディレクトリ <span class="required">*</span>
+                                <?php echo $this->render_tooltip( 'サーバー上のGitリポジトリのフルパスを指定（例: /home/username/my-repo） 相対パスではなく、/（スラッシュ）から始まる絶対パスで入力してください' ); ?>
+                            </label>
                             <input type="text" id="cp-git-local-work-dir" name="git_local_work_dir" class="regular-text" value="<?php echo esc_attr( $settings['git_local_work_dir'] ?? '' ); ?>" placeholder="/path/to/git/repo">
-                            <p class="description">サーバー上のGitリポジトリのフルパスを指定（例: /home/username/my-repo）<br>相対パスではなく、/（スラッシュ）から始まる絶対パスで入力してください</p>
                         </div>
 
                         <div class="cp-form-group">
-                            <label for="cp-git-local-branch">ブランチ名 <span class="required">*</span></label>
+                            <label for="cp-git-local-branch">
+                                ブランチ名 <span class="required">*</span>
+                                <?php echo $this->render_tooltip( '静的ファイルをコミットするブランチ名を指定（例: main、master、gh-pages など）' ); ?>
+                            </label>
                             <input type="text" id="cp-git-local-branch" name="git_local_branch" class="regular-text" value="<?php echo esc_attr( $settings['git_local_branch'] ?? 'main' ); ?>" placeholder="main">
-                            <p class="description">静的ファイルをコミットするブランチ名を指定（例: main、master、gh-pages など）</p>
                         </div>
 
                         <div class="cp-form-group">
                             <label>
                                 <input type="checkbox" id="cp-git-local-push-remote" name="git_local_push_remote" value="1" <?php checked( ! empty( $settings['git_local_push_remote'] ) ); ?>>
                                 リモートにプッシュする
+                                <?php echo $this->render_tooltip( 'チェックを入れると、ローカルリポジトリにコミットした後、自動的にリモートリポジトリ（origin）にプッシュします GitHub、GitLabなどのリモートリポジトリと連携している場合に便利です' ); ?>
                             </label>
-                            <p class="description">チェックを入れると、ローカルリポジトリにコミットした後、自動的にリモートリポジトリ（origin）にプッシュします<br>GitHub、GitLabなどのリモートリポジトリと連携している場合に便利です</p>
                         </div>
                     </div>
 
@@ -622,13 +640,11 @@ class CP_Admin {
 
                     <div id="cp-local-settings" class="cp-subsection" <?php echo empty( $settings['local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
                         <div class="cp-form-group">
-                            <label for="cp-local-output-path">静的ファイル出力先パス <span class="required">*</span></label>
+                            <label for="cp-local-output-path">
+                                静的ファイル出力先パス <span class="required">*</span>
+                                <?php echo $this->render_tooltip( '静的HTMLファイルを保存する場所を指定します。必ず絶対パス（フルパス）で入力してください Windows: C:\output または C:/output（どちらでも可） Mac/Linux: /Users/username/output または /home/username/output' ); ?>
+                            </label>
                             <input type="text" id="cp-local-output-path" name="local_output_path" class="regular-text" value="<?php echo esc_attr( $settings['local_output_path'] ?? '' ); ?>" placeholder="<?php echo esc_attr( ( PHP_OS === 'WINNT' ? 'C:/output' : '/Users/username/output' ) ); ?>">
-                            <p class="description">
-                                静的HTMLファイルを保存する場所を指定します。必ず絶対パス（フルパス）で入力してください<br>
-                                Windows: C:\output または C:/output（どちらでも可）<br>
-                                Mac/Linux: /Users/username/output または /home/username/output
-                            </p>
                         </div>
                     </div>
 
@@ -642,12 +658,38 @@ class CP_Admin {
 
                     <div id="cp-zip-settings" class="cp-subsection" <?php echo empty( $settings['zip_enabled'] ) ? 'style="display:none;"' : ''; ?>>
                         <div class="cp-form-group">
-                            <label for="cp-zip-output-path">ZIP出力先パス <span class="required">*</span></label>
+                            <label for="cp-zip-output-path">
+                                ZIP出力先パス <span class="required">*</span>
+                                <?php echo $this->render_tooltip( 'ZIPファイルを保存する場所（ディレクトリ）を指定します ファイル名は自動的に static-output-YYYYMMDD_HHMMSS.zip の形式で作成されます（例: static-output-20241225_143052.zip）' ); ?>
+                            </label>
                             <input type="text" id="cp-zip-output-path" name="zip_output_path" class="regular-text" value="<?php echo esc_attr( $settings['zip_output_path'] ?? '' ); ?>">
-                            <p class="description">
-                                ZIPファイルを保存する場所（ディレクトリ）を指定します<br>
-                                ファイル名は自動的に static-output-YYYYMMDD_HHMMSS.zip の形式で作成されます（例: static-output-20241225_143052.zip）
-                            </p>
+                        </div>
+                    </div>
+
+                    <!-- URL設定 -->
+                    <div class="cp-form-group">
+                        <label>
+                            URL形式
+                            <?php echo $this->render_tooltip( '相対パス: /about/ の形式。どのドメインでも動作するため、サブディレクトリやテスト環境でも使えます（推奨）<br>絶対パス: https://example.com/about/ の形式。特定のドメインに固定したい場合に選択します' ); ?>
+                        </label>
+                        <div>
+                            <label>
+                                <input type="radio" name="url_mode" value="relative" <?php checked( $settings['url_mode'] ?? 'relative', 'relative' ); ?>>
+                                相対パス
+                            </label>
+                        </div>
+                        <div>
+                            <label>
+                                <input type="radio" name="url_mode" value="absolute" <?php checked( $settings['url_mode'] ?? 'relative', 'absolute' ); ?>>
+                                絶対パス
+                            </label>
+                        </div>
+
+                        <div class="cp-base-url-field" style="margin-top: 16px;">
+                            <label for="cp-base-url">URL <span class="required">*</span></label>
+                            <input type="url" id="cp-base-url" name="base_url" class="regular-text" value="<?php echo esc_attr( $settings['base_url'] ?? '' ); ?>" placeholder="https://example.com">
+                            <p class="description" id="cp-base-url-description-absolute" style="display: none;">絶対パスで使用するベースURLを入力してください（例: https://example.com）<br>このURLをもとに、すべてのリンクが絶対URLに変換されます<br>※ 末尾のスラッシュ（/）は不要です</p>
+                            <p class="description" id="cp-base-url-description-relative" style="display: none;">サイトマップやrobots.txtで使用するベースURLを入力してください（例: https://example.com）<br>HTMLファイル内のリンクは相対パスのままですが、サイトマップには絶対URLが使用されます<br>※ 末尾のスラッシュ（/）は不要です</p>
                         </div>
                     </div>
 
@@ -670,25 +712,19 @@ class CP_Admin {
                              aria-hidden="true">
 
                     <div class="cp-form-group">
-                        <label for="cp-include-paths">追加したいファイル/フォルダのパス指定</label>
+                        <label for="cp-include-paths">
+                            追加したいファイル/フォルダのパス指定
+                            <?php echo $this->render_tooltip( 'WordPressに含まれないファイル（画像、PDF、動画など）を静的サイトに追加したい場合に指定します。各ファイル/フォルダのフルパスを1行に1つずつ記載してください。 記載例： /home/username/Desktop/logo.png /home/username/videos/intro.mp4' ); ?>
+                        </label>
                         <textarea id="cp-include-paths" name="include_paths" class="large-text" rows="5"><?php echo esc_textarea( $settings['include_paths'] ?? '' ); ?></textarea>
-                        <p class="description">
-                            WordPressに含まれないファイル（画像、PDF、動画など）を静的サイトに追加したい場合に指定します<br>
-                            各ファイル/フォルダのフルパスを1行に1つずつ記載してください<br>
-                            記載例：<br>
-                            /home/username/Desktop/logo.png<br>
-                            /home/username/videos/intro.mp4
-                        </p>
                     </div>
 
                     <div class="cp-form-group">
-                        <label for="cp-exclude-patterns">除外したいファイル/フォルダのパス指定</label>
+                        <label for="cp-exclude-patterns">
+                            除外したいファイル/フォルダのパス指定
+                            <?php echo $this->render_tooltip( '静的サイトに含めたくないファイルやフォルダを指定します。ワイルドカード（*）を使ったパターン指定が可能です。1行に1つずつ記載してください。<br>※ HTMLから参照されていないファイルは自動的に除外されます' ); ?>
+                        </label>
                         <textarea id="cp-exclude-patterns" name="exclude_patterns" class="large-text" rows="5"><?php echo esc_textarea( $settings['exclude_patterns'] ?? '' ); ?></textarea>
-                        <p class="description">
-                            静的サイトに含めたくないファイルやフォルダを指定します<br>
-                            ワイルドカード（*）を使ったパターン指定が可能です。1行に1つずつ記載してください<br>
-                            ※ HTMLから参照されていないファイルは自動的に除外されます
-                        </p>
                     </div>
 
                         </div><!-- .cp-accordion-content -->
@@ -713,56 +749,56 @@ class CP_Admin {
                         <label>
                             <input type="checkbox" name="enable_tag_archive" value="1" <?php checked( $settings['enable_tag_archive'] ?? false ); ?>>
                             タグアーカイブを出力
+                            <?php echo $this->render_tooltip( 'タグアーカイブ = タグごとの記事一覧ページ（例: /tag/wordpress/） 無効にすると、タグアーカイブページを出力せず、投稿ページ内のタグリンクも非表示になります' ); ?>
                         </label>
-                        <p class="description">タグアーカイブ = タグごとの記事一覧ページ（例: /tag/wordpress/）<br>無効にすると、タグアーカイブページを出力せず、投稿ページ内のタグリンクも非表示になります</p>
                     </div>
 
                     <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_date_archive" value="1" <?php checked( $settings['enable_date_archive'] ?? false ); ?>>
                             日付アーカイブを出力
+                            <?php echo $this->render_tooltip( '日付アーカイブ = 年月日ごとの記事一覧ページ（例: /2024/12/、/2024/12/25/） 無効にすると、日付アーカイブページを出力せず、投稿ページ内の日付はリンクなしのテキストで表示されます' ); ?>
                         </label>
-                        <p class="description">日付アーカイブ = 年月日ごとの記事一覧ページ（例: /2024/12/、/2024/12/25/）<br>無効にすると、日付アーカイブページを出力せず、投稿ページ内の日付はリンクなしのテキストで表示されます</p>
                     </div>
 
                     <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_author_archive" value="1" <?php checked( $settings['enable_author_archive'] ?? false ); ?>>
                             著者アーカイブを出力
+                            <?php echo $this->render_tooltip( '著者アーカイブ = 著者ごとの記事一覧ページ（例: /author/john/） 無効にすると、著者アーカイブページを出力せず、投稿ページ内の著者名はリンクなしのテキストで表示されます' ); ?>
                         </label>
-                        <p class="description">著者アーカイブ = 著者ごとの記事一覧ページ（例: /author/john/）<br>無効にすると、著者アーカイブページを出力せず、投稿ページ内の著者名はリンクなしのテキストで表示されます</p>
                     </div>
 
                     <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_post_format_archive" value="1" <?php checked( $settings['enable_post_format_archive'] ?? false ); ?>>
                             投稿フォーマットアーカイブを出力
+                            <?php echo $this->render_tooltip( '投稿フォーマットアーカイブ = 投稿の種類ごとの記事一覧ページ（例: /type/image/、/type/video/） 無効にすると、これらのページを出力しません。通常のブログでは使わないことが多いです' ); ?>
                         </label>
-                        <p class="description">投稿フォーマットアーカイブ = 投稿の種類ごとの記事一覧ページ（例: /type/image/、/type/video/）<br>無効にすると、これらのページを出力しません。通常のブログでは使わないことが多いです</p>
                     </div>
 
                     <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_sitemap" value="1" <?php checked( $settings['enable_sitemap'] ?? true ); ?>>
                             サイトマップ（sitemap.xml）を出力
+                            <?php echo $this->render_tooltip( 'サイトマップ（sitemap.xml） = サイト内の全ページURLをリストアップしたXMLファイル Google検索などの検索エンジンがサイトを見つけやすくなります。通常は有効にすることを推奨します' ); ?>
                         </label>
-                        <p class="description">サイトマップ（sitemap.xml） = サイト内の全ページURLをリストアップしたXMLファイル<br>Google検索などの検索エンジンがサイトを見つけやすくなります。通常は有効にすることを推奨します</p>
                     </div>
 
                     <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_robots_txt" value="1" <?php checked( $settings['enable_robots_txt'] ?? true ); ?>>
                             robots.txtを出力
+                            <?php echo $this->render_tooltip( 'robots.txt = 検索エンジンやBot（Googleボットなど）に対して、サイトのどの部分をクロールして良いかを指示するファイル。有効にすると、主要な検索エンジンのみを許可し、AIクローラーなど他のBotをブロックする設定のファイルを出力します。検索エンジンに正しくサイトを認識してもらうため、基本的には有効にすることを推奨します。<br>※ 出力先に「ローカルディレクトリ」を選択している場合は、生成後にファイルを直接編集してカスタマイズすることも可能です' ); ?>
                         </label>
-                        <p class="description">robots.txt = 検索エンジンやBot（Googleボットなど）に対して、サイトのどの部分をクロールして良いかを指示するファイル<br>有効にすると、主要な検索エンジンのみを許可し、AIクローラーなど他のBotをブロックする設定のファイルを出力します<br>検索エンジンに正しくサイトを認識してもらうため、基本的には有効にすることを推奨します<br>※ 出力先に「ローカルディレクトリ」を選択している場合は、生成後にファイルを直接編集してカスタマイズすることも可能です</p>
                     </div>
 
                     <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="enable_rss" value="1" <?php checked( $settings['enable_rss'] ?? true ); ?>>
                             RSSフィードを出力
+                            <?php echo $this->render_tooltip( 'RSSフィード = サイトの新着記事情報を配信するXMLファイル（/feed/など） 読者がRSSリーダーでサイトの更新を購読できるようになります。通常は有効にすることを推奨します' ); ?>
                         </label>
-                        <p class="description">RSSフィード = サイトの新着記事情報を配信するXMLファイル（/feed/など）<br>読者がRSSリーダーでサイトの更新を購読できるようになります。通常は有効にすることを推奨します</p>
                     </div>
 
                         </div><!-- .cp-accordion-content -->
@@ -784,34 +820,10 @@ class CP_Admin {
                              aria-hidden="true">
 
                     <div class="cp-form-group">
-                        <label>URL形式</label>
-                        <div>
-                            <label>
-                                <input type="radio" name="url_mode" value="relative" <?php checked( $settings['url_mode'] ?? 'relative', 'relative' ); ?>>
-                                相対パス
-                            </label>
-                        </div>
-                        <div>
-                            <label>
-                                <input type="radio" name="url_mode" value="absolute" <?php checked( $settings['url_mode'] ?? 'relative', 'absolute' ); ?>>
-                                絶対パス
-                            </label>
-                        </div>
-                        <p class="description">
-                            <strong>相対パス:</strong> /about/ の形式。どのドメインでも動作するため、サブディレクトリやテスト環境でも使えます（推奨）<br>
-                            <strong>絶対パス:</strong> https://example.com/about/ の形式。特定のドメインに固定したい場合に選択します
-                        </p>
-
-                        <div class="cp-base-url-field" style="margin-top: 16px;">
-                            <label for="cp-base-url">URL <span class="required">*</span></label>
-                            <input type="url" id="cp-base-url" name="base_url" class="regular-text" value="<?php echo esc_attr( $settings['base_url'] ?? '' ); ?>" placeholder="https://example.com">
-                            <p class="description" id="cp-base-url-description-absolute" style="display: none;">絶対パスで使用するベースURLを入力してください（例: https://example.com）<br>このURLをもとに、すべてのリンクが絶対URLに変換されます<br>※ 末尾のスラッシュ（/）は不要です</p>
-                            <p class="description" id="cp-base-url-description-relative" style="display: none;">サイトマップやrobots.txtで使用するベースURLを入力してください（例: https://example.com）<br>HTMLファイル内のリンクは相対パスのままですが、サイトマップには絶対URLが使用されます<br>※ 末尾のスラッシュ（/）は不要です</p>
-                        </div>
-                    </div>
-
-                    <div class="cp-form-group">
-                        <label>フォルダ名のカスタマイズ</label>
+                        <label>
+                            フォルダ名のカスタマイズ
+                            <?php echo $this->render_tooltip( '静的サイト生成時に wp-includes や wp-content フォルダを別の名前に変更できます。<br>wp-includes: WordPress本体のJavaScript、CSSファイルなど<br>wp-content: テーマのCSS/JS、アップロードした画像など<br>用途: ポートフォリオサイトなどで、WordPressで作られたことを隠したい場合に便利です。<br>空欄の場合は元の名前のまま生成されます。使用可能な文字: 英数字、ハイフン（-）、アンダースコア（_）のみ（1-50文字）' ); ?>
+                        </label>
                         <div style="margin-bottom: 12px;">
                             <label for="cp-custom-wp-includes">wp-includes フォルダ名</label>
                             <input type="text" id="cp-custom-wp-includes" name="custom_wp_includes" class="regular-text" value="<?php echo esc_attr( $settings['custom_wp_includes'] ?? '' ); ?>" placeholder="wp-includes" maxlength="50">
@@ -820,36 +832,46 @@ class CP_Admin {
                             <label for="cp-custom-wp-content">wp-content フォルダ名</label>
                             <input type="text" id="cp-custom-wp-content" name="custom_wp_content" class="regular-text" value="<?php echo esc_attr( $settings['custom_wp_content'] ?? '' ); ?>" placeholder="wp-content" maxlength="50">
                         </div>
-                        <p class="description">
-                            静的サイト生成時に wp-includes や wp-content フォルダを別の名前に変更できます<br>
-                            <strong>wp-includes:</strong> WordPress本体のJavaScript、CSSファイルなど<br>
-                            <strong>wp-content:</strong> テーマのCSS/JS、アップロードした画像など<br>
-                            <strong>用途:</strong> ポートフォリオサイトなどで、WordPressで作られたことを隠したい場合に便利です<br>
-                            空欄の場合は元の名前のまま生成されます<br>
-                            使用可能な文字: 英数字、ハイフン（-）、アンダースコア（_）のみ（1-50文字）
-                        </p>
                     </div>
 
                     <div class="cp-form-group">
-                        <label for="cp-timeout">タイムアウト時間（秒）</label>
+                        <label for="cp-timeout">
+                            タイムアウト時間（秒）
+                            <?php echo $this->render_tooltip( '静的化処理の最大実行時間を設定します（デフォルト: 300秒 = 5分） ページ数が多いサイトや画像が多いサイトの場合は、この時間を長く設定してください 設定可能範囲: 60〜18000秒（1分〜5時間）' ); ?>
+                        </label>
                         <input type="number" id="cp-timeout" name="timeout" class="small-text" value="<?php echo esc_attr( $settings['timeout'] ?? 300 ); ?>" min="60" max="18000">
-                        <p class="description">静的化処理の最大実行時間を設定します（デフォルト: 300秒 = 5分）<br>ページ数が多いサイトや画像が多いサイトの場合は、この時間を長く設定してください<br>設定可能範囲: 60〜18000秒（1分〜5時間）</p>
+                    </div>
+
+                    <div class="cp-form-group">
+                        <label>
+                            <input type="checkbox" name="minify_html" value="1" <?php checked( ! empty( $settings['minify_html'] ) ); ?>>
+                            HTML圧縮の有効化
+                            <?php echo $this->render_tooltip( 'HTMLファイルを圧縮してファイルサイズを削減します。改行・インデント・不要なスペース・HTMLコメントを削除します。<br>注意: 一部のテーマやプラグインで表示が崩れる可能性があります。有効化後は必ずサイトの表示を確認してください' ); ?>
+                        </label>
+                    </div>
+
+                    <div class="cp-form-group">
+                        <label>
+                            <input type="checkbox" name="minify_css" value="1" <?php checked( ! empty( $settings['minify_css'] ) ); ?>>
+                            インラインCSS圧縮の有効化
+                            <?php echo $this->render_tooltip( 'インラインCSSを圧縮してファイルサイズを削減します 改行・インデント・不要なスペース・CSSコメントを削除します' ); ?>
+                        </label>
                     </div>
 
                     <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="auto_generate" value="1" <?php checked( ! empty( $settings['auto_generate'] ) ); ?>>
                             記事公開時に自動で静的化を実行する
+                            <?php echo $this->render_tooltip( '有効にすると、記事を公開または更新した時に自動的に静的化処理が開始されます。手動で実行ボタンを押す手間が省けて便利です。<br>注意: 頻繁に記事を更新する場合、処理が重複して実行される可能性があるため、サーバー負荷にご注意ください' ); ?>
                         </label>
-                        <p class="description">有効にすると、記事を公開または更新した時に自動的に静的化処理が開始されます<br>手動で実行ボタンを押す手間が省けて便利です<br><strong>注意:</strong> 頻繁に記事を更新する場合、処理が重複して実行される可能性があるため、サーバー負荷にご注意ください</p>
                     </div>
 
                     <div class="cp-form-group">
                         <label>
                             <input type="checkbox" name="cache_enabled" value="1" <?php checked( ! empty( $settings['cache_enabled'] ) ); ?>>
                             キャッシュを有効化（生成を高速化）
+                            <?php echo $this->render_tooltip( '有効にすると、前回から変更がないページはキャッシュから取得してスキップします 2回目以降の静的化処理が大幅に高速化されます（推奨）' ); ?>
                         </label>
-                        <p class="description">有効にすると、前回から変更がないページはキャッシュから取得してスキップします<br>2回目以降の静的化処理が大幅に高速化されます（推奨）</p>
                     </div>
 
                         </div><!-- .cp-accordion-content -->
@@ -1060,16 +1082,16 @@ class CP_Admin {
 
         // レート制限チェック（1分間に10回まで）
         if ( ! $this->check_rate_limit( 'save_settings', 10, 60 ) ) {
-            wp_send_json_error( array( 'message' => 'リクエストが多すぎます。しばらく待ってから再試行してください。' ) );
+            wp_send_json_error( array( 'message' => '設定の保存を連続で行いすぎています。1分間お待ちいただいてから再度お試しください。' ) );
         }
 
         // フォームのnonceも検証
         if ( isset( $_POST['cp_settings_nonce'] ) && ! wp_verify_nonce( $_POST['cp_settings_nonce'], 'cp_save_settings' ) ) {
-            wp_send_json_error( array( 'message' => 'セキュリティチェックに失敗しました。' ) );
+            wp_send_json_error( array( 'message' => 'セキュリティチェックに失敗しました。ページをリロード（F5キー）してから再度お試しください。' ) );
         }
 
         if ( ! current_user_can( 'cp_manage_settings' ) ) {
-            wp_send_json_error( array( 'message' => '設定変更の権限がありません。' ) );
+            wp_send_json_error( array( 'message' => '設定を変更する権限がありません。管理者権限を持つユーザーアカウントでログインしてください。' ) );
         }
 
         // ホワイトリスト: 許可されたフィールドのみ処理
@@ -1089,6 +1111,8 @@ class CP_Admin {
             'enable_sitemap' => 'boolean',
             'enable_robots_txt' => 'boolean',
             'enable_rss' => 'boolean',
+            'minify_html' => 'boolean',
+            'minify_css' => 'boolean',
             'cloudflare_enabled' => 'boolean',
             'gitlab_enabled' => 'boolean',
             'netlify_enabled' => 'boolean',
@@ -1197,8 +1221,8 @@ class CP_Admin {
             // HTTP/HTTPSのみ許可
             $parsed_url = wp_parse_url( $settings['base_url'] );
             if ( empty( $parsed_url['scheme'] ) || ! in_array( $parsed_url['scheme'], array( 'http', 'https' ), true ) ) {
-                // 無効なURLの場合は空にする
-                $settings['base_url'] = '';
+                // 無効なURLの場合はエラー
+                wp_send_json_error( array( 'message' => 'URLの形式が正しくありません。「https://example.com」のように、http:// または https:// から始まる完全なURLを入力してください。' ) );
             }
         }
 
@@ -1208,7 +1232,7 @@ class CP_Admin {
 
         // カスタムフォルダ名またはURL形式が変更されたかチェック
         $should_clear_cache = false;
-        $cache_clear_fields = array( 'custom_wp_includes', 'custom_wp_content', 'url_mode', 'base_url' );
+        $cache_clear_fields = array( 'custom_wp_includes', 'custom_wp_content', 'url_mode', 'base_url', 'minify_html', 'minify_css' );
 
         foreach ( $cache_clear_fields as $field ) {
             $old_value = isset( $old_settings[ $field ] ) ? $old_settings[ $field ] : '';
@@ -1413,7 +1437,7 @@ class CP_Admin {
             }
             $log_text .= "  - Netlify出力: " . ( ! empty( $settings['netlify_enabled'] ) ? '有効' : '無効' ) . "\n";
             if ( ! empty( $settings['netlify_enabled'] ) ) {
-                $log_text .= "    - Site ID: " . ( $settings['netlify_site_id'] ?? 'なし' ) . "\n";
+                $log_text .= "    - Project ID: " . ( $settings['netlify_site_id'] ?? 'なし' ) . "\n";
             }
             $log_text .= "  - ZIP出力: " . ( ! empty( $settings['zip_enabled'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "\n";
@@ -1430,6 +1454,8 @@ class CP_Admin {
                 $log_text .= "    - キャッシュファイル数: " . $cache_stats['count'] . " 個\n";
                 $log_text .= "    - キャッシュサイズ: " . $cache_stats['size_formatted'] . "\n";
             }
+            $log_text .= "  - HTML圧縮: " . ( ! empty( $settings['minify_html'] ) ? '有効' : '無効' ) . "\n";
+            $log_text .= "  - インラインCSS圧縮: " . ( ! empty( $settings['minify_css'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "  - 出力対象:\n";
             $log_text .= "    - タグアーカイブ: " . ( ! empty( $settings['enable_tag_archive'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "    - 日付アーカイブ: " . ( ! empty( $settings['enable_date_archive'] ) ? '有効' : '無効' ) . "\n";
@@ -1781,5 +1807,21 @@ class CP_Admin {
         }
 
         return $deleted_total;
+    }
+
+    /**
+     * ツールチップHTMLを生成
+     *
+     * @param string $text ツールチップに表示するテキスト
+     * @return string ツールチップHTML
+     */
+    private function render_tooltip( $text ) {
+        return sprintf(
+            '<span class="cp-tooltip-wrapper">' .
+            '<span class="cp-tooltip-trigger" tabindex="0" role="button" aria-label="詳細を表示" aria-expanded="false">?</span>' .
+            '<span class="cp-tooltip-content" role="tooltip">%s</span>' .
+            '</span>',
+            wp_kses( $text, array( 'br' => array() ) )
+        );
     }
 }

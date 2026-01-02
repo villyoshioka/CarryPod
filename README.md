@@ -5,7 +5,7 @@
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue.svg)](https://www.php.net/)
-[![Version](https://img.shields.io/badge/Version-2.1.0-green.svg)](https://github.com/villyoshioka/CarryPod/releases)
+[![Version](https://img.shields.io/badge/Version-2.2.0-green.svg)](https://github.com/villyoshioka/CarryPod/releases)
 
 > **注意**: **このプラグインについて、コードは公開していますが、サポートは行っていません。**
 
@@ -43,20 +43,6 @@ WordPress で作ったサイトを、静的な HTML や CSS などのファイ�
 3. ダウンロードした ZIP ファイルを選択してインストール
 4. 「有効化」をクリック
 
-### v2.0.0へのアップグレード
-
-**重要**: v2.0.0は内部名称を大幅に変更した破壊的変更を含むため、v1.x系からの自動アップデートは提供しません。以下の手順で手動アップグレードしてください：
-
-1. **設定のエクスポート**: 現在の設定を「設定のエクスポート」機能でバックアップ
-2. 既存のプラグインを無効化して削除
-3. [Releases](https://github.com/villyoshioka/CarryPod/releases) から v2.0.0 の ZIP ファイルをダウンロード
-4. 「プラグイン」→「新規追加」→「プラグインのアップロード」で ZIP をアップロード
-5. 「今すぐインストール」を選択
-6. 「有効化」をクリック
-7. **設定のインポート**: バックアップした設定をインポート
-
-v2.0.0以降は自動更新が利用できます。
-
 ---
 
 ## 使い方
@@ -66,7 +52,7 @@ v2.0.0以降は自動更新が利用できます。
 1. **設定画面**で出力先を選択します（GitHub / GitLab / Cloudflare Workers / Netlify / ローカル Git / ZIP / ディレクトリ）
 2. 必要に応じて、カスタムフォルダ名、追加・除外ファイル、URL形式などの設定を行います
 3. **実行画面**で「静的化を実行」ボタンをクリックします
-4. 進捗を確認しながら完了を待ちます（時間がかかる場合がありますので、その間に桜餅でもどうぞ）
+4. 進捗を確認しながら完了を待ちます（時間がかかる場合がありますので、その間にどら焼きでもどうぞ）
 
 ### デバッグモード
 

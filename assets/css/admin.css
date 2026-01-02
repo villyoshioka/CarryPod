@@ -1833,3 +1833,157 @@ input[type="text"].regular-text {
         align-items: flex-start !important;
     }
 }
+
+/* ========================================
+   ツールチップ
+   ======================================== */
+
+/* ツールチップラッパー（相対位置の基準） */
+.cp-tooltip-wrapper {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+/* ツールチップトリガー（?ボタン） */
+.cp-tooltip-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #646970;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+    user-select: none;
+    line-height: 1;
+    padding: 0;
+    border: none;
+}
+
+.cp-tooltip-trigger:hover {
+    background: #2c3338;
+}
+
+.cp-tooltip-trigger:focus {
+    outline: none;
+}
+
+/* ツールチップコンテンツ（吹き出し） */
+.cp-tooltip-content {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1d2327;
+    color: #fff;
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: normal;
+    width: max-content;
+    max-width: 280px;
+    z-index: 10000;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* ツールチップの矢印（下向き） */
+.cp-tooltip-content::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid #1d2327;
+}
+
+/* ツールチップ表示状態 */
+.cp-tooltip-wrapper.show .cp-tooltip-content {
+    opacity: 1;
+    visibility: visible;
+    animation: cpTooltipFadeIn 0.2s ease-in-out;
+}
+
+/* ツールチップのフェードインアニメーション */
+@keyframes cpTooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* フォームグループ内のツールチップ配置調整 */
+.cp-form-group label .cp-tooltip-wrapper {
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+/* ========================================
+   ツールチップのレスポンシブ対応
+   ======================================== */
+
+/* タブレット・スマートフォン（782px以下） */
+@media screen and (max-width: 782px) {
+    .cp-tooltip-content {
+        max-width: 240px;
+        font-size: 12px;
+        padding: 8px 10px;
+    }
+
+    .cp-tooltip-trigger {
+        width: 20px;
+        height: 20px;
+        font-size: 13px;
+    }
+}
+
+/* スマートフォン（480px以下） */
+@media screen and (max-width: 480px) {
+    .cp-tooltip-content {
+        max-width: 200px;
+        font-size: 11px;
+        padding: 6px 8px;
+        left: auto;
+        right: 0;
+        transform: none;
+    }
+
+    .cp-tooltip-content::after {
+        left: auto;
+        right: 12px;
+        transform: none;
+    }
+
+    .cp-tooltip-wrapper.show .cp-tooltip-content {
+        animation: cpTooltipFadeIn 0.2s ease-in-out;
+    }
+
+    @keyframes cpTooltipFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(4px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+}
