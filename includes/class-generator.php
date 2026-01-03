@@ -2969,18 +2969,19 @@ class CP_Generator {
             // style内のurl()
             preg_match_all( '/url\(["\']?([^"\')\s]+)["\']?\)/', $content, $url_matches );
 
-            $all_paths = array_merge( $css_matches[1], $js_matches[1], $url_matches[1] );
+            // data-src属性（カスタムプレイヤー等）
+            preg_match_all( '/data-src=["\']([^"\']+)["\']/', $content, $data_src_matches );
+
+            $all_paths = array_merge( $css_matches[1], $js_matches[1], $url_matches[1], $data_src_matches[1] );
 
             foreach ( $all_paths as $path ) {
-                // wp-content/uploads/ またはカスタムフォルダ名/uploads/ を含むパスのみ（ただしメディアライブラリ形式以外）
+                // wp-content/uploads/ またはカスタムフォルダ名/uploads/ を含むパスのみ
                 $content_dirname = ! empty( $this->settings['custom_wp_content'] ) ? $this->settings['custom_wp_content'] : 'wp-content';
 
                 $is_uploads_path = ( strpos( $path, 'wp-content/uploads/' ) !== false ) ||
                                    ( strpos( $path, $content_dirname . '/uploads/' ) !== false );
 
                 if ( $is_uploads_path ) {
-                    // 年/月形式のディレクトリ（2025/09/など）以外を対象
-                    // プラグイン生成ファイル（loftloader-pro/, wp2static/ など）
                     $normalized = ltrim( $path, '/' );
                     $normalized = preg_replace( '/\?.*$/', '', $normalized ); // クエリ文字列を除去
 
@@ -2988,8 +2989,10 @@ class CP_Generator {
                     $pattern = '/(?:wp-content|' . preg_quote( $content_dirname, '/' ) . ')\/uploads\/(.+)/';
                     if ( preg_match( $pattern, $normalized, $matches ) ) {
                         $upload_relative = $matches[1];
-                        // 年月形式（YYYY/MM/）以外のパス
-                        if ( ! preg_match( '/^\d{4}\/\d{2}\//', $upload_relative ) ) {
+                        // data-src由来のパスはすべて含める（年月形式でも）
+                        // それ以外は年月形式（YYYY/MM/）以外を対象（プラグイン生成ファイル）
+                        $is_from_data_src = in_array( $path, $data_src_matches[1], true );
+                        if ( $is_from_data_src || ! preg_match( '/^\d{4}\/\d{2}\//', $upload_relative ) ) {
                             $referenced_paths[] = $upload_relative;
                         }
                     }
@@ -3022,6 +3025,91 @@ class CP_Generator {
         if ( $copied_count > 0 ) {
             $this->logger->debug( "プラグイン生成ファイルコピー（uploads）: {$copied_count}ファイル" );
         }
+    }
+
+    /**
+     * 公開済み投稿・固定ページに添付されているメディアIDを取得
+     *
+     * @return array attachment IDの配列
+     */
+    private function get_attached_media_ids() {
+        global $wpdb;
+
+        // 公開済み投稿・固定ページに添付されているメディアを一括取得
+        $attachment_ids = $wpdb->get_col(
+            "SELECT DISTINCT p.ID
+             FROM {$wpdb->posts} p
+             INNER JOIN {$wpdb->posts} parent ON p.post_parent = parent.ID
+             WHERE p.post_type = 'attachment'
+             AND parent.post_status = 'publish'
+             AND parent.post_type IN ('post', 'page')"
+        );
+
+        return array_map( 'intval', $attachment_ids );
+    }
+
+    /**
+     * カスタマイザー設定から全てのattachment IDを動的に取得
+     *
+     * @return array attachment IDの配列
+     */
+    private function get_all_theme_mod_attachment_ids() {
+        $attachment_ids = array();
+
+        // 標準的なカスタマイザー設定を明示的にチェック
+        $standard_mods = array(
+            'custom_logo',
+            'header_image',         // 追加
+            'header_image_data',
+            'background_image',
+        );
+
+        foreach ( $standard_mods as $mod_name ) {
+            $value = get_theme_mod( $mod_name );
+
+            if ( is_numeric( $value ) && $value > 0 ) {
+                $attachment_ids[] = intval( $value );
+            } elseif ( is_array( $value ) && isset( $value['attachment_id'] ) ) {
+                $attachment_ids[] = intval( $value['attachment_id'] );
+            } elseif ( is_string( $value ) && ! empty( $value ) ) {
+                // URL形式の場合、attachment IDに変換を試みる
+                $id = attachment_url_to_postid( $value );
+                if ( $id ) {
+                    $attachment_ids[] = $id;
+                }
+            }
+        }
+
+        // テーマ独自設定を動的にスキャン
+        $theme_slug = get_option( 'stylesheet' );
+        $theme_mods = get_option( "theme_mods_{$theme_slug}", array() );
+
+        if ( is_array( $theme_mods ) ) {
+            foreach ( $theme_mods as $key => $value ) {
+                // 既にチェック済みの標準設定はスキップ
+                if ( in_array( $key, $standard_mods, true ) ) {
+                    continue;
+                }
+
+                // 数値IDの場合
+                if ( is_numeric( $value ) && $value > 0 ) {
+                    $attachment_ids[] = intval( $value );
+                }
+                // 配列でattachment_idを含む場合
+                elseif ( is_array( $value ) && isset( $value['attachment_id'] ) ) {
+                    $attachment_ids[] = intval( $value['attachment_id'] );
+                }
+                // URL文字列の場合
+                elseif ( is_string( $value ) && strpos( $value, '/wp-content/uploads/' ) !== false ) {
+                    $id = attachment_url_to_postid( $value );
+                    if ( $id ) {
+                        $attachment_ids[] = $id;
+                    }
+                }
+            }
+        }
+
+        return array_unique( array_filter( $attachment_ids ) );
     }
 
     /**
@@ -3072,20 +3160,13 @@ class CP_Generator {
             $attachment_ids[] = $site_icon_id;
         }
 
-        // 5. カスタマイザーで設定されたロゴ・ヘッダー画像
-        $customizer_images = array(
-            'custom_logo',
-            'header_image_data',
-            'background_image',
-        );
-        foreach ( $customizer_images as $option ) {
-            $value = get_theme_mod( $option );
-            if ( is_numeric( $value ) ) {
-                $attachment_ids[] = intval( $value );
-            } elseif ( is_array( $value ) && isset( $value['attachment_id'] ) ) {
-                $attachment_ids[] = intval( $value['attachment_id'] );
-            }
-        }
+        // 5. カスタマイザー設定（拡張）
+        $customizer_ids = $this->get_all_theme_mod_attachment_ids();
+        $attachment_ids = array_merge( $attachment_ids, $customizer_ids );
+
+        // 6. 投稿・固定ページに添付されているメディア（新規）
+        $attached_ids = $this->get_attached_media_ids();
+        $attachment_ids = array_merge( $attachment_ids, $attached_ids );
 
         // 重複を除去して整数配列として返す
         return array_unique( array_filter( array_map( 'intval', $attachment_ids ) ) );
