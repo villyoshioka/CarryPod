@@ -195,6 +195,8 @@ class CP_Admin {
             </div>
             <?php endif; ?>
 
+            <?php $this->check_mati_compatibility(); ?>
+
             <div class="cp-dynamic-sections">
                 <div class="cp-execute-section">
                     <button type="button" id="cp-execute-button" class="button button-primary" <?php echo $is_running ? 'disabled' : ''; ?>>
@@ -331,8 +333,7 @@ class CP_Admin {
             </div>
             <?php endif; ?>
 
-            <?php
-            ?>
+            <?php $this->check_mati_compatibility(); ?>
 
             <?php if ( $beta_message === 'need_password' ) : ?>
             <div class="notice notice-warning">
@@ -1823,5 +1824,35 @@ class CP_Admin {
             '</span>',
             wp_kses( $text, array( 'br' => array() ) )
         );
+    }
+
+    /**
+     * Mati互換性チェック
+     *
+     * Matiがインストールされており、バージョンが1.3.0未満の場合に警告を表示
+     */
+    public function check_mati_compatibility() {
+        // Matiがインストールされていない場合は何も表示しない
+        if ( ! defined( 'MATI_VERSION' ) ) {
+            return;
+        }
+
+        $mati_version = MATI_VERSION;
+
+        // Mati 1.3.0以降の場合は何も表示しない（正常に連携可能）
+        if ( version_compare( $mati_version, '1.3.0', '>=' ) ) {
+            return;
+        }
+
+        // Matiが古い場合は警告を表示
+        ?>
+        <div class="notice notice-warning">
+            <p>
+                <strong>⚠️ Mati連携</strong><br>
+                Mati 1.3.0以降にアップデートすると、双方向連携機能が有効になります。<br>
+                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 1.3.0+</small>
+            </p>
+        </div>
+        <?php
     }
 }

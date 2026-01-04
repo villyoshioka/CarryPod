@@ -248,7 +248,65 @@ class CP_Cache {
             }
         }
 
+        // Mati連携: seedを再生成（フィルターでスキップされない場合）
+        $this->trigger_mati_seed_regeneration();
+
         return $deleted;
+    }
+
+    /**
+     * Mati連携: obfuscation seedを再生成
+     *
+     * キャッシュクリア時にMatiのobfuscation seedを再生成することで、
+     * 静的化ファイルの難読化パターンを変更する
+     */
+    private function trigger_mati_seed_regeneration() {
+        // フィルターでスキップ指定されている場合は処理しない（無限ループ防止）
+        if ( apply_filters( 'cp_skip_mati_seed_regen', false ) ) {
+            return;
+        }
+
+        // Matiがインストールされていない場合は処理しない
+        if ( ! defined( 'MATI_VERSION' ) ) {
+            return;
+        }
+
+        // Mati_Settingsクラスが存在することを確認
+        if ( ! class_exists( 'Mati_Settings' ) ) {
+            return;
+        }
+
+        try {
+            // Mati_Settingsインスタンスを取得
+            if ( ! method_exists( 'Mati_Settings', 'get_instance' ) ) {
+                error_log( 'CarryPod: Mati連携エラー - get_instanceメソッドが存在しません' );
+                return;
+            }
+
+            $mati_settings = Mati_Settings::get_instance();
+
+            // save_settingsメソッドが存在することを確認
+            if ( ! method_exists( $mati_settings, 'save_settings' ) ) {
+                error_log( 'CarryPod: Mati連携エラー - save_settingsメソッドが存在しません' );
+                return;
+            }
+
+            // get_settingsメソッドが存在することを確認
+            if ( ! method_exists( $mati_settings, 'get_settings' ) ) {
+                error_log( 'CarryPod: Mati連携エラー - get_settingsメソッドが存在しません' );
+                return;
+            }
+
+            // 既存の設定を取得
+            $current_settings = $mati_settings->get_settings();
+
+            // seedを再生成（skip_cp_clearオプションで無限ループ防止）
+            $mati_settings->save_settings( $current_settings, array( 'skip_cp_clear' => true ) );
+
+        } catch ( Exception $e ) {
+            // エラーが発生してもキャッシュクリア処理は成功させる
+            error_log( 'CarryPod: Mati連携エラー - ' . $e->getMessage() );
+        }
     }
 
     /**
