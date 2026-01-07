@@ -16,6 +16,11 @@ class CP_Cache {
     private $cache_dir;
 
     /**
+     * 現在のページで使用された投稿IDリスト
+     */
+    private $current_dependent_posts = array();
+
+    /**
      * シングルトンインスタンスを取得
      */
     public static function get_instance() {
@@ -112,6 +117,46 @@ class CP_Cache {
             return false;
         }
 
+        $cache_time = $meta['timestamp'];
+
+        // グローバルな最終投稿変更時刻をチェック
+        $last_post_change = get_option( 'cp_last_post_change', 0 );
+        if ( $last_post_change > $cache_time ) {
+            return false;
+        }
+
+        // 依存投稿リストをチェック（後方互換性: 存在しない場合はスキップ）
+        if ( isset( $meta['dependent_posts'] ) && is_array( $meta['dependent_posts'] ) ) {
+            foreach ( $meta['dependent_posts'] as $dependent_post_id ) {
+                $post = get_post( $dependent_post_id );
+                if ( ! $post ) {
+                    // 投稿が削除された場合、キャッシュ無効
+                    return false;
+                }
+
+                // 投稿が非公開になった場合、キャッシュ無効
+                if ( $post->post_status !== 'publish' ) {
+                    return false;
+                }
+
+                // post_modified_gmt（UTC）を使用してタイムゾーン問題を回避
+                $post_modified = (float) strtotime( $post->post_modified_gmt . ' UTC' );
+                if ( $post_modified > $cache_time ) {
+                    return false;
+                }
+
+                // 依存投稿のURLが変更されていないかチェック（スラッグ変更対応）
+                if ( isset( $meta['dependent_posts_urls'] ) && is_array( $meta['dependent_posts_urls'] ) ) {
+                    $cached_url = isset( $meta['dependent_posts_urls'][ $dependent_post_id ] ) ? $meta['dependent_posts_urls'][ $dependent_post_id ] : '';
+                    $current_url = get_permalink( $dependent_post_id );
+                    if ( $cached_url && $current_url !== $cached_url ) {
+                        // URLが変更されている場合、キャッシュ無効
+                        return false;
+                    }
+                }
+            }
+        }
+
         // 投稿IDが指定されている場合は更新日時をチェック
         if ( $post_id ) {
             $post = get_post( $post_id );
@@ -119,8 +164,8 @@ class CP_Cache {
                 return false;
             }
 
-            $post_modified = strtotime( $post->post_modified );
-            $cache_time = $meta['timestamp'];
+            // post_modified_gmt（UTC）を使用してタイムゾーン問題を回避
+            $post_modified = (float) strtotime( $post->post_modified_gmt . ' UTC' );
 
             // 投稿が更新されていればキャッシュは無効
             if ( $post_modified > $cache_time ) {
@@ -166,16 +211,30 @@ class CP_Cache {
             return false;
         }
 
+        // 依存投稿リストを取得（最大100件に制限）
+        $dependent_posts = array_slice( array_unique( $this->current_dependent_posts ), 0, 100 );
+
+        // 依存投稿のURLマップを作成（スラッグ変更検出用）
+        $dependent_posts_urls = array();
+        foreach ( $dependent_posts as $dep_post_id ) {
+            $dependent_posts_urls[ $dep_post_id ] = get_permalink( $dep_post_id );
+        }
+
         // メタデータを保存
         $meta = array(
             'url' => $url,
             'post_id' => $post_id,
-            'timestamp' => time(),
+            'dependent_posts' => $dependent_posts,
+            'dependent_posts_urls' => $dependent_posts_urls,
+            'timestamp' => microtime( true ),
         );
 
         if ( false === file_put_contents( $meta_file, json_encode( $meta ) ) ) {
             return false;
         }
+
+        // 依存投稿リストをクリア
+        $this->current_dependent_posts = array();
 
         return true;
     }
@@ -307,6 +366,33 @@ class CP_Cache {
             // エラーが発生してもキャッシュクリア処理は成功させる
             error_log( 'CarryPod: Mati連携エラー - ' . $e->getMessage() );
         }
+    }
+
+    /**
+     * 依存投稿IDを記録
+     *
+     * @param int $post_id 投稿ID
+     */
+    public function add_dependent_post( $post_id ) {
+        if ( $post_id > 0 && ! in_array( $post_id, $this->current_dependent_posts ) ) {
+            $this->current_dependent_posts[] = $post_id;
+        }
+    }
+
+    /**
+     * 記録された依存投稿IDを取得
+     *
+     * @return array 投稿IDの配列
+     */
+    public function get_dependent_posts() {
+        return $this->current_dependent_posts;
+    }
+
+    /**
+     * 依存投稿IDリストをクリア
+     */
+    public function clear_dependent_posts() {
+        $this->current_dependent_posts = array();
     }
 
     /**
