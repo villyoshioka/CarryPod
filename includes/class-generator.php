@@ -40,6 +40,11 @@ class CP_Generator {
     private $url_to_post_id_map = array();
 
     /**
+     * URL→依存投稿IDリストマップ（アーカイブページ用）
+     */
+    private $url_to_dependent_posts_map = array();
+
+    /**
      * 静的化されたHTMLページのリスト（サイトマップ生成用）
      */
     private $generated_html_pages = array();
@@ -124,6 +129,7 @@ class CP_Generator {
                 $parallel_crawler = new CP_Parallel_Crawler();
                 $parallel_crawler->set_concurrency( 5 ); // 同時に5つのURLを処理
                 $parallel_crawler->set_timeout( 30 );
+                $parallel_crawler->set_url_to_dependent_posts_map( $this->url_to_dependent_posts_map );
 
                 // バッチ処理でURLをクロール
                 $batch_size = 10; // 10URLずつ処理
@@ -211,6 +217,18 @@ class CP_Generator {
 
                     // URLから投稿IDを取得（マップから高速に取得、なければ0）
                     $post_id = isset( $this->url_to_post_id_map[ $url ] ) ? $this->url_to_post_id_map[ $url ] : 0;
+
+                    // 依存投稿IDを記録
+                    if ( $post_id > 0 ) {
+                        $this->cache->add_dependent_post( $post_id );
+                    }
+
+                    // アーカイブページの依存投稿を記録
+                    if ( isset( $this->url_to_dependent_posts_map[ $url ] ) ) {
+                        foreach ( $this->url_to_dependent_posts_map[ $url ] as $dependent_id ) {
+                            $this->cache->add_dependent_post( $dependent_id );
+                        }
+                    }
 
                     // キャッシュが有効で、かつキャッシュが有効な場合
                     if ( $cache_enabled && $this->cache->is_valid( $url, $post_id ) ) {
@@ -419,14 +437,34 @@ class CP_Generator {
         // 進捗更新: 開始
         $this->logger->update_progress( 0, 100, 'URLを収集中: 投稿を取得中...' );
 
-        // トップページ
+        // トップページと依存投稿の記録
         $urls[] = $home_url;
 
-        // トップページのページネーション
+        // トップページのページネーション + 依存投稿の記録
         $post_count = wp_count_posts( 'post' )->publish;
         $max_pages = ceil( $post_count / $posts_per_page );
-        for ( $i = 2; $i <= $max_pages; $i++ ) {
-            $urls[] = $home_url . 'page/' . $i . '/';
+
+        // トップページ各ページの依存投稿を取得
+        for ( $page = 1; $page <= $max_pages; $page++ ) {
+            $page_url = ( $page === 1 ) ? $home_url : $home_url . 'page/' . $page . '/';
+            if ( $page > 1 ) {
+                $urls[] = $page_url;
+            }
+
+            // このページに表示される投稿IDを取得
+            $page_posts = get_posts( array(
+                'post_type'      => 'post',
+                'post_status'    => 'publish',
+                'posts_per_page' => $posts_per_page,
+                'paged'          => $page,
+                'fields'         => 'ids',
+                'no_found_rows'  => true,
+                'suppress_filters' => true,
+            ) );
+
+            if ( ! empty( $page_posts ) ) {
+                $this->url_to_dependent_posts_map[ $page_url ] = $page_posts;
+            }
         }
 
         // 全投稿タイプを1回のクエリで取得（post, page, カスタム投稿タイプ）
@@ -453,7 +491,31 @@ class CP_Generator {
                 $urls[] = $permalink;
                 // URL→投稿IDマップを構築（後でurl_to_postid()を呼ばなくて済む）
                 $this->url_to_post_id_map[ $permalink ] = $post->ID;
+
+                // 前後投稿の依存関係を記録（投稿タイプが post の場合のみ）
+                if ( $post->post_type === 'post' ) {
+                    $dependent_ids = array( $post->ID );
+
+                    // グローバル$postを設定（get_adjacent_post()が使用）
+                    setup_postdata( $post );
+
+                    // 前の投稿を取得
+                    $prev_post = get_adjacent_post( false, '', true, 'category' );
+                    if ( $prev_post ) {
+                        $dependent_ids[] = $prev_post->ID;
+                    }
+
+                    // 次の投稿を取得
+                    $next_post = get_adjacent_post( false, '', false, 'category' );
+                    if ( $next_post ) {
+                        $dependent_ids[] = $next_post->ID;
+                    }
+
+                    $this->url_to_dependent_posts_map[ $permalink ] = $dependent_ids;
+                }
             }
+            // グローバル$postをリセット
+            wp_reset_postdata();
         }
 
         // カスタム投稿タイプのアーカイブページ
@@ -479,10 +541,28 @@ class CP_Generator {
                 $category_link = get_category_link( $category->term_id );
                 $urls[] = $category_link;
 
-                // ページネーション
+                // ページネーション + 依存投稿の記録
                 $max_pages = ceil( $category->count / $posts_per_page );
-                for ( $i = 2; $i <= $max_pages; $i++ ) {
-                    $urls[] = $category_link . 'page/' . $i . '/';
+                for ( $page = 1; $page <= $max_pages; $page++ ) {
+                    $page_url = ( $page === 1 ) ? $category_link : $category_link . 'page/' . $page . '/';
+                    if ( $page > 1 ) {
+                        $urls[] = $page_url;
+                    }
+
+                    // このカテゴリーページに表示される投稿IDを取得
+                    $category_posts = get_posts( array(
+                        'category'       => $category->term_id,
+                        'post_status'    => 'publish',
+                        'posts_per_page' => $posts_per_page,
+                        'paged'          => $page,
+                        'fields'         => 'ids',
+                        'no_found_rows'  => true,
+                        'suppress_filters' => true,
+                    ) );
+
+                    if ( ! empty( $category_posts ) ) {
+                        $this->url_to_dependent_posts_map[ $page_url ] = $category_posts;
+                    }
                 }
             }
         }

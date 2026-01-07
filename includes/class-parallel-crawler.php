@@ -35,6 +35,11 @@ class CP_Parallel_Crawler {
     private $cache;
 
     /**
+     * URL→依存投稿IDリストマップ
+     */
+    private $url_to_dependent_posts_map = array();
+
+    /**
      * コンストラクタ
      */
     public function __construct() {
@@ -149,6 +154,18 @@ class CP_Parallel_Crawler {
         foreach ( $urls as $url ) {
             $post_id = url_to_postid( $url );
 
+            // 依存投稿IDを記録
+            if ( $post_id > 0 ) {
+                $this->cache->add_dependent_post( $post_id );
+            }
+
+            // アーカイブページの依存投稿を記録
+            if ( isset( $this->url_to_dependent_posts_map[ $url ] ) ) {
+                foreach ( $this->url_to_dependent_posts_map[ $url ] as $dependent_id ) {
+                    $this->cache->add_dependent_post( $dependent_id );
+                }
+            }
+
             if ( $this->cache->is_valid( $url, $post_id ) ) {
                 $cached_content = $this->cache->get( $url );
                 if ( $cached_content !== false ) {
@@ -176,6 +193,12 @@ class CP_Parallel_Crawler {
             foreach ( $crawl_results as $url => $result ) {
                 if ( $result['status_code'] == 200 && ! empty( $result['content'] ) ) {
                     $post_id = url_to_postid( $url );
+
+                    // 依存投稿IDを記録
+                    if ( $post_id > 0 ) {
+                        $this->cache->add_dependent_post( $post_id );
+                    }
+
                     $this->cache->set( $url, $result['content'], $post_id );
                 }
 
@@ -202,5 +225,14 @@ class CP_Parallel_Crawler {
      */
     public function set_timeout( $timeout ) {
         $this->timeout = max( 10, intval( $timeout ) );
+    }
+
+    /**
+     * URL→依存投稿IDリストマップを設定
+     *
+     * @param array $map URL→依存投稿IDリストのマップ
+     */
+    public function set_url_to_dependent_posts_map( $map ) {
+        $this->url_to_dependent_posts_map = $map;
     }
 }

@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Carry Pod
- * Version: 2.3.0
+ * Version: 2.3.1
  * Description: WordPressサイトを静的化してデプロイするプラグイン
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // プラグインの定数を定義
-define( 'CP_VERSION', '2.3.0' );
+define( 'CP_VERSION', '2.3.1' );
 define( 'CP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'CP_PLUGIN_FILE', __FILE__ );
@@ -277,20 +277,25 @@ class Carry_Pod {
      * 投稿変更時の自動静的化
      */
     public function auto_generate_on_post_change( $new_status, $old_status, $post ) {
-        // 自動実行が無効なら何もしない
-        $settings = get_option( 'cp_settings', array() );
-        if ( empty( $settings['auto_generate'] ) ) {
-            return;
-        }
-
         // 投稿タイプチェック（投稿、固定ページ、カスタム投稿タイプ）
         $post_types = array_merge( array( 'post', 'page' ), get_post_types( array( 'public' => true, '_builtin' => false ) ) );
         if ( ! in_array( $post->post_type, $post_types ) ) {
             return;
         }
 
+        // 新規投稿の公開時のみグローバルタイムスタンプを更新
+        // （既存投稿の編集・削除・非公開化は依存投稿チェックで対応）
+        if ( $old_status !== 'publish' && $new_status === 'publish' ) {
+            update_option( 'cp_last_post_change', microtime( true ) );
+        }
+
+        // 自動実行が無効なら静的化はスキップ
+        $settings = get_option( 'cp_settings', array() );
+        if ( empty( $settings['auto_generate'] ) ) {
+            return;
+        }
+
         // 公開状態の変更をチェック
-        $trigger_statuses = array( 'publish', 'trash', 'draft', 'private' );
         if ( in_array( $new_status, $trigger_statuses ) || in_array( $old_status, $trigger_statuses ) ) {
             // 手動実行中フラグをチェック
             if ( get_transient( 'cp_manual_running' ) ) {
