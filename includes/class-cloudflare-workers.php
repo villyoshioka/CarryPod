@@ -389,11 +389,48 @@ class CP_Cloudflare_Workers {
      * @return bool|WP_Error 成功ならtrue
      */
     private function deploy_worker( $completion_token ) {
-        // 静的アセット専用のシンプルなWorkerスクリプト
+        // 静的アセット専用のWorkerスクリプト（ASSETSバインディングの存在確認・404エラーハンドリング付き）
         $worker_script = <<<'WORKER'
 export default {
     async fetch(request, env) {
-        return env.ASSETS.fetch(request);
+        // ASSETSバインディングの存在確認
+        if (!env.ASSETS) {
+            return new Response(
+                'Service configuration error. Please contact the administrator.',
+                {
+                    status: 503,
+                    headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+                }
+            );
+        }
+
+        // リクエストされたアセットを取得
+        const response = await env.ASSETS.fetch(request);
+
+        // 404エラーの場合、カスタム404.htmlがあればそれを返す
+        if (response.status === 404) {
+            try {
+                // 元のリクエストURLから404.htmlへのURLを構築
+                const url = new URL(request.url);
+                const notFoundUrl = url.origin + '/404.html';
+                const notFoundResponse = await env.ASSETS.fetch(notFoundUrl);
+
+                // 404.htmlが存在する場合のみ、それをステータス404で返す
+                if (notFoundResponse.status === 200) {
+                    return new Response(notFoundResponse.body, {
+                        status: 404,
+                        statusText: 'Not Found',
+                        headers: notFoundResponse.headers
+                    });
+                }
+            } catch (e) {
+                // 404.htmlの取得に失敗した場合は元のレスポンスを返す
+                // エラーをコンソールに出力（Cloudflare Workersログで確認可能）
+                console.error('404.html fetch error:', e.message);
+            }
+        }
+
+        return response;
     }
 };
 WORKER;
@@ -401,10 +438,16 @@ WORKER;
         // multipart/form-data でスクリプトとメタデータを送信（暗号学的に安全な乱数を使用）
         $boundary = bin2hex( random_bytes( 16 ) );
 
-        // メタデータ
+        // メタデータ（ASSETSバインディング設定を追加）
         $metadata = array(
             'main_module'        => 'worker.js',
             'compatibility_date' => date( 'Y-m-d' ),
+            'bindings'           => array(
+                array(
+                    'type' => 'assets',
+                    'name' => 'ASSETS',
+                ),
+            ),
             'assets'             => array(
                 'jwt' => $completion_token,
             ),
@@ -471,6 +514,18 @@ WORKER;
         if ( ! empty( $response_body['result']['id'] ) ) {
             $worker_url = "https://{$this->script_name}.{$this->account_id}.workers.dev";
             $this->logger->info( "Worker URL: {$worker_url}" );
+        }
+
+        // ASSETSバインディングの設定状態を確認
+        $this->logger->info( 'ASSETSバインディングの設定状態を確認中...' );
+        $binding_status = $this->verify_assets_binding();
+
+        if ( is_wp_error( $binding_status ) ) {
+            $this->logger->debug( 'ASSETSバインディングの確認をスキップしました: ' . $binding_status->get_error_message() );
+        } elseif ( $binding_status === true ) {
+            $this->logger->info( 'ASSETSバインディングが正常に設定されています' );
+        } else {
+            $this->logger->debug( 'ASSETSバインディングの検証をスキップしました（デプロイは正常に完了しています）' );
         }
 
         return true;
@@ -557,5 +612,55 @@ WORKER;
             : 'Workerの削除に失敗しました';
 
         return new WP_Error( 'delete_failed', $error_message );
+    }
+
+    /**
+     * ASSETSバインディングの設定状態を確認
+     *
+     * @return bool|WP_Error true: 設定済み、false: 未設定、WP_Error: エラー
+     */
+    private function verify_assets_binding() {
+        // 正しいエンドポイント: /settings を使用
+        $endpoint = "accounts/{$this->account_id}/workers/scripts/{$this->script_name}/settings";
+        $response = $this->api_request( $endpoint, 'GET' );
+
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+
+        $status_code = wp_remote_retrieve_response_code( $response );
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( $status_code !== 200 ) {
+            // 404の場合はWorkerが見つからない（まだデプロイされていない可能性）
+            if ( $status_code === 404 ) {
+                $this->logger->debug( 'Worker設定が見つかりませんでした（デプロイ直後の場合は正常）' );
+                return false;
+            }
+            return new WP_Error( 'binding_check_failed', 'バインディング情報の取得に失敗しました' );
+        }
+
+        // バインディング情報を確認（複数のパスパターンを試行）
+        // パターン1: result.bindings
+        if ( ! empty( $body['result']['bindings'] ) && is_array( $body['result']['bindings'] ) ) {
+            foreach ( $body['result']['bindings'] as $binding ) {
+                if ( isset( $binding['name'] ) && $binding['name'] === 'ASSETS' &&
+                     isset( $binding['type'] ) && $binding['type'] === 'assets' ) {
+                    return true;
+                }
+            }
+        }
+
+        // パターン2: bindings（トップレベル）
+        if ( ! empty( $body['bindings'] ) && is_array( $body['bindings'] ) ) {
+            foreach ( $body['bindings'] as $binding ) {
+                if ( isset( $binding['name'] ) && $binding['name'] === 'ASSETS' &&
+                     isset( $binding['type'] ) && $binding['type'] === 'assets' ) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
