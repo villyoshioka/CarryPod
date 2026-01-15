@@ -2968,15 +2968,11 @@ class CP_Generator {
         // 使用されているメディアIDを収集
         $referenced_ids = $this->get_referenced_attachment_ids();
 
-        if ( empty( $referenced_ids ) ) {
-            $this->logger->debug( "参照メディアなし: uploadsをスキップ" );
-            return true;
-        }
-
         $copied_count = 0;
         $total_size = 0;
 
-        foreach ( $referenced_ids as $attachment_id ) {
+        if ( ! empty( $referenced_ids ) ) {
+            foreach ( $referenced_ids as $attachment_id ) {
             $file_path = get_attached_file( $attachment_id );
             if ( ! $file_path || ! file_exists( $file_path ) ) {
                 continue;
@@ -3013,10 +3009,13 @@ class CP_Generator {
                     }
                 }
             }
+            }
         }
 
-        $size_mb = round( $total_size / 1024 / 1024, 2 );
-        $this->logger->debug( "メディアコピー: {$copied_count}ファイル ({$size_mb}MB)" );
+        if ( $copied_count > 0 ) {
+            $size_mb = round( $total_size / 1024 / 1024, 2 );
+            $this->logger->debug( "メディアコピー: {$copied_count}ファイル ({$size_mb}MB)" );
+        }
 
         // HTMLから参照されているuploads内の非メディアファイル（プラグイン生成CSSなど）もコピー
         $this->copy_referenced_upload_files( $uploads_base, $uploads_dest );
@@ -3046,13 +3045,16 @@ class CP_Generator {
             // script src
             preg_match_all( '/<script[^>]+src=["\']([^"\']+)["\']/', $content, $js_matches );
 
+            // img src
+            preg_match_all( '/<img[^>]+src=["\']([^"\']+)["\']/', $content, $img_matches );
+
             // style内のurl()
             preg_match_all( '/url\(["\']?([^"\')\s]+)["\']?\)/', $content, $url_matches );
 
             // data-src属性（カスタムプレイヤー等）
             preg_match_all( '/data-src=["\']([^"\']+)["\']/', $content, $data_src_matches );
 
-            $all_paths = array_merge( $css_matches[1], $js_matches[1], $url_matches[1], $data_src_matches[1] );
+            $all_paths = array_merge( $css_matches[1], $js_matches[1], $img_matches[1], $url_matches[1], $data_src_matches[1] );
 
             foreach ( $all_paths as $path ) {
                 // wp-content/uploads/ またはカスタムフォルダ名/uploads/ を含むパスのみ
@@ -3069,12 +3071,12 @@ class CP_Generator {
                     $pattern = '/(?:wp-content|' . preg_quote( $content_dirname, '/' ) . ')\/uploads\/(.+)/';
                     if ( preg_match( $pattern, $normalized, $matches ) ) {
                         $upload_relative = $matches[1];
-                        // data-src由来のパスはすべて含める（年月形式でも）
-                        // それ以外は年月形式（YYYY/MM/）以外を対象（プラグイン生成ファイル）
-                        $is_from_data_src = in_array( $path, $data_src_matches[1], true );
-                        if ( $is_from_data_src || ! preg_match( '/^\d{4}\/\d{2}\//', $upload_relative ) ) {
-                            $referenced_paths[] = $upload_relative;
+
+                        if ( strpos( $upload_relative, '..' ) !== false ) {
+                            continue;
                         }
+
+                        $referenced_paths[] = $upload_relative;
                     }
                 }
             }
@@ -3087,17 +3089,27 @@ class CP_Generator {
             $src_path = $uploads_base . '/' . $relative_path;
             $dest_path = $uploads_dest . '/' . $relative_path;
 
-            if ( ! file_exists( $src_path ) ) {
+            $real_src_path = realpath( $src_path );
+            $real_uploads_base = realpath( $uploads_base );
+
+            if ( $real_src_path === false || $real_uploads_base === false ) {
                 continue;
             }
 
-            // ディレクトリを作成
+            if ( strpos( $real_src_path, $real_uploads_base ) !== 0 ) {
+                continue;
+            }
+
+            if ( ! file_exists( $real_src_path ) ) {
+                continue;
+            }
+
             $dest_dir = dirname( $dest_path );
             if ( ! is_dir( $dest_dir ) ) {
                 mkdir( $dest_dir, 0755, true );
             }
 
-            if ( copy( $src_path, $dest_path ) ) {
+            if ( copy( $real_src_path, $dest_path ) ) {
                 $copied_count++;
             }
         }
