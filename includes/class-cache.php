@@ -396,6 +396,136 @@ class CP_Cache {
     }
 
     /**
+     * 特定の投稿に関連するキャッシュをクリア
+     *
+     * @param int $post_id 投稿ID
+     * @return int 削除したキャッシュファイル数
+     */
+    public function clear_by_post( $post_id ) {
+        $deleted = 0;
+
+        // 全てのメタファイルを走査
+        $meta_files = glob( $this->cache_dir . '/*.meta' );
+        foreach ( $meta_files as $meta_file ) {
+            $meta = json_decode( file_get_contents( $meta_file ), true );
+
+            // メタデータが正しく読み込めない場合はスキップ
+            if ( ! is_array( $meta ) ) {
+                continue;
+            }
+
+            // dependent_postsに指定された投稿IDが含まれているかチェック
+            if ( isset( $meta['dependent_posts'] ) && is_array( $meta['dependent_posts'] ) ) {
+                if ( in_array( $post_id, $meta['dependent_posts'] ) ) {
+                    // メタファイルを削除
+                    unlink( $meta_file );
+                    $deleted++;
+
+                    // 対応するHTMLファイルも削除
+                    $html_file = str_replace( '.meta', '.html', $meta_file );
+                    if ( file_exists( $html_file ) ) {
+                        unlink( $html_file );
+                    }
+                }
+            }
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * 投稿ステータス変更時に前後の投稿のキャッシュをクリア
+     *
+     * @param int $post_id 投稿ID
+     * @param string $old_status 変更前のステータス
+     * @param string $new_status 変更後のステータス
+     * @return int 削除したキャッシュファイル数
+     */
+    public function clear_adjacent_posts_cache( $post_id, $old_status, $new_status ) {
+        $deleted = 0;
+
+        // 指定された投稿を取得
+        $post = get_post( $post_id );
+        if ( ! $post || $post->post_type !== 'post' ) {
+            return 0;
+        }
+
+        // 1. 非公開になった場合: dependent_postsに含まれるキャッシュをクリア + 前後の投稿のキャッシュをクリア
+        if ( $old_status === 'publish' && $new_status !== 'publish' ) {
+            // 1-1. dependent_postsに含まれるキャッシュをクリア（新しいキャッシュ対応）
+            $meta_files = glob( $this->cache_dir . '/*.meta' );
+            foreach ( $meta_files as $meta_file ) {
+                $meta = json_decode( file_get_contents( $meta_file ), true );
+
+                if ( ! is_array( $meta ) ) {
+                    continue;
+                }
+
+                if ( isset( $meta['dependent_posts'] ) && is_array( $meta['dependent_posts'] ) ) {
+                    if ( in_array( $post_id, $meta['dependent_posts'] ) ) {
+                        unlink( $meta_file );
+                        $deleted++;
+
+                        $html_file = str_replace( '.meta', '.html', $meta_file );
+                        if ( file_exists( $html_file ) ) {
+                            unlink( $html_file );
+                        }
+                    }
+                }
+            }
+
+            // 1-2. 前後の投稿のキャッシュをクリア（古いキャッシュ対応）
+            global $post;
+            $backup_post = $post;
+            $post = get_post( $post_id );
+            setup_postdata( $post );
+
+            // 前の投稿を取得
+            $prev_post = get_adjacent_post( false, '', true, 'category' );
+            if ( $prev_post ) {
+                $deleted += $this->clear_by_post( $prev_post->ID );
+            }
+
+            // 次の投稿を取得
+            $next_post = get_adjacent_post( false, '', false, 'category' );
+            if ( $next_post ) {
+                $deleted += $this->clear_by_post( $next_post->ID );
+            }
+
+            // グローバル$postをリセット
+            wp_reset_postdata();
+            $post = $backup_post;
+        }
+
+        // 2. 公開になった場合: 前後の投稿のキャッシュをクリア
+        if ( $old_status !== 'publish' && $new_status === 'publish' ) {
+            // グローバル$postを設定（get_adjacent_post()が使用）
+            global $post;
+            $backup_post = $post;
+            $post = get_post( $post_id );
+            setup_postdata( $post );
+
+            // 前の投稿を取得
+            $prev_post = get_adjacent_post( false, '', true, 'category' );
+            if ( $prev_post ) {
+                $deleted += $this->clear_by_post( $prev_post->ID );
+            }
+
+            // 次の投稿を取得
+            $next_post = get_adjacent_post( false, '', false, 'category' );
+            if ( $next_post ) {
+                $deleted += $this->clear_by_post( $next_post->ID );
+            }
+
+            // グローバル$postをリセット
+            wp_reset_postdata();
+            $post = $backup_post;
+        }
+
+        return $deleted;
+    }
+
+    /**
      * キャッシュ統計を取得
      *
      * @return array キャッシュ統計
