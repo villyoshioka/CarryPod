@@ -199,6 +199,13 @@ class CP_Parallel_Crawler {
                         $this->cache->add_dependent_post( $post_id );
                     }
 
+                    // アーカイブページの依存投稿を記録
+                    if ( isset( $this->url_to_dependent_posts_map[ $url ] ) ) {
+                        foreach ( $this->url_to_dependent_posts_map[ $url ] as $dependent_id ) {
+                            $this->cache->add_dependent_post( $dependent_id );
+                        }
+                    }
+
                     $this->cache->set( $url, $result['content'], $post_id );
                 }
 

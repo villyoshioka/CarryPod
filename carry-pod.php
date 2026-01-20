@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Carry Pod
- * Version: 2.3.3
+ * Version: 2.3.4
  * Description: WordPressサイトを静的化してデプロイするプラグイン
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // プラグインの定数を定義
-define( 'CP_VERSION', '2.3.3' );
+define( 'CP_VERSION', '2.3.4' );
 define( 'CP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'CP_PLUGIN_FILE', __FILE__ );
@@ -295,6 +295,9 @@ class Carry_Pod {
             return;
         }
 
+        // 公開状態の変更をトリガー
+        $trigger_statuses = array( 'publish' );
+
         // 公開状態の変更をチェック
         if ( in_array( $new_status, $trigger_statuses ) || in_array( $old_status, $trigger_statuses ) ) {
             // 手動実行中フラグをチェック
@@ -308,6 +311,13 @@ class Carry_Pod {
             // ログと進捗情報をクリア
             update_option( 'cp_logs', array() );
             delete_option( 'cp_progress' );
+
+            // 変更された投稿に関連するキャッシュのみクリア
+            $cache = CP_Cache::get_instance();
+            $cache->clear_by_post( $post->ID );
+
+            // 前後の投稿のキャッシュもクリア（公開/非公開状態変更時）
+            $cache->clear_adjacent_posts_cache( $post->ID, $old_status, $new_status );
 
             // 実行中フラグをセット
             set_transient( 'cp_auto_running', true, 3600 );
