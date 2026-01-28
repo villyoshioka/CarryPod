@@ -669,22 +669,14 @@ class CP_Admin {
 
                     <!-- URL設定 -->
                     <div class="cp-form-group">
-                        <label>
+                        <label for="cp-url-mode">
                             URL形式
                             <?php echo $this->render_tooltip( '相対パス: /about/ の形式。どのドメインでも動作するため、サブディレクトリやテスト環境でも使えます（推奨）<br>絶対パス: https://example.com/about/ の形式。特定のドメインに固定したい場合に選択します' ); ?>
                         </label>
-                        <div>
-                            <label>
-                                <input type="radio" name="url_mode" value="relative" <?php checked( $settings['url_mode'] ?? 'relative', 'relative' ); ?>>
-                                相対パス
-                            </label>
-                        </div>
-                        <div>
-                            <label>
-                                <input type="radio" name="url_mode" value="absolute" <?php checked( $settings['url_mode'] ?? 'relative', 'absolute' ); ?>>
-                                絶対パス
-                            </label>
-                        </div>
+                        <select id="cp-url-mode" name="url_mode" class="regular-text">
+                            <option value="relative" <?php selected( $settings['url_mode'] ?? 'relative', 'relative' ); ?>>相対パス</option>
+                            <option value="absolute" <?php selected( $settings['url_mode'] ?? 'relative', 'absolute' ); ?>>絶対パス</option>
+                        </select>
 
                         <div class="cp-base-url-field" style="margin-top: 16px;">
                             <label for="cp-base-url">URL <span class="required">*</span></label>
