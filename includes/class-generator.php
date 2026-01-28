@@ -164,21 +164,34 @@ class CP_Generator {
                         if ( $result['status_code'] == 200 && ! empty( $result['content'] ) ) {
                             $html = $result['content'];
 
-                            // URL形式を変換
-                            if ( $this->settings['url_mode'] === 'absolute' ) {
-                                $html = $this->convert_to_absolute_urls( $html );
+                            // XMLファイル（フィード、サイトマップ）かどうかを判定
+                            $is_xml = ( strpos( $url, '/feed' ) !== false ||
+                                       strpos( $url, '/rss' ) !== false ||
+                                       strpos( $url, '/atom' ) !== false ||
+                                       strpos( $url, '.xml' ) !== false ||
+                                       strpos( $html, '<?xml' ) === 0 );
+
+                            // XMLファイルでない場合のみHTML処理を実行
+                            if ( ! $is_xml ) {
+                                // URL形式を変換
+                                if ( $this->settings['url_mode'] === 'absolute' ) {
+                                    $html = $this->convert_to_absolute_urls( $html );
+                                } else {
+                                    $html = $this->convert_to_relative_urls( $html );
+                                }
+
+                                // カスタムフォルダ名に置換
+                                $html = $this->replace_custom_folder_names( $html );
+
+                                // WordPress動的要素を削除/置換
+                                $html = $this->sanitize_static_html( $html );
+
+                                // アーカイブリンクを除去・変更
+                                $html = $this->remove_archive_links( $html );
                             } else {
-                                $html = $this->convert_to_relative_urls( $html );
+                                // XMLファイルの場合は常に絶対URLに変換
+                                $html = $this->convert_xml_to_absolute_urls( $html );
                             }
-
-                            // カスタムフォルダ名に置換
-                            $html = $this->replace_custom_folder_names( $html );
-
-                            // WordPress動的要素を削除/置換
-                            $html = $this->sanitize_static_html( $html );
-
-                            // アーカイブリンクを除去・変更
-                            $html = $this->remove_archive_links( $html );
 
                             // ファイルパスを生成
                             $path = $this->url_to_path( $url );
@@ -788,23 +801,9 @@ class CP_Generator {
 
             // CSS構文チェックは削除 - WordPressが生成したHTMLをそのまま使用
         } else {
-            // XMLファイルの場合はそのまま出力
+            // XMLファイルの場合は常に絶対URLに変換
             $this->logger->debug( "XMLファイル取得: {$url}" );
-
-            // XMLの場合、絶対URLを相対URLに変換（サイトマップのリンクなど）
-            if ( $this->settings['url_mode'] === 'relative' ) {
-                $site_url = trailingslashit( get_site_url() );
-                $home_url = trailingslashit( get_home_url() );
-
-                // http:// と https:// の両方に対応
-                $site_url_http = str_replace( 'https://', 'http://', $site_url );
-                $site_url_https = str_replace( 'http://', 'https://', $site_url );
-                $home_url_http = str_replace( 'https://', 'http://', $home_url );
-                $home_url_https = str_replace( 'http://', 'https://', $home_url );
-
-                // XML内のURLを相対URLに変換
-                $html = str_replace( array( $site_url_https, $site_url_http, $home_url_https, $home_url_http ), '/', $html );
-            }
+            $html = $this->convert_xml_to_absolute_urls( $html );
         }
 
         // HTML圧縮を適用
@@ -1029,6 +1028,43 @@ class CP_Generator {
         $html = str_replace( '\\"/', '\\"' . $base_url . '/', $html );
 
         return $html;
+    }
+
+    /**
+     * XML内のURLを絶対URLに変換
+     *
+     * @param string $xml XML内容
+     * @return string 変換後のXML
+     */
+    private function convert_xml_to_absolute_urls( $xml ) {
+        // base_urlが設定されていない場合はget_site_url()を使用
+        $base_url = ! empty( $this->settings['base_url'] ) ? $this->settings['base_url'] : untrailingslashit( get_site_url() );
+
+        $site_url = trailingslashit( get_site_url() );
+        $home_url = trailingslashit( get_home_url() );
+
+        // http:// と https:// の両方に対応
+        $site_url_http = str_replace( 'https://', 'http://', $site_url );
+        $site_url_https = str_replace( 'http://', 'https://', $site_url );
+        $home_url_http = str_replace( 'https://', 'http://', $home_url );
+        $home_url_https = str_replace( 'http://', 'https://', $home_url );
+
+        // XML内の動的URLを絶対URLに変換
+        $xml = str_replace(
+            array( $site_url_https, $site_url_http, $home_url_https, $home_url_http ),
+            trailingslashit( $base_url ),
+            $xml
+        );
+
+        // 相対パス形式（/で始まるパス）を絶対URLに変換
+        // XMLタグ内のURL属性やテキストノードを対象
+        $xml = preg_replace(
+            '/(<link>|<url>|<loc>|<guid[^>]*>|href=["\'])\/([^<"\']+)/i',
+            '$1' . $base_url . '/$2',
+            $xml
+        );
+
+        return $xml;
     }
 
     /**

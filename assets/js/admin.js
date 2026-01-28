@@ -985,7 +985,7 @@ jQuery(document).ready(function($) {
     // ========================================
 
     function toggleBaseUrlDescription() {
-        const urlMode = $('input[name="url_mode"]:checked').val();
+        const urlMode = $('#cp-url-mode').val();
         const $descAbsolute = $('#cp-base-url-description-absolute');
         const $descRelative = $('#cp-base-url-description-relative');
 
@@ -1002,7 +1002,7 @@ jQuery(document).ready(function($) {
     toggleBaseUrlDescription();
 
     // URL形式の変更を監視
-    $('input[name="url_mode"]').on('change', function() {
+    $('#cp-url-mode').on('change', function() {
         toggleBaseUrlDescription();
     });
 
