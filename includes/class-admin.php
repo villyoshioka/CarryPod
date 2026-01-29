@@ -198,30 +198,6 @@ class CP_Admin {
             <?php $this->check_mati_compatibility(); ?>
 
             <div class="cp-dynamic-sections">
-                <div class="cp-execute-section">
-                    <button type="button" id="cp-execute-button" class="button button-primary" <?php echo $is_running ? 'disabled' : ''; ?>>
-                        <?php echo $is_running ? '静的化中...' : '静的化を実行'; ?>
-                    </button>
-                    <button type="button" id="cp-cancel-button" class="button" <?php echo ! $is_running ? 'disabled' : ''; ?> style="<?php echo ! $is_running ? 'display:none;' : ''; ?>">
-                        実行中止
-                    </button>
-                </div>
-
-                <div class="cp-commit-section <?php echo ( ! empty( $settings['github_enabled'] ) || ! empty( $settings['git_local_enabled'] ) ) ? 'active' : ''; ?>">
-                    <h3>
-                        コミットメッセージ
-                        <?php echo $this->render_tooltip( 'デフォルト形式: update:YYYYMMDD_HHMMSS（例: update:20241225_143052）分かりやすいメッセージにすることで、後から履歴を見返す時に何の更新だったか分かりやすくなります' ); ?>
-                    </h3>
-                    <div class="cp-section-content">
-                        <div class="cp-form-group">
-                            <div class="cp-commit-container">
-                                <input type="text" id="cp-commit-message" class="regular-text" value="<?php echo esc_attr( ! empty( $settings['commit_message'] ) ? $settings['commit_message'] : 'update:' . current_time( 'Ymd_His' ) ); ?>" placeholder="コミットメッセージを入力">
-                                <button type="button" id="cp-reset-commit-message" class="button">リセット</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="cp-progress-section">
                     <h3>進捗状況</h3>
                     <div class="cp-progress-container">
@@ -236,6 +212,30 @@ class CP_Admin {
                             <button type="button" id="cp-download-log" class="button" <?php echo $is_running ? 'disabled' : ''; ?>>最新のログをダウンロード</button>
                         </div>
                     </div>
+                </div>
+
+                <div class="cp-commit-section <?php echo ( ! empty( $settings['github_enabled'] ) || ! empty( $settings['git_local_enabled'] ) || ! empty( $settings['gitlab_enabled'] ) ) ? 'active' : ''; ?>">
+                    <h3>
+                        コミットメッセージ
+                        <?php echo $this->render_tooltip( 'デフォルト形式: update:YYYYMMDD_HHMMSS（例: update:20241225_143052）分かりやすいメッセージにすることで、後から履歴を見返す時に何の更新だったか分かりやすくなります' ); ?>
+                    </h3>
+                    <div class="cp-section-content">
+                        <div class="cp-form-group">
+                            <div class="cp-commit-container">
+                                <input type="text" id="cp-commit-message" class="regular-text" value="<?php echo esc_attr( ! empty( $settings['commit_message'] ) ? $settings['commit_message'] : 'update:' . current_time( 'Ymd_His' ) ); ?>" placeholder="コミットメッセージを入力">
+                                <button type="button" id="cp-reset-commit-message" class="button">リセット</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cp-execute-section">
+                    <button type="button" id="cp-execute-button" class="button button-primary" <?php echo $is_running ? 'disabled' : ''; ?>>
+                        <?php echo $is_running ? '静的化中...' : '静的化を実行'; ?>
+                    </button>
+                    <button type="button" id="cp-cancel-button" class="button" <?php echo ! $is_running ? 'disabled' : ''; ?> style="<?php echo ! $is_running ? 'display:none;' : ''; ?>">
+                        実行中止
+                    </button>
                 </div>
             </div>
 
@@ -788,6 +788,14 @@ class CP_Admin {
 
                     <div class="cp-form-group">
                         <label>
+                            <input type="checkbox" name="enable_llms_txt" value="1" <?php checked( $settings['enable_llms_txt'] ?? true ); ?>>
+                            llms.txtを出力
+                            <?php echo $this->render_tooltip( 'llms.txt = LLM（大規模言語モデル）向けのサイト情報提供ファイル。AIクローラーに対してレート制限やアクセスポリシーを伝えるために使用します。<br>デフォルトではAI学習への利用を禁止する設定になっていますが、出力先に「ローカルディレクトリ」を選択している場合は、生成後にファイルを直接編集することでポリシーをカスタマイズできます（許可設定への変更も可能）' ); ?>
+                        </label>
+                    </div>
+
+                    <div class="cp-form-group">
+                        <label>
                             <input type="checkbox" name="enable_rss" value="1" <?php checked( $settings['enable_rss'] ?? true ); ?>>
                             RSSフィードを出力
                             <?php echo $this->render_tooltip( 'RSSフィード = サイトの新着記事情報を配信するXMLファイル（/feed/など） 読者がRSSリーダーでサイトの更新を購読できるようになります。通常は有効にすることを推奨します' ); ?>
@@ -1103,6 +1111,7 @@ class CP_Admin {
             'enable_post_format_archive' => 'boolean',
             'enable_sitemap' => 'boolean',
             'enable_robots_txt' => 'boolean',
+            'enable_llms_txt' => 'boolean',
             'enable_rss' => 'boolean',
             'minify_html' => 'boolean',
             'minify_css' => 'boolean',
@@ -1455,6 +1464,7 @@ class CP_Admin {
             $log_text .= "    - 著者アーカイブ: " . ( ! empty( $settings['enable_author_archive'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "    - サイトマップ: " . ( ! empty( $settings['enable_sitemap'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "    - robots.txt: " . ( ! empty( $settings['enable_robots_txt'] ) ? '有効' : '無効' ) . "\n";
+            $log_text .= "    - llms.txt: " . ( ! empty( $settings['enable_llms_txt'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "    - RSS: " . ( ! empty( $settings['enable_rss'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "\n";
 
