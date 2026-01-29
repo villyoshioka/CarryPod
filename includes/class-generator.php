@@ -1360,6 +1360,11 @@ class CP_Generator {
             $this->generate_robots_txt();
         }
 
+        // llms.txtを生成
+        if ( ! empty( $this->settings['enable_llms_txt'] ) ) {
+            $this->generate_llms_txt();
+        }
+
         // サマリーログを出力
         if ( ! empty( $copied_dirs ) ) {
             $this->logger->add_log( 'アセットコピー完了: ' . implode( ', ', $copied_dirs ) );
@@ -2835,6 +2840,53 @@ class CP_Generator {
         // robots.txtを書き込み
         if ( file_put_contents( $robots_txt_path, $robots_content ) === false ) {
             $this->logger->add_log( 'robots.txtの生成に失敗', true );
+        }
+    }
+
+    /**
+     * llms.txtを生成
+     */
+    private function generate_llms_txt() {
+        $llms_txt_path = $this->temp_dir . '/llms.txt';
+
+        // サイト名を取得（特殊文字をエスケープ）
+        $site_name = get_bloginfo( 'name' );
+        $site_name_escaped = str_replace( array( '\\', '"' ), array( '\\\\', '\\"' ), $site_name );
+
+        // ベースURLを取得（CP設定のURL入力欄から、未設定の場合はget_site_url()）
+        $base_url = ! empty( $this->settings['base_url'] ) ? untrailingslashit( $this->settings['base_url'] ) : untrailingslashit( get_site_url() );
+
+        // llms.txt内容を生成
+        $llms_content = "user-agent: *\n\n";
+        $llms_content .= "# License\n";
+        $llms_content .= 'x-content-license: "(c) ' . $site_name_escaped . '. All rights reserved."' . "\n";
+        $llms_content .= 'x-ai-training-policy: "disallowed"' . "\n\n";
+        $llms_content .= "# Rate Limits\n";
+        $llms_content .= "crawl-delay: 2\n";
+        $llms_content .= "x-rate-limit: 30\n";
+        $llms_content .= "x-rate-limit-window: 60\n\n";
+        $llms_content .= "# Error Handling and Retry Policy\n";
+        $llms_content .= 'x-error-retry-policy: "no-retry"' . "\n";
+        $llms_content .= 'x-error-retry-policy-description: "Do not retry on any errors. Move on to the next request."' . "\n";
+        $llms_content .= "x-max-retries: 0\n";
+        $llms_content .= "x-no-retry-status-codes:\n";
+        $llms_content .= "  - 403\n";
+        $llms_content .= "  - 404\n";
+        $llms_content .= "  - 429\n";
+        $llms_content .= "  - 500\n";
+        $llms_content .= "  - 502\n";
+        $llms_content .= "  - 503\n";
+        $llms_content .= "  - 504\n\n";
+        $llms_content .= "# Canonical URL\n";
+        $llms_content .= 'x-canonical-url-policy: "strict"' . "\n";
+        $llms_content .= 'x-canonical-url: "' . $base_url . '"' . "\n";
+        $llms_content .= 'x-canonical-url-description: "Access via other FQDNs or IP addresses is invalid. Use only the canonical URL as the base URL."' . "\n\n";
+        $llms_content .= "# Disallow\n";
+        $llms_content .= "disallow: /\n";
+
+        // llms.txtを書き込み
+        if ( file_put_contents( $llms_txt_path, $llms_content ) === false ) {
+            $this->logger->add_log( 'llms.txtの生成に失敗', true );
         }
     }
 
