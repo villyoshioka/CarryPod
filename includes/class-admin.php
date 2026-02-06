@@ -208,9 +208,6 @@ class CP_Admin {
                             <span id="cp-progress-percentage" class="cp-progress-percentage">0%</span>
                         </div>
                         <div id="cp-progress-status" class="cp-progress-status">待機中...</div>
-                        <div style="margin-top: 15px;">
-                            <button type="button" id="cp-download-log" class="button" <?php echo $is_running ? 'disabled' : ''; ?>>最新のログをダウンロード</button>
-                        </div>
                     </div>
                 </div>
 
@@ -233,9 +230,10 @@ class CP_Admin {
                     <button type="button" id="cp-execute-button" class="button button-primary" <?php echo $is_running ? 'disabled' : ''; ?>>
                         <?php echo $is_running ? '静的化中...' : '静的化を実行'; ?>
                     </button>
-                    <button type="button" id="cp-cancel-button" class="button" <?php echo ! $is_running ? 'disabled' : ''; ?> style="<?php echo ! $is_running ? 'display:none;' : ''; ?>">
+                    <button type="button" id="cp-cancel-button" class="button" <?php echo ! $is_running ? 'disabled' : ''; ?>>
                         実行中止
                     </button>
+                    <button type="button" id="cp-download-log" class="button" <?php echo $is_running ? 'disabled' : ''; ?>>最新のログをダウンロード</button>
                 </div>
             </div>
 
@@ -782,7 +780,7 @@ class CP_Admin {
                         <label>
                             <input type="checkbox" name="enable_robots_txt" value="1" <?php checked( $settings['enable_robots_txt'] ?? true ); ?>>
                             robots.txtを出力
-                            <?php echo $this->render_tooltip( 'robots.txt = 検索エンジンやBot（Googleボットなど）に対して、サイトのどの部分をクロールして良いかを指示するファイル。有効にすると、主要な検索エンジンのみを許可し、AIクローラーなど他のBotをブロックする設定のファイルを出力します。検索エンジンに正しくサイトを認識してもらうため、基本的には有効にすることを推奨します。<br>※ 出力先に「ローカルディレクトリ」を選択している場合は、生成後にファイルを直接編集してカスタマイズすることも可能です' ); ?>
+                            <?php echo $this->render_tooltip( 'robots.txt = 検索エンジンやBot（Googleボットなど）に対して、サイトのどの部分をクロールして良いかを指示するファイル。有効にすると、主要な検索エンジンのみを許可し、AIクローラーなど他のBotをブロックする設定のファイルを出力します。検索エンジンに正しくサイトを認識してもらうため、基本的には有効にすることを推奨します。<br><br>注意:<br>- 自動生成を有効にすると、既存のrobots.txtファイルは上書きされます<br>- 自動生成を無効にした場合、既存のrobots.txtを残したいときは「追加ファイル・フォルダ」設定でrobots.txtを指定してください<br>- 出力先に「ローカルディレクトリ」を選択している場合は、生成後にファイルを直接編集してカスタマイズすることも可能です' ); ?>
                         </label>
                     </div>
 
@@ -790,9 +788,22 @@ class CP_Admin {
                         <label>
                             <input type="checkbox" name="enable_llms_txt" value="1" <?php checked( $settings['enable_llms_txt'] ?? true ); ?>>
                             llms.txtを出力
-                            <?php echo $this->render_tooltip( 'llms.txt = LLM（大規模言語モデル）向けのサイト情報提供ファイル。AIクローラーに対してレート制限やアクセスポリシーを伝えるために使用します。<br>デフォルトではAI学習への利用を禁止する設定になっていますが、出力先に「ローカルディレクトリ」を選択している場合は、生成後にファイルを直接編集することでポリシーをカスタマイズできます（許可設定への変更も可能）' ); ?>
+                            <?php echo $this->render_tooltip( 'llms.txt = LLM（大規模言語モデル）向けのサイト情報提供ファイル。AIクローラーに対してレート制限やアクセスポリシーを伝えるために使用します。デフォルトではAI学習への利用を禁止する設定になっています。<br><br>注意:<br>- 自動生成を有効にすると、既存のllms.txtファイルは上書きされます<br>- 自動生成を無効にした場合、既存のllms.txtを残したいときは「追加ファイル・フォルダ」設定でllms.txtを指定してください<br>- 出力先に「ローカルディレクトリ」を選択している場合は、生成後にファイルを直接編集することでポリシーをカスタマイズできます（許可設定への変更も可能）' ); ?>
                         </label>
                     </div>
+
+                    <?php
+                    $mati_available = defined( 'MATI_VERSION' ) && class_exists( 'Mati_Settings' );
+                    if ( $mati_available ) :
+                    ?>
+                    <div class="cp-form-group">
+                        <label>
+                            <input type="checkbox" name="generate_mati_headers" value="1" <?php checked( $settings['generate_mati_headers'] ?? true ); ?>>
+                            _headersファイルを自動生成する
+                            <?php echo $this->render_tooltip( 'Matiプラグインと連携して、静的サイト向けのセキュリティヘッダー設定ファイル（_headers）を自動生成します。<br><br>このファイルはCloudflare PagesやNetlifyで自動的に読み込まれ、以下のセキュリティヘッダーを設定します：<br>- Content-Security-Policy: frame-ancestors \'self\'<br>- X-Content-Type-Options: nosniff<br>- X-Robots-Tag（Matiの設定に応じて）<br><br>注意:<br>- 自動生成を有効にすると、既存の_headersファイルは上書きされます<br>- 自動生成を無効にした場合、既存の_headersを残したいときは「追加ファイル・フォルダ」設定で_headersを指定してください' ); ?>
+                        </label>
+                    </div>
+                    <?php endif; ?>
 
                     <div class="cp-form-group">
                         <label>
@@ -1112,6 +1123,7 @@ class CP_Admin {
             'enable_sitemap' => 'boolean',
             'enable_robots_txt' => 'boolean',
             'enable_llms_txt' => 'boolean',
+            'generate_mati_headers' => 'boolean',
             'enable_rss' => 'boolean',
             'minify_html' => 'boolean',
             'minify_css' => 'boolean',
@@ -1465,6 +1477,10 @@ class CP_Admin {
             $log_text .= "    - サイトマップ: " . ( ! empty( $settings['enable_sitemap'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "    - robots.txt: " . ( ! empty( $settings['enable_robots_txt'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "    - llms.txt: " . ( ! empty( $settings['enable_llms_txt'] ) ? '有効' : '無効' ) . "\n";
+            // Matiが有効な場合のみ_headersの設定を表示
+            if ( defined( 'MATI_VERSION' ) && class_exists( 'Mati_Settings' ) ) {
+                $log_text .= "    - _headers: " . ( ! empty( $settings['generate_mati_headers'] ) ? '有効' : '無効' ) . "\n";
+            }
             $log_text .= "    - RSS: " . ( ! empty( $settings['enable_rss'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "\n";
 

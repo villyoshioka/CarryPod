@@ -349,7 +349,7 @@ body.toplevel_page_carry-pod .cp-admin-wrap {
     font-size: 14px;
     font-weight: 600;
     color: #1d2327;
-    margin-bottom: 10px;
+    margin-bottom: 0;
     line-height: 1.5;
 }
 
@@ -549,7 +549,7 @@ body.toplevel_page_carry-pod .cp-admin-wrap {
 .cp-execute-section {
     order: 3;
     /* 最後に配置 */
-    padding: 15px;
+    padding: 20px 15px;
     background: #fff;
     border: none;
     border-top: 1px solid #e2e4e7;
@@ -581,6 +581,15 @@ body.toplevel_page_carry-pod .cp-admin-wrap {
     color: #cc1818;
 }
 
+/* ログダウンロードボタンのスタイル */
+#cp-download-log {
+    font-size: 14px;
+    padding: 0 16px;
+    height: 40px;
+    line-height: 40px;
+    min-height: 40px;
+}
+
 #cp-cancel-button:hover,
 #cp-reset-scheduler:hover {
     background: #cc1818;
@@ -606,12 +615,12 @@ body.toplevel_page_carry-pod .cp-admin-wrap {
 
 #cp-cancel-button:disabled,
 #cp-reset-scheduler:disabled {
-    opacity: 0.3;
+    background: #7e8993 !important;
+    border-color: #7e8993 !important;
+    color: #fff !important;
     cursor: not-allowed;
     pointer-events: none;
-    background: transparent;
-    border-color: #cc1818;
-    color: #cc1818;
+    opacity: 0.5;
 }
 
 /* コミットメッセージが空の時にボタンを無効化するスタイル */
