@@ -179,6 +179,8 @@ class CP_Settings {
             'enable_robots_txt' => true,
             'enable_llms_txt' => true,
             'enable_rss' => true,
+            // Mati連携設定
+            'generate_mati_headers' => true,
             // Cloudflare Workers設定
             'cloudflare_enabled' => false,
             'cloudflare_api_token' => '',
@@ -904,6 +906,8 @@ class CP_Settings {
             'enable_robots_txt' => true,
             'enable_llms_txt' => true,
             'enable_rss' => true,
+            // Mati連携設定
+            'generate_mati_headers' => true,
             // Cloudflare Workers設定
             'cloudflare_enabled' => false,
             'cloudflare_api_token' => '', // トークンもクリア
@@ -1010,6 +1014,7 @@ class CP_Settings {
             'commit_message',
             'enable_tag_archive', 'enable_date_archive', 'enable_author_archive',
             'enable_post_format_archive', 'enable_sitemap', 'enable_robots_txt', 'enable_llms_txt', 'enable_rss',
+            'generate_mati_headers',
         );
 
         $sanitized = array();
@@ -1022,6 +1027,7 @@ class CP_Settings {
                     'cloudflare_enabled', 'gitlab_enabled', 'netlify_enabled',
                     'enable_tag_archive', 'enable_date_archive', 'enable_author_archive',
                     'enable_post_format_archive', 'enable_sitemap', 'enable_robots_txt', 'enable_llms_txt', 'enable_rss',
+                    'generate_mati_headers',
                 );
                 if ( is_bool( $current[ $key ] ?? false ) || in_array( $key, $boolean_keys, true ) ) {
                     $sanitized[ $key ] = (bool) $imported[ $key ];

@@ -460,7 +460,7 @@ jQuery(document).ready(function($) {
 
                         // ボタンを元に戻す
                         $('#cp-execute-button').prop('disabled', false).text('静的化を実行');
-                        $('#cp-cancel-button').prop('disabled', true).hide();
+                        $('#cp-cancel-button').prop('disabled', true).text('実行中止');
                         $('#cp-download-log').prop('disabled', false);
 
                         // 進捗をリセット
@@ -539,8 +539,8 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 console.log('AJAX成功:', response);
                 if (response.success) {
-                    // 停止ボタンを表示
-                    $('#cp-cancel-button').prop('disabled', false).show();
+                    // 停止ボタンを有効化
+                    $('#cp-cancel-button').prop('disabled', false).text('実行中止');
 
                     // 進捗のポーリングを開始
                     startProgressPolling();
@@ -601,7 +601,7 @@ jQuery(document).ready(function($) {
                     if (!isRunning) {
                         console.log('実行中ではないため、ボタンを有効化します');
                         $('#cp-execute-button').prop('disabled', false).text('静的化を実行');
-                        $('#cp-cancel-button').prop('disabled', true).hide();
+                        $('#cp-cancel-button').prop('disabled', true).text('実行中止');
                         $('#cp-download-log').prop('disabled', false);
                         stopProgressPolling();
 

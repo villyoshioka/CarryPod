@@ -1365,6 +1365,11 @@ class CP_Generator {
             $this->generate_llms_txt();
         }
 
+        // _headersファイルを生成（Mati連携）
+        if ( ! empty( $this->settings['generate_mati_headers'] ) ) {
+            $this->generate_mati_headers();
+        }
+
         // サマリーログを出力
         if ( ! empty( $copied_dirs ) ) {
             $this->logger->add_log( 'アセットコピー完了: ' . implode( ', ', $copied_dirs ) );
@@ -2887,6 +2892,73 @@ class CP_Generator {
         // llms.txtを書き込み
         if ( file_put_contents( $llms_txt_path, $llms_content ) === false ) {
             $this->logger->add_log( 'llms.txtの生成に失敗', true );
+        }
+    }
+
+    /**
+     * _headersファイルを生成（Mati連携）
+     */
+    private function generate_mati_headers() {
+        // Matiプラグインが有効かチェック
+        if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
+            return;
+        }
+
+        try {
+            // Mati設定を取得
+            if ( ! method_exists( 'Mati_Settings', 'get_instance' ) ) {
+                $this->logger->add_log( '_headersファイル生成エラー: Mati_Settings::get_instanceメソッドが存在しません', true );
+                return;
+            }
+
+            $mati_settings_instance = Mati_Settings::get_instance();
+
+            if ( ! method_exists( $mati_settings_instance, 'get_settings' ) ) {
+                $this->logger->add_log( '_headersファイル生成エラー: get_settingsメソッドが存在しません', true );
+                return;
+            }
+
+            $mati_settings = $mati_settings_instance->get_settings();
+
+            // _headers内容を生成
+            $headers_content = "/*\n";
+
+            // 基本的なセキュリティヘッダー（常に出力）
+            $headers_content .= "  Content-Security-Policy: frame-ancestors 'self'\n";
+            $headers_content .= "  X-Content-Type-Options: nosniff\n";
+
+            // X-Robots-Tag（Matiの設定に応じて）
+            $robots_tags = array();
+
+            if ( ! empty( $mati_settings['add_noindex_meta'] ) ) {
+                $robots_tags[] = 'noindex';
+            }
+            if ( ! empty( $mati_settings['add_noarchive_meta'] ) ) {
+                $robots_tags[] = 'noarchive';
+            }
+            if ( ! empty( $mati_settings['add_noimageindex_meta'] ) ) {
+                $robots_tags[] = 'noimageindex';
+            }
+            if ( ! empty( $mati_settings['add_noai_meta'] ) ) {
+                $robots_tags[] = 'noai';
+                $robots_tags[] = 'noimageai';
+            }
+
+            if ( ! empty( $robots_tags ) ) {
+                $headers_content .= '  X-Robots-Tag: ' . implode( ', ', $robots_tags ) . "\n";
+            }
+
+            // _headersファイルパス
+            $headers_path = $this->temp_dir . '/_headers';
+
+            // ファイルを書き込み
+            if ( file_put_contents( $headers_path, $headers_content ) === false ) {
+                $this->logger->add_log( '_headersファイルの生成に失敗', true );
+            } else {
+                $this->logger->add_log( '_headersファイルを生成しました', false );
+            }
+        } catch ( Exception $e ) {
+            $this->logger->add_log( '_headersファイル生成エラー: ' . $e->getMessage(), true );
         }
     }
 
