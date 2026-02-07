@@ -176,6 +176,11 @@ class CP_Cloudflare_Workers {
                 $relative_path = '/' . ltrim( substr( $full_path, strlen( $base_dir ) ), '/' );
                 $size = $file->getSize();
 
+                // _headersファイルはWorkers Static Assetsでは機能しないため除外
+                if ( basename( $relative_path ) === '_headers' ) {
+                    continue;
+                }
+
                 // ファイルサイズチェック
                 if ( $size > self::MAX_FILE_SIZE ) {
                     $this->logger->warning( "ファイルサイズ上限超過（スキップ）: {$relative_path} ({$size} bytes)" );
