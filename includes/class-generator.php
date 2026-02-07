@@ -2904,6 +2904,24 @@ class CP_Generator {
             return;
         }
 
+        // Cloudflare Workersのみ有効で他の出力先がない場合は_headersを生成しない
+        // （Workers Static AssetsのDirect Upload APIでは_headersファイルが機能しないため）
+        $settings = CP_Settings::get_instance()->get_settings();
+        if ( ! empty( $settings['cloudflare_enabled'] ) ) {
+            $other_destinations = array( 'github_enabled', 'gitlab_enabled', 'netlify_enabled', 'git_local_enabled', 'local_enabled', 'zip_enabled' );
+            $has_other          = false;
+            foreach ( $other_destinations as $key ) {
+                if ( ! empty( $settings[ $key ] ) ) {
+                    $has_other = true;
+                    break;
+                }
+            }
+            if ( ! $has_other ) {
+                $this->logger->add_log( '_headersファイル生成をスキップ（Cloudflare Workersでは機能しないため）', false );
+                return;
+            }
+        }
+
         try {
             // Mati設定を取得
             if ( ! method_exists( 'Mati_Settings', 'get_instance' ) ) {

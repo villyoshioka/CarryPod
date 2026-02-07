@@ -5,7 +5,7 @@
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue.svg)](https://www.php.net/)
-[![Version](https://img.shields.io/badge/Version-2.6.0-green.svg)](https://github.com/villyoshioka/CarryPod/releases)
+[![Version](https://img.shields.io/badge/Version-2.7.0-green.svg)](https://github.com/villyoshioka/CarryPod/releases)
 
 > **注意**: **このプラグインについて、コードは公開していますが、サポートは行っていません。**
 
@@ -52,7 +52,7 @@ WordPress で作ったサイトを、静的な HTML や CSS などのファイ�
 1. **設定画面**で出力先を選択します（GitHub / GitLab / Cloudflare Workers / Netlify / ローカル Git / ZIP / ディレクトリ）
 2. 必要に応じて、カスタムフォルダ名、追加・除外ファイル、URL形式などの設定を行います
 3. **実行画面**で「静的化を実行」ボタンをクリックします
-4. 進捗を確認しながら完了を待ちます（時間がかかる場合がありますので、その間にもみじ饅頭でもどうぞ）
+4. 進捗を確認しながら完了を待ちます（時間がかかる場合がありますので、その間に黄身時雨でもどうぞ）
 
 ### デバッグモード
 

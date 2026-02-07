@@ -798,10 +798,48 @@ class CP_Admin {
                     ?>
                     <div class="cp-form-group">
                         <label>
-                            <input type="checkbox" name="generate_mati_headers" value="1" <?php checked( $settings['generate_mati_headers'] ?? true ); ?>>
+                            <input type="checkbox" id="cp-mati-headers" name="generate_mati_headers" value="1" <?php checked( $settings['generate_mati_headers'] ?? true ); ?>>
                             _headersファイルを自動生成する
                             <?php echo $this->render_tooltip( 'Matiプラグインと連携して、静的サイト向けのセキュリティヘッダー設定ファイル（_headers）を自動生成します。<br><br>このファイルはCloudflare PagesやNetlifyで自動的に読み込まれ、以下のセキュリティヘッダーを設定します：<br>- Content-Security-Policy: frame-ancestors \'self\'<br>- X-Content-Type-Options: nosniff<br>- X-Robots-Tag（Matiの設定に応じて）<br><br>注意:<br>- 自動生成を有効にすると、既存の_headersファイルは上書きされます<br>- 自動生成を無効にした場合、既存の_headersを残したいときは「追加ファイル・フォルダ」設定で_headersを指定してください' ); ?>
                         </label>
+                    </div>
+                    <div id="cp-cf-transform-guide" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <details class="cp-guide-details">
+                            <summary>Cloudflare Workersでのセキュリティヘッダー設定</summary>
+                            <div class="cp-guide-content">
+                                <p><code>_headers</code>ファイルはCloudflare Workersでは機能しません。代わりにCloudflareのレスポンスヘッダー変換ルール（<strong>Transform Rules</strong>）で以下の2つのルールを設定してください。</p>
+
+                                <h4>ルール1: セキュリティヘッダー</h4>
+                                <ul>
+                                    <li>条件: <strong>すべての受信リクエスト</strong></li>
+                                    <li>操作: <strong>静的を追加</strong></li>
+                                </ul>
+                                <table class="cp-guide-headers-table">
+                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><code>Content-Security-Policy</code></td><td><code>frame-ancestors 'self'</code></td></tr>
+                                        <tr><td><code>X-Robots-Tag</code></td><td><code><?php echo esc_html( $this->get_mati_xrobots_value() ); ?></code></td></tr>
+                                    </tbody>
+                                </table>
+
+                                <h4>ルール2: HTMLコンテンツタイプ</h4>
+                                <ul>
+                                    <li>条件: <strong>カスタムフィルタ式</strong></li>
+                                    <li>式: <code>not http.request.uri.path contains "."</code></li>
+                                    <li>操作: <strong>静的を追加</strong></li>
+                                </ul>
+                                <table class="cp-guide-headers-table">
+                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><code>Content-Type</code></td><td><code>text/html; charset=utf-8</code></td></tr>
+                                        <tr><td><code>X-Content-Type-Options</code></td><td><code>nosniff</code></td></tr>
+                                    </tbody>
+                                </table>
+
+                                <p class="description">※ Matiの設定を変更した場合は、ルール1のX-Robots-Tagの値も更新してください。</p>
+                                <p class="description"><a href="https://developers.cloudflare.com/rules/transform/response-header-modification/" target="_blank" rel="noopener noreferrer">Cloudflare Transform Rules ドキュメント →</a></p>
+                            </div>
+                        </details>
                     </div>
                     <?php endif; ?>
 
@@ -1479,7 +1517,22 @@ class CP_Admin {
             $log_text .= "    - llms.txt: " . ( ! empty( $settings['enable_llms_txt'] ) ? '有効' : '無効' ) . "\n";
             // Matiが有効な場合のみ_headersの設定を表示
             if ( defined( 'MATI_VERSION' ) && class_exists( 'Mati_Settings' ) ) {
-                $log_text .= "    - _headers: " . ( ! empty( $settings['generate_mati_headers'] ) ? '有効' : '無効' ) . "\n";
+                $headers_enabled = ! empty( $settings['generate_mati_headers'] );
+                // Cloudflare Workersのみ有効で他の出力先がない場合は無効扱い
+                if ( $headers_enabled && ! empty( $settings['cloudflare_enabled'] ) ) {
+                    $other_destinations = array( 'github_enabled', 'gitlab_enabled', 'netlify_enabled', 'git_local_enabled', 'local_enabled', 'zip_enabled' );
+                    $has_other          = false;
+                    foreach ( $other_destinations as $key ) {
+                        if ( ! empty( $settings[ $key ] ) ) {
+                            $has_other = true;
+                            break;
+                        }
+                    }
+                    if ( ! $has_other ) {
+                        $headers_enabled = false;
+                    }
+                }
+                $log_text .= "    - _headers: " . ( $headers_enabled ? '有効' : '無効' ) . "\n";
             }
             $log_text .= "    - RSS: " . ( ! empty( $settings['enable_rss'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "\n";
@@ -1842,6 +1895,50 @@ class CP_Admin {
             '</span>',
             wp_kses( $text, array( 'br' => array() ) )
         );
+    }
+
+    /**
+     * Mati設定からX-Robots-Tagの値を取得
+     *
+     * @return string X-Robots-Tagの値
+     */
+    private function get_mati_xrobots_value() {
+        if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
+            return '';
+        }
+
+        try {
+            if ( ! method_exists( 'Mati_Settings', 'get_instance' ) ) {
+                return '';
+            }
+
+            $mati_settings_instance = Mati_Settings::get_instance();
+
+            if ( ! method_exists( $mati_settings_instance, 'get_settings' ) ) {
+                return '';
+            }
+
+            $mati_settings = $mati_settings_instance->get_settings();
+            $robots_tags   = array();
+
+            if ( ! empty( $mati_settings['add_noindex_meta'] ) ) {
+                $robots_tags[] = 'noindex';
+            }
+            if ( ! empty( $mati_settings['add_noarchive_meta'] ) ) {
+                $robots_tags[] = 'noarchive';
+            }
+            if ( ! empty( $mati_settings['add_noimageindex_meta'] ) ) {
+                $robots_tags[] = 'noimageindex';
+            }
+            if ( ! empty( $mati_settings['add_noai_meta'] ) ) {
+                $robots_tags[] = 'noai';
+                $robots_tags[] = 'noimageai';
+            }
+
+            return ! empty( $robots_tags ) ? implode( ', ', $robots_tags ) : '（Matiで設定されていません）';
+        } catch ( Exception $e ) {
+            return '';
+        }
     }
 
     /**

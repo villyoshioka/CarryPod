@@ -102,27 +102,27 @@ jQuery(document).ready(function($) {
     // チェックボックスの連動
     $('#cp-github-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-github-settings').slideDown();
+            $('#cp-github-settings').slideDown(200);
         } else {
-            $('#cp-github-settings').slideUp();
+            $('#cp-github-settings').slideUp(200);
         }
         updateExecuteButton();
     });
 
     $('#cp-git-local-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-git-local-settings').slideDown();
+            $('#cp-git-local-settings').slideDown(200);
         } else {
-            $('#cp-git-local-settings').slideUp();
+            $('#cp-git-local-settings').slideUp(200);
         }
         updateExecuteButton();
     });
 
     $('#cp-local-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-local-settings').slideDown();
+            $('#cp-local-settings').slideDown(200);
         } else {
-            $('#cp-local-settings').slideUp();
+            $('#cp-local-settings').slideUp(200);
         }
         updateExecuteButton();
     });
@@ -130,9 +130,9 @@ jQuery(document).ready(function($) {
     // ZIP出力チェックボックスの連動
     $('#cp-zip-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-zip-settings').slideDown();
+            $('#cp-zip-settings').slideDown(200);
         } else {
-            $('#cp-zip-settings').slideUp();
+            $('#cp-zip-settings').slideUp(200);
         }
         updateExecuteButton();
     });
@@ -140,19 +140,75 @@ jQuery(document).ready(function($) {
     // Cloudflare出力チェックボックスの連動
     $('#cp-cloudflare-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-cloudflare-settings').slideDown();
+            $('#cp-cloudflare-settings').slideDown(200);
         } else {
-            $('#cp-cloudflare-settings').slideUp();
+            $('#cp-cloudflare-settings').slideUp(200);
         }
         updateExecuteButton();
     });
 
+    // Cloudflare Workers Transform Rulesガイドの表示・_headersチェックボックス制御
+    function updateCfTransformGuide(noTransition) {
+        var cfEnabled = $('#cp-cloudflare-enabled').is(':checked');
+        var otherEnabled = $('#cp-github-enabled, #cp-gitlab-enabled, #cp-netlify-enabled, #cp-git-local-enabled, #cp-local-enabled, #cp-zip-enabled')
+            .filter(':checked').length > 0;
+
+        // ガイド表示: Workers有効時
+        var $guide = $('#cp-cf-transform-guide');
+        var $headersGroup = $('#cp-mati-headers').closest('.cp-form-group');
+        if (cfEnabled) {
+            if (noTransition) {
+                $guide.show();
+            } else {
+                $guide.slideDown(200);
+            }
+            $headersGroup.addClass('cp-form-group--has-guide');
+        } else {
+            if (noTransition) {
+                $guide.hide();
+            } else {
+                $guide.slideUp(200);
+            }
+            $headersGroup.removeClass('cp-form-group--has-guide');
+        }
+
+        // チェックボックスグレーアウト: Workersのみ有効時
+        var $headersCheckbox = $('#cp-mati-headers');
+        if ($headersCheckbox.length) {
+            if (cfEnabled && !otherEnabled) {
+                $headersCheckbox.prop('disabled', true).prop('checked', false);
+            } else {
+                $headersCheckbox.prop('disabled', false);
+            }
+        }
+    }
+
+    // 全出力先チェックボックスの変更を監視
+    $('#cp-cloudflare-enabled, #cp-github-enabled, #cp-gitlab-enabled, #cp-netlify-enabled, #cp-git-local-enabled, #cp-local-enabled, #cp-zip-enabled')
+        .on('change', function() { updateCfTransformGuide(false); });
+
+    // 初期状態を設定（アニメーションなし）
+    updateCfTransformGuide(true);
+
+    // Transform Rulesガイドの<details>開閉状態をLocalStorageで保持
+    var $guideDetails = $('#cp-cf-transform-guide .cp-guide-details');
+    if ($guideDetails.length) {
+        // 復元
+        if (getAccordionState('cf-transform-guide')) {
+            $guideDetails.attr('open', '');
+        }
+        // 変更を監視
+        $guideDetails.on('toggle', function() {
+            // saveAllAccordionStatesで一括保存されるため、ここでは何もしない
+        });
+    }
+
     // GitLab出力チェックボックスの連動
     $('#cp-gitlab-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-gitlab-settings').slideDown();
+            $('#cp-gitlab-settings').slideDown(200);
         } else {
-            $('#cp-gitlab-settings').slideUp();
+            $('#cp-gitlab-settings').slideUp(200);
         }
         updateExecuteButton();
     });
@@ -160,9 +216,9 @@ jQuery(document).ready(function($) {
     // Netlify出力チェックボックスの連動
     $('#cp-netlify-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-netlify-settings').slideDown();
+            $('#cp-netlify-settings').slideDown(200);
         } else {
-            $('#cp-netlify-settings').slideUp();
+            $('#cp-netlify-settings').slideUp(200);
         }
         updateExecuteButton();
     });
@@ -378,6 +434,11 @@ jQuery(document).ready(function($) {
                 const isExpanded = $(this).attr('aria-expanded') === 'true';
                 states[sectionId] = isExpanded;
             });
+            // Transform Rulesガイドの<details>開閉状態
+            var $guideDetails = $('#cp-cf-transform-guide .cp-guide-details');
+            if ($guideDetails.length) {
+                states['cf-transform-guide'] = $guideDetails.prop('open');
+            }
             localStorage.setItem('cp_accordion_states', JSON.stringify(states));
         } catch (e) {
             console.error('LocalStorage一括保存エラー:', e);

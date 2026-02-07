@@ -251,9 +251,15 @@ body.toplevel_page_carry-pod .cp-admin-wrap {
 
 .cp-admin-wrap .cp-form-group input[type="checkbox"]:disabled,
 .cp-admin-wrap .cp-form-group input[type="radio"]:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
-    background: #f6f7f7 !important;
+    background: #dcdcde !important;
+    border-color: #c3c4c7 !important;
+}
+
+.cp-admin-wrap .cp-form-group label:has(input[type="checkbox"]:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
     border-color: #8d96a0 !important;
 }
 
@@ -560,34 +566,12 @@ body.toplevel_page_carry-pod .cp-admin-wrap {
     align-items: center;
 }
 
-#cp-execute-button {
-    font-size: 14px;
-    padding: 0 16px;
-    height: 40px;
-    line-height: 40px;
-    min-height: 40px;
-}
-
 /* 停止ボタンとScheduled Actionsリセットボタンのスタイル */
 #cp-cancel-button,
 #cp-reset-scheduler {
-    font-size: 14px;
-    padding: 0 16px;
-    height: 40px;
-    line-height: 40px;
-    min-height: 40px;
     background: transparent;
     border: 1px solid #cc1818;
     color: #cc1818;
-}
-
-/* ログダウンロードボタンのスタイル */
-#cp-download-log {
-    font-size: 14px;
-    padding: 0 16px;
-    height: 40px;
-    line-height: 40px;
-    min-height: 40px;
 }
 
 #cp-cancel-button:hover,
@@ -1385,7 +1369,7 @@ input[type="text"].regular-text {
 .cp-commit-section h3 {
     display: block;
     margin: 0;
-    padding: 0 0 15px 0;
+    padding: 0 0 10px 0;
     font-weight: 600;
     color: #1d2327;
     font-size: 16px;
@@ -1408,7 +1392,7 @@ input[type="text"].regular-text {
     align-items: center;
     gap: 10px;
     background: transparent;
-    padding: 10px 5px 5px;
+    padding: 0 0 5px;
 }
 
 .cp-commit-section .description {
@@ -2023,5 +2007,169 @@ input[type="text"].regular-text {
             opacity: 1;
             transform: translateY(0);
         }
+    }
+}
+
+/* ========================================
+   Cloudflare Transform Rules ガイド
+   ======================================== */
+
+.cp-form-group--has-guide {
+    margin-bottom: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-bottom: none !important;
+}
+
+#cp-cf-transform-guide {
+    margin-bottom: 20px;
+}
+
+.cp-guide-details {
+    padding: 0;
+    background: #fef8ee;
+    border: 1px solid #e0c9a6;
+    border-left: 4px solid #dba617;
+    border-radius: 0 0 4px 4px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #1d2327;
+}
+
+.cp-guide-details summary {
+    cursor: pointer;
+    color: #996800;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 12px 16px;
+    user-select: none;
+    list-style: none;
+}
+
+.cp-guide-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.cp-guide-details summary::before {
+    content: "\25B6";
+    display: inline-block;
+    margin-right: 6px;
+    font-size: 10px;
+    transition: transform 0.2s;
+}
+
+.cp-guide-details[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.cp-guide-details summary:hover {
+    color: #6e4b00;
+}
+
+.cp-guide-content {
+    padding: 0 16px 16px;
+    border-top: 1px solid #e0c9a6;
+}
+
+.cp-guide-content h4 {
+    margin: 16px 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.cp-guide-content ul {
+    margin: 0 0 8px 16px;
+    padding: 0;
+}
+
+.cp-guide-content ul li {
+    margin-bottom: 4px;
+}
+
+.cp-guide-content p {
+    margin: 8px 0;
+}
+
+.cp-guide-content code {
+    background: #f0e6d0;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12px;
+    user-select: all;
+}
+
+.cp-guide-headers-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 16px;
+    font-size: 13px;
+    table-layout: fixed;
+}
+
+.cp-guide-headers-table th:first-child,
+.cp-guide-headers-table td:first-child {
+    width: 40%;
+}
+
+.cp-guide-headers-table th,
+.cp-guide-headers-table td {
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid #e0c9a6;
+}
+
+.cp-guide-headers-table th {
+    background: #f0e6d0;
+    font-weight: 600;
+    font-size: 12px;
+    color: #2c3338;
+}
+
+.cp-guide-headers-table td {
+    background: #fff;
+}
+
+.cp-guide-headers-table code {
+    background: transparent;
+    padding: 0;
+    word-break: break-all;
+}
+
+.cp-guide-content .description {
+    margin-left: 0;
+    color: #646970;
+}
+
+.cp-guide-content .description a {
+    text-decoration: none;
+}
+
+.cp-guide-content .description a:hover {
+    text-decoration: underline;
+}
+
+@media screen and (max-width: 782px) {
+    .cp-guide-details {
+        margin-left: 0;
+    }
+
+    .cp-guide-headers-table th,
+    .cp-guide-headers-table td {
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .cp-guide-details summary,
+    .cp-guide-content {
+        padding-left: 12px;
+        padding-right: 12px;
+        font-size: 12px;
+    }
+
+    .cp-guide-headers-table {
+        font-size: 11px;
     }
 }
