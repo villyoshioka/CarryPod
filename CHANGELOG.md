@@ -1,5 +1,14 @@
 # リリースノート
 
+## 2.7.2 - 2026-02-08
+
+### 改善
+
+- **Cloudflare Workers向けTransform Rulesガイドを更新**: CSS/JSファイルのContent-Type設定ルール（ルール3・4）を追加しました。Cloudflare WorkersではCSS/JSにContent-Typeヘッダーが付与されないため、これらのルールがないとブラウザがCSS/JSの読み込みをブロックしてしまう場合があります。
+- **`_headers`ファイルからX-Content-Type-Optionsヘッダーを削除**: 静的サイトではnosniffヘッダーは不要なため、生成される`_headers`ファイルから除外しました。
+
+---
+
 ## 2.7.1 - 2026-02-08
 
 ### バグ修正
@@ -18,8 +27,8 @@
 
 ### 改善
 
-- **_headersファイルのWorkerデプロイ除外**: `_headers`ファイルはCloudflare Workersへのデプロイ時に自動的に除外されるようになりました。
-- **_headersチェックボックスの自動制御**: Cloudflare Workersのみが有効な場合、`_headers`生成チェックボックスを自動的に無効化します。
+- **\_headersファイルのWorkerデプロイ除外**: `_headers`ファイルはCloudflare Workersへのデプロイ時に自動的に除外されるようになりました。
+- **\_headersチェックボックスの自動制御**: Cloudflare Workersのみが有効な場合、`_headers`生成チェックボックスを自動的に無効化します。
 - **パフォーマンス改善**: 設定画面の開閉アニメーションを高速化し、操作のレスポンスを向上させました。
 - **実行画面のレイアウト調整**: ボタンサイズとコミットメッセージセクションの余白を改善しました。
 
@@ -29,7 +38,7 @@
 
 ### 機能追加
 
-- **Mati連携強化**: Matiプラグインと連携して、静的サイト向けのセキュリティヘッダー設定ファイル（_headers）を自動生成できるようになりました。Matiの設定に応じて、Content-Security-Policy、X-Content-Type-Options、X-Robots-Tagなどのセキュリティヘッダーを自動的に設定します。
+- **Mati連携強化**: Matiプラグインと連携して、静的サイト向けのセキュリティヘッダー設定ファイル（\_headers）を自動生成できるようになりました。Matiの設定に応じて、Content-Security-Policy、X-Content-Type-Options、X-Robots-Tagなどのセキュリティヘッダーを自動的に設定します。
 
 ### 改善
 
