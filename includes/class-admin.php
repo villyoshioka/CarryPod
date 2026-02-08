@@ -800,14 +800,14 @@ class CP_Admin {
                         <label>
                             <input type="checkbox" id="cp-mati-headers" name="generate_mati_headers" value="1" <?php checked( $settings['generate_mati_headers'] ?? true ); ?>>
                             _headersファイルを自動生成する
-                            <?php echo $this->render_tooltip( 'Matiプラグインと連携して、静的サイト向けのセキュリティヘッダー設定ファイル（_headers）を自動生成します。<br><br>このファイルはCloudflare PagesやNetlifyで自動的に読み込まれ、以下のセキュリティヘッダーを設定します：<br>- Content-Security-Policy: frame-ancestors \'self\'<br>- X-Content-Type-Options: nosniff<br>- X-Robots-Tag（Matiの設定に応じて）<br><br>注意:<br>- 自動生成を有効にすると、既存の_headersファイルは上書きされます<br>- 自動生成を無効にした場合、既存の_headersを残したいときは「追加ファイル・フォルダ」設定で_headersを指定してください' ); ?>
+                            <?php echo $this->render_tooltip( 'Matiプラグインと連携して、静的サイト向けのセキュリティヘッダー設定ファイル（_headers）を自動生成します。<br><br>このファイルはCloudflare PagesやNetlifyで自動的に読み込まれ、以下のセキュリティヘッダーを設定します：<br>- Content-Security-Policy: frame-ancestors \'self\'<br>- X-Robots-Tag（Matiの設定に応じて）<br><br>注意:<br>- 自動生成を有効にすると、既存の_headersファイルは上書きされます<br>- 自動生成を無効にした場合、既存の_headersを残したいときは「追加ファイル・フォルダ」設定で_headersを指定してください' ); ?>
                         </label>
                     </div>
                     <div id="cp-cf-transform-guide" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
                         <details class="cp-guide-details">
                             <summary>Cloudflare Workersでのセキュリティヘッダー設定</summary>
                             <div class="cp-guide-content">
-                                <p><code>_headers</code>ファイルはCloudflare Workersでは機能しません。代わりにCloudflareのレスポンスヘッダー変換ルール（<strong>Transform Rules</strong>）で以下の2つのルールを設定してください。</p>
+                                <p><code>_headers</code>ファイルはCloudflare Workersでは機能しません。代わりにCloudflareのレスポンスヘッダー変換ルール（<strong>Transform Rules</strong>）で以下の4つのルールを設定してください。Cloudflare WorkersではCSS/JSにContent-Typeヘッダーが付与されないため、ルール3・4を設定しないとブラウザがCSS/JSの読み込みをブロックします。</p>
 
                                 <h4>ルール1: セキュリティヘッダー</h4>
                                 <ul>
@@ -832,7 +832,32 @@ class CP_Admin {
                                     <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
                                     <tbody>
                                         <tr><td><code>Content-Type</code></td><td><code>text/html; charset=utf-8</code></td></tr>
-                                        <tr><td><code>X-Content-Type-Options</code></td><td><code>nosniff</code></td></tr>
+                                    </tbody>
+                                </table>
+
+                                <h4>ルール3: CSSコンテンツタイプ</h4>
+                                <ul>
+                                    <li>条件: <strong>カスタムフィルタ式</strong></li>
+                                    <li>式: <code>http.request.uri.path.extension eq "css"</code></li>
+                                    <li>操作: <strong>静的を追加</strong></li>
+                                </ul>
+                                <table class="cp-guide-headers-table">
+                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><code>Content-Type</code></td><td><code>text/css; charset=utf-8</code></td></tr>
+                                    </tbody>
+                                </table>
+
+                                <h4>ルール4: JSコンテンツタイプ</h4>
+                                <ul>
+                                    <li>条件: <strong>カスタムフィルタ式</strong></li>
+                                    <li>式: <code>http.request.uri.path.extension eq "js"</code></li>
+                                    <li>操作: <strong>静的を追加</strong></li>
+                                </ul>
+                                <table class="cp-guide-headers-table">
+                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><code>Content-Type</code></td><td><code>application/javascript; charset=utf-8</code></td></tr>
                                     </tbody>
                                 </table>
 

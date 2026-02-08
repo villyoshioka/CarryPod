@@ -2943,7 +2943,6 @@ class CP_Generator {
 
             // 基本的なセキュリティヘッダー（常に出力）
             $headers_content .= "  Content-Security-Policy: frame-ancestors 'self'\n";
-            $headers_content .= "  X-Content-Type-Options: nosniff\n";
 
             // X-Robots-Tag（Matiの設定に応じて）
             $robots_tags = array();
