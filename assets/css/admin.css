@@ -751,6 +751,14 @@ form#cp-settings-form {
 
     .cp-execute-section {
         text-align: left !important;
+        flex-direction: column;
+    }
+
+    .cp-execute-section .button {
+        width: 100% !important;
+        height: 40px !important;
+        padding: 0 16px !important;
+        font-size: 14px !important;
     }
 
     .cp-commit-section {
@@ -1894,6 +1902,12 @@ input[type="text"].regular-text {
 .cp-tooltip-trigger:active {
     background: #f0f0f1;
     transform: none;
+}
+
+.cp-tooltip-trigger.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: not-allowed;
 }
 
 /* ツールチップコンテンツ（吹き出し） */
