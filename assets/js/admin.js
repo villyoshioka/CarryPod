@@ -175,11 +175,14 @@ jQuery(document).ready(function($) {
         // チェックボックスグレーアウト: Workersのみ有効時
         var $headersCheckbox = $('#cp-mati-headers');
         if ($headersCheckbox.length) {
-            if (cfEnabled && !otherEnabled) {
+            var workersOnly = cfEnabled && !otherEnabled;
+            if (workersOnly) {
                 $headersCheckbox.prop('disabled', true).prop('checked', false);
             } else {
                 $headersCheckbox.prop('disabled', false);
             }
+            // ヘルプボタンも連動
+            $headersCheckbox.closest('label').find('.cp-tooltip-trigger').toggleClass('disabled', workersOnly);
         }
     }
 

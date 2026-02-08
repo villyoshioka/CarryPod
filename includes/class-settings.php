@@ -1053,6 +1053,21 @@ class CP_Settings {
         // バージョン情報を更新
         $merged['version'] = CP_VERSION;
 
+        // Workersのみ有効の場合、_headers生成を無効化
+        if ( ! empty( $merged['cloudflare_enabled'] ) ) {
+            $other_destinations = array( 'github_enabled', 'gitlab_enabled', 'netlify_enabled', 'git_local_enabled', 'local_enabled', 'zip_enabled' );
+            $has_other = false;
+            foreach ( $other_destinations as $key ) {
+                if ( ! empty( $merged[ $key ] ) ) {
+                    $has_other = true;
+                    break;
+                }
+            }
+            if ( ! $has_other ) {
+                $merged['generate_mati_headers'] = false;
+            }
+        }
+
         // バリデーションを実行
         $validation = $this->validate_settings( $merged );
         if ( is_wp_error( $validation ) ) {
