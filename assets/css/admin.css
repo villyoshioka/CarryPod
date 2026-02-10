@@ -101,6 +101,7 @@ body.toplevel_page_carry-pod .cp-admin-wrap {
 }
 
 .cp-form-group input[type="text"],
+.cp-form-group input[type="password"],
 .cp-form-group input[type="url"],
 .cp-form-group input[type="number"],
 .cp-form-group textarea,
@@ -126,6 +127,7 @@ body.toplevel_page_carry-pod .cp-admin-wrap {
 }
 
 .cp-form-group input[type="text"]:focus,
+.cp-form-group input[type="password"]:focus,
 .cp-form-group input[type="url"]:focus,
 .cp-form-group input[type="number"]:focus,
 .cp-form-group textarea:focus,
@@ -741,7 +743,7 @@ form#cp-settings-form {
         text-align: left !important;
     }
 
-    .cp-admin-wrap * {
+    .cp-admin-wrap *:not(.button):not(button) {
         text-align: left !important;
     }
 
@@ -759,6 +761,7 @@ form#cp-settings-form {
         height: 40px !important;
         padding: 0 16px !important;
         font-size: 14px !important;
+        text-align: center !important;
     }
 
     .cp-commit-section {
@@ -774,8 +777,7 @@ form#cp-settings-form {
         justify-content: flex-start !important;
     }
 
-    .cp-commit-container input,
-    .cp-commit-container button {
+    .cp-commit-container input {
         text-align: left !important;
     }
 
@@ -945,7 +947,7 @@ form#cp-settings-form {
 
     .cp-commit-container {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
         gap: 12px;
         text-align: left;
     }
@@ -961,6 +963,11 @@ form#cp-settings-form {
     #cp-commit-message {
         width: 100%;
         max-width: 100%;
+    }
+
+    #cp-reset-commit-message {
+        width: 100% !important;
+        text-align: center !important;
     }
 
     form#cp-settings-form {
@@ -1403,6 +1410,11 @@ input[type="text"].regular-text {
     padding: 0 0 5px;
 }
 
+.cp-commit-container #cp-commit-message {
+    flex: 1;
+    min-width: 0;
+}
+
 .cp-commit-section .description {
     font-size: 13px;
     color: #646970;
@@ -1415,7 +1427,7 @@ input[type="text"].regular-text {
 /* コミットメッセージ入力欄の調整 */
 #cp-commit-message {
     flex: 1;
-    max-width: 450px;
+    max-width: 100%;
     height: 36px;
     line-height: 36px;
     padding: 0 10px;
@@ -1508,7 +1520,7 @@ input[type="text"].regular-text {
         text-align: left !important;
     }
 
-    .cp-admin-wrap * {
+    .cp-admin-wrap *:not(.button):not(button) {
         text-align: left !important;
     }
 
@@ -1533,8 +1545,7 @@ input[type="text"].regular-text {
         justify-content: flex-start !important;
     }
 
-    .cp-commit-container input,
-    .cp-commit-container button {
+    .cp-commit-container input {
         text-align: left !important;
     }
 
@@ -1627,6 +1638,16 @@ input[type="text"].regular-text {
    ボタン群のレスポンシブ対応（1267px未満）
    ======================================== */
 @media screen and (max-width: 1266px) {
+    .cp-commit-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .cp-commit-container #cp-commit-message {
+        width: 100%;
+        max-width: 100%;
+    }
+
     .cp-form-actions {
         display: flex;
         flex-direction: column;
@@ -1924,7 +1945,7 @@ input[type="text"].regular-text {
     line-height: 1.5;
     white-space: normal;
     width: max-content;
-    max-width: 280px;
+    max-width: 360px;
     z-index: 10000;
     pointer-events: none;
     opacity: 0;
@@ -1972,16 +1993,53 @@ input[type="text"].regular-text {
     vertical-align: middle;
 }
 
+/* 左端に近いツールチップは左揃えに（はみ出し防止） */
+.cp-commit-section h3 .cp-tooltip-content {
+    left: 0;
+    transform: none;
+}
+
+.cp-commit-section h3 .cp-tooltip-wrapper.show .cp-tooltip-content {
+    animation: cpTooltipFadeInLeft 0.2s ease-in-out;
+}
+
+@keyframes cpTooltipFadeInLeft {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.cp-commit-section h3 .cp-tooltip-content::after {
+    left: 9px;
+    transform: none;
+}
+
 /* ========================================
    ツールチップのレスポンシブ対応
    ======================================== */
 
-/* タブレット・スマートフォン（782px以下） */
+/* タブレット（782px以下） */
 @media screen and (max-width: 782px) {
     .cp-tooltip-content {
-        max-width: 240px;
+        max-width: 300px;
         font-size: 12px;
         padding: 8px 10px;
+        left: 0;
+        transform: none;
+    }
+
+    .cp-tooltip-content::after {
+        left: 9px;
+        transform: none;
+    }
+
+    .cp-tooltip-wrapper.show .cp-tooltip-content {
+        animation: cpTooltipFadeInLeft 0.2s ease-in-out;
     }
 
     .cp-tooltip-trigger {
@@ -1994,33 +2052,19 @@ input[type="text"].regular-text {
 /* スマートフォン（480px以下） */
 @media screen and (max-width: 480px) {
     .cp-tooltip-content {
-        max-width: 200px;
+        position: fixed;
+        top: 46px;
+        bottom: auto;
+        left: 10px !important;
+        right: 10px;
+        max-width: none;
+        width: auto;
         font-size: 11px;
-        padding: 6px 8px;
-        left: auto;
-        right: 0;
-        transform: none;
+        padding: 8px 10px;
     }
 
     .cp-tooltip-content::after {
-        left: auto;
-        right: 12px;
-        transform: none;
-    }
-
-    .cp-tooltip-wrapper.show .cp-tooltip-content {
-        animation: cpTooltipFadeIn 0.2s ease-in-out;
-    }
-
-    @keyframes cpTooltipFadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(4px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        display: none;
     }
 }
 
@@ -2035,7 +2079,8 @@ input[type="text"].regular-text {
     border-bottom: none !important;
 }
 
-#cp-cf-transform-guide {
+#cp-cf-transform-guide,
+#cp-wrangler-guide {
     margin-bottom: 20px;
 }
 

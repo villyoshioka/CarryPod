@@ -183,6 +183,7 @@ class CP_Settings {
             'generate_mati_headers' => true,
             // Cloudflare Workers設定
             'cloudflare_enabled' => false,
+            'cloudflare_use_wrangler' => false,
             'cloudflare_api_token' => '',
             'cloudflare_account_id' => '',
             'cloudflare_script_name' => '',
@@ -910,6 +911,7 @@ class CP_Settings {
             'generate_mati_headers' => true,
             // Cloudflare Workers設定
             'cloudflare_enabled' => false,
+            'cloudflare_use_wrangler' => false,
             'cloudflare_api_token' => '', // トークンもクリア
             'cloudflare_account_id' => '',
             'cloudflare_script_name' => '',
@@ -1003,7 +1005,7 @@ class CP_Settings {
             'git_local_enabled', 'git_local_work_dir', 'git_local_branch', 'git_local_push_remote',
             'git_work_dir',
             'zip_enabled', 'zip_output_path',
-            'cloudflare_enabled', 'cloudflare_account_id', 'cloudflare_script_name',
+            'cloudflare_enabled', 'cloudflare_use_wrangler', 'cloudflare_account_id', 'cloudflare_script_name',
             'gitlab_enabled', 'gitlab_project',
             'gitlab_branch_mode', 'gitlab_existing_branch', 'gitlab_new_branch', 'gitlab_base_branch',
             'gitlab_api_url',
@@ -1024,7 +1026,7 @@ class CP_Settings {
                 $boolean_keys = array(
                     'local_enabled', 'github_enabled', 'git_local_enabled', 'zip_enabled',
                     'git_local_push_remote', 'cache_enabled', 'auto_generate',
-                    'cloudflare_enabled', 'gitlab_enabled', 'netlify_enabled',
+                    'cloudflare_enabled', 'cloudflare_use_wrangler', 'gitlab_enabled', 'netlify_enabled',
                     'enable_tag_archive', 'enable_date_archive', 'enable_author_archive',
                     'enable_post_format_archive', 'enable_sitemap', 'enable_robots_txt', 'enable_llms_txt', 'enable_rss',
                     'generate_mati_headers',
@@ -1053,8 +1055,8 @@ class CP_Settings {
         // バージョン情報を更新
         $merged['version'] = CP_VERSION;
 
-        // Workersのみ有効の場合、_headers生成を無効化
-        if ( ! empty( $merged['cloudflare_enabled'] ) ) {
+        // Workersのみ有効かつWrangler未使用の場合、_headers生成を無効化
+        if ( ! empty( $merged['cloudflare_enabled'] ) && empty( $merged['cloudflare_use_wrangler'] ) ) {
             $other_destinations = array( 'github_enabled', 'gitlab_enabled', 'netlify_enabled', 'git_local_enabled', 'local_enabled', 'zip_enabled' );
             $has_other = false;
             foreach ( $other_destinations as $key ) {
