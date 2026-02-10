@@ -107,10 +107,17 @@ class CP_Admin {
         wp_enqueue_script( 'cp-admin-js', CP_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery' ), CP_VERSION . '.' . filemtime( CP_PLUGIN_DIR . 'assets/js/admin.js' ), true );
 
         // JavaScriptに渡すデータ
-        wp_localize_script( 'cp-admin-js', 'sgeData', array(
+        $js_data = array(
             'ajaxurl' => admin_url( 'admin-ajax.php' ),
             'nonce' => wp_create_nonce( 'cp_nonce' ),
-        ) );
+        );
+
+        // 設定ページではWrangler検出結果を渡す
+        if ( $hook === 'carry-pod_page_carry-pod-settings' || $hook === 'carry-pod-1_page_carry-pod-settings' ) {
+            $js_data['wranglerInfo'] = $this->detect_wrangler();
+        }
+
+        wp_localize_script( 'cp-admin-js', 'sgeData', $js_data );
     }
 
     /**
@@ -214,7 +221,7 @@ class CP_Admin {
                 <div class="cp-commit-section <?php echo ( ! empty( $settings['github_enabled'] ) || ! empty( $settings['git_local_enabled'] ) || ! empty( $settings['gitlab_enabled'] ) ) ? 'active' : ''; ?>">
                     <h3>
                         コミットメッセージ
-                        <?php echo $this->render_tooltip( 'デフォルト形式: update:YYYYMMDD_HHMMSS（例: update:20241225_143052）分かりやすいメッセージにすることで、後から履歴を見返す時に何の更新だったか分かりやすくなります' ); ?>
+                        <?php echo $this->render_tooltip( 'デフォルト: update:YYYYMMDD_HHMMSS<br>分かりやすいメッセージにすると、後から履歴を見返す時に便利です' ); ?>
                     </h3>
                     <div class="cp-section-content">
                         <div class="cp-form-group">
@@ -395,6 +402,19 @@ class CP_Admin {
                     </div>
 
                     <div id="cp-cloudflare-settings" class="cp-subsection" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="cp-form-group">
+                            <label for="cp-cloudflare-use-wrangler">
+                                Wrangler
+                                <?php echo $this->render_tooltip( 'WranglerはCloudflare公式のCLIツールです。Wranglerを使ってデプロイすると、レスポンス ヘッダー変換ルールの設定が不要になります。<br><br>LocalやMAMPなどのローカル環境やVPSなど、Node.jsをインストールできる環境では「使用する」がおすすめです。<br><br>共用レンタルサーバーなどNode.jsが使えない環境では「使用しない」を選び、Cloudflareの管理画面でレスポンス ヘッダー変換ルールを設定してください。<br><br>使用するには、WordPressが動いている環境に以下がインストールされている必要があります。<br>- Node.js<br>- Wrangler CLI（v4以上）' ); ?>
+                            </label>
+                            <select id="cp-cloudflare-use-wrangler" name="cloudflare_use_wrangler">
+                                <option value="0" <?php selected( empty( $settings['cloudflare_use_wrangler'] ) ); ?>>使用しない</option>
+                                <option value="1" <?php selected( ! empty( $settings['cloudflare_use_wrangler'] ) ); ?>>使用する</option>
+                            </select>
+                        </div>
+
+                        <div id="cp-wrangler-guide"></div>
+
                         <div class="cp-form-group">
                             <label for="cp-cloudflare-api-token">Cloudflare API Token <span class="required">*</span></label>
                             <?php
@@ -805,9 +825,9 @@ class CP_Admin {
                     </div>
                     <div id="cp-cf-transform-guide" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
                         <details class="cp-guide-details">
-                            <summary>Cloudflare Workersでのセキュリティヘッダー設定</summary>
+                            <summary>レスポンス ヘッダー変換ルールの設定が必要です</summary>
                             <div class="cp-guide-content">
-                                <p><code>_headers</code>ファイルはCloudflare Workersでは機能しません。代わりにCloudflareのレスポンスヘッダー変換ルール（<strong>Transform Rules</strong>）で以下の4つのルールを設定してください。Cloudflare WorkersではCSS/JSにContent-Typeヘッダーが付与されないため、ルール3・4を設定しないとブラウザがCSS/JSの読み込みをブロックします。</p>
+                                <p>Cloudflareの管理画面で以下の4つのレスポンス ヘッダー変換ルールを設定してください。</p>
 
                                 <h4>ルール1: セキュリティヘッダー</h4>
                                 <ul>
@@ -1191,6 +1211,7 @@ class CP_Admin {
             'minify_html' => 'boolean',
             'minify_css' => 'boolean',
             'cloudflare_enabled' => 'boolean',
+            'cloudflare_use_wrangler' => 'boolean_select',
             'gitlab_enabled' => 'boolean',
             'netlify_enabled' => 'boolean',
             // Text fields
@@ -1234,6 +1255,8 @@ class CP_Admin {
         foreach ( $allowed_fields as $field => $type ) {
             if ( $type === 'boolean' ) {
                 $settings[ $field ] = isset( $_POST[ $field ] ) ? 1 : 0;
+            } elseif ( $type === 'boolean_select' ) {
+                $settings[ $field ] = ! empty( $_POST[ $field ] ) ? 1 : 0;
             } elseif ( $type === 'text' ) {
                 $settings[ $field ] = isset( $_POST[ $field ] ) ? sanitize_text_field( wp_unslash( $_POST[ $field ] ) ) : '';
             } elseif ( $type === 'textarea' ) {
@@ -1747,6 +1770,189 @@ class CP_Admin {
             'has_error' => $has_error,
             'count' => $has_error ? intval( $error_notification['count'] ) : 0,
         ) );
+    }
+
+    /**
+     * Wrangler CLIの検出結果を取得（外部からのアクセス用）
+     *
+     * @return array 検出結果
+     */
+    public function get_wrangler_info() {
+        return $this->detect_wrangler();
+    }
+
+    /**
+     * Wrangler CLIを検出
+     *
+     * @return array 検出結果（found, path, version, needs_update）
+     */
+    private function detect_wrangler() {
+        // PATHディレクトリからwranglerの実行ファイルを直接検索（which/whereに依存しない）
+        $extended_path = $this->get_extended_path();
+        $is_windows = PHP_OS_FAMILY === 'Windows';
+        $separator = $is_windows ? ';' : ':';
+        $dirs = explode( $separator, $extended_path );
+
+        $executables = array( 'wrangler' );
+        if ( $is_windows ) {
+            $executables = array( 'wrangler.cmd', 'wrangler.exe', 'wrangler.ps1' );
+        }
+
+        $full_path = '';
+        foreach ( $dirs as $dir ) {
+            $dir = rtrim( $dir, '/\\' );
+            if ( empty( $dir ) || ! is_dir( $dir ) ) {
+                continue;
+            }
+            foreach ( $executables as $exe ) {
+                $candidate = $dir . DIRECTORY_SEPARATOR . $exe;
+                if ( ! is_file( $candidate ) ) {
+                    continue;
+                }
+                // Windowsではis_executable()が.cmdに対してfalseを返すことがあるためis_file()のみで判定
+                if ( $is_windows || is_executable( $candidate ) ) {
+                    $full_path = $candidate;
+                    break 2;
+                }
+            }
+        }
+
+        if ( empty( $full_path ) ) {
+            return array(
+                'found'        => false,
+                'path'         => '',
+                'version'      => '',
+                'needs_update' => false,
+            );
+        }
+
+        // バージョン取得
+        $descriptors = array(
+            0 => array( 'pipe', 'r' ),
+            1 => array( 'pipe', 'w' ),
+            2 => array( 'pipe', 'w' ),
+        );
+
+        $process = proc_open( escapeshellarg( $full_path ) . ' --version', $descriptors, $pipes );
+        if ( ! is_resource( $process ) ) {
+            return array(
+                'found'        => true,
+                'path'         => $full_path,
+                'version'      => '',
+                'needs_update' => false,
+            );
+        }
+
+        fclose( $pipes[0] );
+        $version_output = trim( stream_get_contents( $pipes[1] ) );
+        fclose( $pipes[1] );
+        fclose( $pipes[2] );
+        proc_close( $process );
+
+        // バージョン番号を抽出（例: "4.0.0" or "wrangler 4.0.0"）
+        if ( preg_match( '/(\d+\.\d+\.\d+)/', $version_output, $matches ) ) {
+            $version = $matches[1];
+            $major = intval( explode( '.', $version )[0] );
+
+            return array(
+                'found'        => true,
+                'path'         => $full_path,
+                'version'      => $version,
+                'needs_update' => $major < 4,
+            );
+        }
+
+        return array(
+            'found'        => true,
+            'path'         => $full_path,
+            'version'      => '',
+            'needs_update' => false,
+        );
+    }
+
+    /**
+     * Node.js/npmの一般的なインストールパスを補完したPATH文字列を取得
+     *
+     * @return string 拡張されたPATH
+     */
+    public function get_extended_path() {
+        $path = getenv( 'PATH' ) ?: '';
+        $is_windows = PHP_OS_FAMILY === 'Windows';
+
+        if ( ! $is_windows ) {
+            // Mac/Linux: Node.js/npm/pnpmの一般的なインストールパス
+            $home = getenv( 'HOME' ) ?: ( isset( $_SERVER['HOME'] ) ? $_SERVER['HOME'] : '' );
+
+            // 優先パス（PATHの先頭に追加 - nvmのNode.jsをシステムNodeより優先）
+            $priority_paths = array();
+            if ( ! empty( $home ) ) {
+                $nvm_version = $this->detect_node_version( $home );
+                if ( ! empty( $nvm_version ) ) {
+                    $priority_paths[] = $home . '/.nvm/versions/node/' . $nvm_version . '/bin';
+                }
+                $priority_paths[] = $home . '/Library/pnpm';
+                $priority_paths[] = $home . '/.local/share/pnpm';
+                $priority_paths[] = $home . '/.npm-global/bin';
+                $priority_paths[] = $home . '/.yarn/bin';
+            }
+            foreach ( array_reverse( $priority_paths ) as $extra ) {
+                if ( is_dir( $extra ) && strpos( $path, $extra ) === false ) {
+                    $path = $extra . ':' . $path;
+                }
+            }
+
+            // システムパス（PATHの末尾に追加）
+            $system_paths = array(
+                '/usr/bin',
+                '/usr/local/bin',
+                '/opt/homebrew/bin',
+            );
+            foreach ( $system_paths as $extra ) {
+                if ( is_dir( $extra ) && strpos( $path, $extra ) === false ) {
+                    $path .= ':' . $extra;
+                }
+            }
+        }
+
+        return $path;
+    }
+
+    /**
+     * proc_open用の拡張PATH環境変数配列を取得
+     *
+     * @return array proc_open用の環境変数配列
+     */
+    public function get_extended_path_env() {
+        $env = array( 'PATH' => $this->get_extended_path() );
+        $home = getenv( 'HOME' );
+        if ( $home !== false ) {
+            $env['HOME'] = $home;
+        }
+        return $env;
+    }
+
+    /**
+     * nvm管理下のNode.jsバージョンを検出
+     *
+     * @param string $home ホームディレクトリ
+     * @return string Node.jsバージョンディレクトリ名（例: v22.12.0）、見つからない場合は空文字
+     */
+    private function detect_node_version( $home ) {
+        $nvm_dir = $home . '/.nvm/versions/node';
+        if ( ! is_dir( $nvm_dir ) ) {
+            return '';
+        }
+        // 最新バージョンを取得（ディレクトリ名でソートして最後の要素）
+        $versions = @scandir( $nvm_dir );
+        if ( $versions === false ) {
+            return '';
+        }
+        $versions = array_filter( $versions, function( $v ) { return $v[0] === 'v'; } );
+        if ( empty( $versions ) ) {
+            return '';
+        }
+        usort( $versions, 'version_compare' );
+        return end( $versions );
     }
 
     /**

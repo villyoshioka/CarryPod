@@ -1909,6 +1909,11 @@ class CP_Generator {
      * Cloudflare Workers出力
      */
     private function output_to_cloudflare_workers() {
+        if ( ! empty( $this->settings['cloudflare_use_wrangler'] ) ) {
+            $this->output_to_cloudflare_wrangler();
+            return;
+        }
+
         $cloudflare = new CP_Cloudflare_Workers(
             $this->settings['cloudflare_api_token'],
             $this->settings['cloudflare_account_id'],
@@ -1935,6 +1940,207 @@ class CP_Generator {
         }
 
         $this->logger->add_log( 'Cloudflare Workers出力完了: ' . $this->settings['cloudflare_script_name'] );
+    }
+
+    /**
+     * Cloudflare Workers出力（Wrangler CLI方式）
+     */
+    private function output_to_cloudflare_wrangler() {
+        $start_time = microtime( true );
+        $this->logger->info( 'Cloudflare Workers（Wrangler）へのデプロイを開始' );
+
+        // Wrangler検出
+        $wrangler_info = CP_Admin::get_instance()->get_wrangler_info();
+
+        if ( ! $wrangler_info['found'] ) {
+            $this->logger->add_log( 'Cloudflare Workers: Wrangler CLIが見つかりません。インストールしてください。', true );
+            return;
+        }
+
+        if ( $wrangler_info['needs_update'] ) {
+            $this->logger->add_log( 'Cloudflare Workers: Wrangler v4以上が必要です（現在: v' . $wrangler_info['version'] . '）', true );
+            return;
+        }
+
+        $this->logger->debug( 'Wrangler検出: ' . $wrangler_info['path'] . ' (v' . $wrangler_info['version'] . ')' );
+
+        // 一時ディレクトリ構成: tmp/wrangler/ に wrangler.toml, worker.js を配置し、public/ にファイルをコピー
+        $wrangler_dir = $this->temp_dir . '_wrangler';
+        $public_dir = $wrangler_dir . '/public';
+
+        if ( ! wp_mkdir_p( $public_dir ) ) {
+            $this->logger->add_log( 'Cloudflare Workers: Wrangler用一時ディレクトリの作成に失敗', true );
+            return;
+        }
+
+        try {
+            // 静的ファイルをpublic/にコピー
+            $this->copy_directory_recursive( $this->temp_dir, $public_dir );
+
+            // wrangler.toml を生成
+            $wrangler_toml = sprintf(
+                "name = %s\naccount_id = %s\ncompatibility_date = \"%s\"\nmain = \"worker.js\"\nsend_metrics = false\nworkers_dev = false\npreview_urls = false\n\n[assets]\ndirectory = \"./public\"\nbinding = \"ASSETS\"\nnot_found_handling = \"404-page\"\n",
+                '"' . addcslashes( $this->settings['cloudflare_script_name'], '"\\' ) . '"',
+                '"' . addcslashes( $this->settings['cloudflare_account_id'], '"\\' ) . '"',
+                date( 'Y-m-d' )
+            );
+
+            if ( file_put_contents( $wrangler_dir . '/wrangler.toml', $wrangler_toml ) === false ) {
+                $this->logger->add_log( 'Cloudflare Workers: wrangler.tomlの生成に失敗', true );
+                $this->remove_directory( $wrangler_dir );
+                return;
+            }
+
+            // worker.js を生成
+            $worker_js = <<<'JS'
+export default {
+    async fetch(request, env) {
+        if (!env.ASSETS) {
+            return new Response('Service configuration error.', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+        }
+        const response = await env.ASSETS.fetch(request);
+        if (response.status === 404) {
+            try {
+                const url = new URL(request.url);
+                const notFoundResponse = await env.ASSETS.fetch(url.origin + '/404.html');
+                if (notFoundResponse.status === 200) {
+                    return new Response(notFoundResponse.body, { status: 404, statusText: 'Not Found', headers: notFoundResponse.headers });
+                }
+            } catch (e) {}
+        }
+        return response;
+    }
+};
+JS;
+
+            if ( file_put_contents( $wrangler_dir . '/worker.js', $worker_js ) === false ) {
+                $this->logger->add_log( 'Cloudflare Workers: worker.jsの生成に失敗', true );
+                $this->remove_directory( $wrangler_dir );
+                return;
+            }
+
+            // wrangler deploy を実行
+            $api_token = $this->settings['cloudflare_api_token'];
+
+            $env_vars = array(
+                'CLOUDFLARE_API_TOKEN'   => $api_token,
+                'WRANGLER_SEND_METRICS'  => 'false',
+            );
+
+            // proc_open でデプロイ実行
+            $descriptors = array(
+                0 => array( 'pipe', 'r' ),
+                1 => array( 'pipe', 'w' ),
+                2 => array( 'pipe', 'w' ),
+            );
+
+            $cmd = escapeshellarg( $wrangler_info['path'] ) . ' deploy';
+            $this->logger->debug( 'Wranglerコマンド: ' . $cmd );
+
+            $process = proc_open(
+                $cmd,
+                $descriptors,
+                $pipes,
+                $wrangler_dir,
+                array_merge( $this->get_env_for_proc(), $env_vars )
+            );
+
+            if ( ! is_resource( $process ) ) {
+                $this->logger->add_log( 'Cloudflare Workers: Wranglerプロセスの起動に失敗', true );
+                $this->remove_directory( $wrangler_dir );
+                return;
+            }
+
+            fclose( $pipes[0] );
+
+            // タイムアウト付きで出力を読み取り
+            stream_set_blocking( $pipes[1], false );
+            stream_set_blocking( $pipes[2], false );
+
+            $stdout = '';
+            $stderr = '';
+            $timeout = 300; // 5分
+            $start = time();
+
+            while ( true ) {
+                $status = proc_get_status( $process );
+                if ( ! $status['running'] ) {
+                    // プロセスが終了した場合、残りの出力を読み取り
+                    $stdout .= stream_get_contents( $pipes[1] );
+                    $stderr .= stream_get_contents( $pipes[2] );
+                    break;
+                }
+
+                if ( ( time() - $start ) > $timeout ) {
+                    proc_terminate( $process );
+                    proc_close( $process );
+                    fclose( $pipes[1] );
+                    fclose( $pipes[2] );
+                    $this->remove_directory( $wrangler_dir );
+                    $this->logger->add_log( 'Cloudflare Workers: デプロイがタイムアウトしました', true );
+                    return;
+                }
+
+                $stdout .= fread( $pipes[1], 8192 );
+                $stderr .= fread( $pipes[2], 8192 );
+                usleep( 100000 ); // 0.1秒
+            }
+
+            fclose( $pipes[1] );
+            fclose( $pipes[2] );
+            $return_code = proc_close( $process );
+
+            // ログ出力
+            if ( ! empty( $stdout ) ) {
+                $this->logger->debug( 'Wrangler stdout: ' . $stdout );
+            }
+            if ( ! empty( $stderr ) ) {
+                // WARNING行を抽出
+                $lines = explode( "\n", $stderr );
+                foreach ( $lines as $line ) {
+                    $line = trim( $line );
+                    if ( ! empty( $line ) && stripos( $line, 'warn' ) !== false ) {
+                        $this->logger->debug( 'Wrangler warning: ' . $line );
+                    }
+                }
+                $this->logger->debug( 'Wrangler stderr: ' . $stderr );
+            }
+
+            if ( $return_code !== 0 ) {
+                $error_msg = ! empty( $stderr ) ? $stderr : 'デプロイに失敗しました（exit code: ' . $return_code . '）';
+                $this->logger->add_log( 'Cloudflare Workers: ' . $error_msg, true );
+                $this->remove_directory( $wrangler_dir );
+                return;
+            }
+
+            $elapsed = microtime( true ) - $start_time;
+            $this->logger->info( sprintf( 'Cloudflare Workers（Wrangler）へのデプロイ完了 (%.1f秒)', $elapsed ) );
+            $this->logger->add_log( 'Cloudflare Workers出力完了: ' . $this->settings['cloudflare_script_name'] );
+
+        } finally {
+            // 一時ディレクトリを確実に削除
+            $this->remove_directory( $wrangler_dir );
+        }
+    }
+
+    /**
+     * proc_open用の環境変数を取得
+     *
+     * @return array 環境変数の配列
+     */
+    private function get_env_for_proc() {
+        // 拡張PATHを取得（Node.js/npm/pnpmの一般的なインストールパスを補完）
+        $env = CP_Admin::get_instance()->get_extended_path_env();
+
+        // 追加の環境変数を引き継ぐ
+        $extra_keys = array( 'LANG', 'LC_ALL', 'TMPDIR', 'TMP', 'TEMP', 'NODE_PATH', 'NVM_DIR' );
+        foreach ( $extra_keys as $key ) {
+            $val = getenv( $key );
+            if ( $val !== false ) {
+                $env[ $key ] = $val;
+            }
+        }
+        return $env;
     }
 
     /**
@@ -2904,10 +3110,10 @@ class CP_Generator {
             return;
         }
 
-        // Cloudflare Workersのみ有効で他の出力先がない場合は_headersを生成しない
-        // （Workers Static AssetsのDirect Upload APIでは_headersファイルが機能しないため）
+        // Cloudflare Workers（Direct Upload API）のみ有効で他の出力先がない場合は_headersを生成しない
+        // Wrangler使用時は_headersが機能するためスキップしない
         $settings = CP_Settings::get_instance()->get_settings();
-        if ( ! empty( $settings['cloudflare_enabled'] ) ) {
+        if ( ! empty( $settings['cloudflare_enabled'] ) && empty( $settings['cloudflare_use_wrangler'] ) ) {
             $other_destinations = array( 'github_enabled', 'gitlab_enabled', 'netlify_enabled', 'git_local_enabled', 'local_enabled', 'zip_enabled' );
             $has_other          = false;
             foreach ( $other_destinations as $key ) {
@@ -2943,6 +3149,7 @@ class CP_Generator {
 
             // 基本的なセキュリティヘッダー（常に出力）
             $headers_content .= "  Content-Security-Policy: frame-ancestors 'self'\n";
+            $headers_content .= "  X-Content-Type-Options: nosniff\n";
 
             // X-Robots-Tag（Matiの設定に応じて）
             $robots_tags = array();

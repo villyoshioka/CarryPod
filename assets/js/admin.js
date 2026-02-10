@@ -147,51 +147,92 @@ jQuery(document).ready(function($) {
         updateExecuteButton();
     });
 
-    // Cloudflare Workers Transform Rulesガイドの表示・_headersチェックボックス制御
-    function updateCfTransformGuide(noTransition) {
+    // Cloudflare Workers ガイド表示・_headersチェックボックス制御
+    function updateCfGuide(noTransition) {
         var cfEnabled = $('#cp-cloudflare-enabled').is(':checked');
+        var useWrangler = $('#cp-cloudflare-use-wrangler').val() === '1';
         var otherEnabled = $('#cp-github-enabled, #cp-gitlab-enabled, #cp-netlify-enabled, #cp-git-local-enabled, #cp-local-enabled, #cp-zip-enabled')
             .filter(':checked').length > 0;
 
-        // ガイド表示: Workers有効時
-        var $guide = $('#cp-cf-transform-guide');
+        var $transformGuide = $('#cp-cf-transform-guide');
         var $headersGroup = $('#cp-mati-headers').closest('.cp-form-group');
-        if (cfEnabled) {
-            if (noTransition) {
-                $guide.show();
-            } else {
-                $guide.slideDown(200);
-            }
+
+        if (cfEnabled && !useWrangler) {
+            // Direct Upload API: Transform Rulesガイドを表示
+            if (noTransition) { $transformGuide.show(); } else { $transformGuide.slideDown(200); }
             $headersGroup.addClass('cp-form-group--has-guide');
         } else {
-            if (noTransition) {
-                $guide.hide();
-            } else {
-                $guide.slideUp(200);
-            }
+            if (noTransition) { $transformGuide.hide(); } else { $transformGuide.slideUp(200); }
             $headersGroup.removeClass('cp-form-group--has-guide');
         }
 
-        // チェックボックスグレーアウト: Workersのみ有効時
+        // _headersチェックボックスグレーアウト: Workers（Direct Upload API）のみ有効時
         var $headersCheckbox = $('#cp-mati-headers');
         if ($headersCheckbox.length) {
-            var workersOnly = cfEnabled && !otherEnabled;
-            if (workersOnly) {
+            var workersOnlyDirectApi = cfEnabled && !useWrangler && !otherEnabled;
+            if (workersOnlyDirectApi) {
                 $headersCheckbox.prop('disabled', true).prop('checked', false);
             } else {
                 $headersCheckbox.prop('disabled', false);
             }
-            // ヘルプボタンも連動
-            $headersCheckbox.closest('label').find('.cp-tooltip-trigger').toggleClass('disabled', workersOnly);
+            $headersCheckbox.closest('label').find('.cp-tooltip-trigger').toggleClass('disabled', workersOnlyDirectApi);
+        }
+
+        // Wranglerガイド表示
+        var $guide = $('#cp-wrangler-guide');
+        var $wranglerGroup = $('#cp-cloudflare-use-wrangler').closest('.cp-form-group');
+        if (cfEnabled && useWrangler && sgeData.wranglerInfo) {
+            var data = sgeData.wranglerInfo;
+            var html = '';
+
+            if (!data.found) {
+                html = '<details class="cp-guide-details"' + (getAccordionState('cf-wrangler-guide') ? ' open' : '') + '>' +
+                    '<summary>Wrangler CLIのインストールが必要です</summary>' +
+                    '<div class="cp-guide-content">' +
+                    '<p>Wrangler CLIが検出できませんでした。以下のいずれかのコマンドでインストールしてください。</p>' +
+                    '<pre><code>npm install -g wrangler</code></pre>' +
+                    '<p>または</p>' +
+                    '<pre><code>pnpm add -g wrangler</code></pre>' +
+                    '<p class="description"><a href="https://developers.cloudflare.com/workers/wrangler/install-and-update/" target="_blank" rel="noopener noreferrer">Wrangler公式ドキュメント →</a></p>' +
+                    '</div></details>';
+            } else if (data.needs_update) {
+                html = '<details class="cp-guide-details"' + (getAccordionState('cf-wrangler-guide') ? ' open' : '') + '>' +
+                    '<summary>Wrangler CLIのアップデートが必要です</summary>' +
+                    '<div class="cp-guide-content">' +
+                    '<p>Wrangler v4以上が必要です（現在: v' + escapeHtml(data.version) + '）。以下のいずれかのコマンドでアップデートしてください。</p>' +
+                    '<pre><code>npm install -g wrangler@latest</code></pre>' +
+                    '<p>または</p>' +
+                    '<pre><code>pnpm add -g wrangler@latest</code></pre>' +
+                    '</div></details>';
+            }
+
+            if (html) {
+                $guide.html(html);
+                $wranglerGroup.addClass('cp-form-group--has-guide');
+                $guide.find('.cp-guide-details').on('toggle', function() {
+                    saveAllAccordionStates();
+                });
+            } else {
+                $guide.empty();
+                $wranglerGroup.removeClass('cp-form-group--has-guide');
+            }
+        } else {
+            $guide.empty();
+            $wranglerGroup.removeClass('cp-form-group--has-guide');
         }
     }
 
+    // Wranglerドロップダウンの変更を監視
+    $('#cp-cloudflare-use-wrangler').on('change', function() {
+        updateCfGuide(false);
+    });
+
     // 全出力先チェックボックスの変更を監視
     $('#cp-cloudflare-enabled, #cp-github-enabled, #cp-gitlab-enabled, #cp-netlify-enabled, #cp-git-local-enabled, #cp-local-enabled, #cp-zip-enabled')
-        .on('change', function() { updateCfTransformGuide(false); });
+        .on('change', function() { updateCfGuide(false); });
 
     // 初期状態を設定（アニメーションなし）
-    updateCfTransformGuide(true);
+    updateCfGuide(true);
 
     // Transform Rulesガイドの<details>開閉状態をLocalStorageで保持
     var $guideDetails = $('#cp-cf-transform-guide .cp-guide-details');
@@ -441,6 +482,11 @@ jQuery(document).ready(function($) {
             var $guideDetails = $('#cp-cf-transform-guide .cp-guide-details');
             if ($guideDetails.length) {
                 states['cf-transform-guide'] = $guideDetails.prop('open');
+            }
+            // Wranglerガイドの<details>開閉状態
+            var $wranglerGuideDetails = $('#cp-wrangler-guide .cp-guide-details');
+            if ($wranglerGuideDetails.length) {
+                states['cf-wrangler-guide'] = $wranglerGuideDetails.prop('open');
             }
             localStorage.setItem('cp_accordion_states', JSON.stringify(states));
         } catch (e) {
