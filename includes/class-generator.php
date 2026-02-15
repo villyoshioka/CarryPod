@@ -1370,6 +1370,9 @@ class CP_Generator {
             $this->generate_mati_headers();
         }
 
+        // .well-known/atproto-did を生成（Mati連携）
+        $this->generate_atproto_did();
+
         // サマリーログを出力
         if ( ! empty( $copied_dirs ) ) {
             $this->logger->add_log( 'アセットコピー完了: ' . implode( ', ', $copied_dirs ) );
@@ -3147,8 +3150,16 @@ JS;
             // _headers内容を生成
             $headers_content = "/*\n";
 
-            // 基本的なセキュリティヘッダー（常に出力）
-            $headers_content .= "  Content-Security-Policy: frame-ancestors 'self'\n";
+            // Content-Security-Policy: frame-ancestors
+            $frame_ancestors = "'self'";
+            $custom_domains  = isset( $mati_settings['frame_ancestors_domains'] ) ? $mati_settings['frame_ancestors_domains'] : '';
+            if ( ! empty( $custom_domains ) ) {
+                $domains = array_filter( array_map( 'trim', explode( "\n", $custom_domains ) ) );
+                if ( ! empty( $domains ) ) {
+                    $frame_ancestors .= ' ' . implode( ' ', $domains );
+                }
+            }
+            $headers_content .= "  Content-Security-Policy: frame-ancestors $frame_ancestors\n";
             $headers_content .= "  X-Content-Type-Options: nosniff\n";
 
             // X-Robots-Tag（Matiの設定に応じて）
@@ -3172,6 +3183,13 @@ JS;
                 $headers_content .= '  X-Robots-Tag: ' . implode( ', ', $robots_tags ) . "\n";
             }
 
+            // .well-known/atproto-did のContent-Type（DID設定がある場合のみ）
+            $bluesky_did = isset( $mati_settings['bluesky_did'] ) ? $mati_settings['bluesky_did'] : '';
+            if ( ! empty( $bluesky_did ) ) {
+                $headers_content .= "/.well-known/atproto-did\n";
+                $headers_content .= "  Content-Type: text/plain; charset=utf-8\n";
+            }
+
             // _headersファイルパス
             $headers_path = $this->temp_dir . '/_headers';
 
@@ -3183,6 +3201,48 @@ JS;
             }
         } catch ( Exception $e ) {
             $this->logger->add_log( '_headersファイル生成エラー: ' . $e->getMessage(), true );
+        }
+    }
+
+    /**
+     * .well-known/atproto-did ファイルを生成（Mati連携）
+     */
+    private function generate_atproto_did() {
+        if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
+            return;
+        }
+
+        try {
+            if ( ! method_exists( 'Mati_Settings', 'get_instance' ) ) {
+                return;
+            }
+
+            $mati_settings_instance = Mati_Settings::get_instance();
+
+            if ( ! method_exists( $mati_settings_instance, 'get_settings' ) ) {
+                return;
+            }
+
+            $mati_settings = $mati_settings_instance->get_settings();
+            $bluesky_did   = isset( $mati_settings['bluesky_did'] ) ? $mati_settings['bluesky_did'] : '';
+
+            if ( empty( $bluesky_did ) ) {
+                return;
+            }
+
+            $well_known_dir = $this->temp_dir . '/.well-known';
+            if ( ! is_dir( $well_known_dir ) ) {
+                mkdir( $well_known_dir, 0755, true );
+            }
+
+            $did_path = $well_known_dir . '/atproto-did';
+            if ( file_put_contents( $did_path, $bluesky_did ) === false ) {
+                $this->logger->add_log( '.well-known/atproto-did の生成に失敗', true );
+            } else {
+                $this->logger->add_log( '.well-known/atproto-did を生成しました', false );
+            }
+        } catch ( Exception $e ) {
+            $this->logger->add_log( '.well-known/atproto-did 生成エラー: ' . $e->getMessage(), true );
         }
     }
 
