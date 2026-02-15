@@ -827,7 +827,7 @@ class CP_Admin {
                         <details class="cp-guide-details">
                             <summary>レスポンス ヘッダー変換ルールの設定が必要です</summary>
                             <div class="cp-guide-content">
-                                <p>Cloudflareの管理画面で以下の4つのレスポンス ヘッダー変換ルールを設定してください。</p>
+                                <p>Cloudflareの管理画面で以下の<?php echo $this->has_mati_bluesky_did() ? '5' : '4'; ?>つのレスポンス ヘッダー変換ルールを設定してください。</p>
 
                                 <h4>ルール1: セキュリティヘッダー</h4>
                                 <ul>
@@ -837,7 +837,7 @@ class CP_Admin {
                                 <table class="cp-guide-headers-table">
                                     <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
                                     <tbody>
-                                        <tr><td><code>Content-Security-Policy</code></td><td><code>frame-ancestors 'self'</code></td></tr>
+                                        <tr><td><code>Content-Security-Policy</code></td><td><code><?php echo esc_html( $this->get_mati_frame_ancestors_value() ); ?></code></td></tr>
                                         <tr><td><code>X-Robots-Tag</code></td><td><code><?php echo esc_html( $this->get_mati_xrobots_value() ); ?></code></td></tr>
                                     </tbody>
                                 </table>
@@ -880,6 +880,21 @@ class CP_Admin {
                                         <tr><td><code>Content-Type</code></td><td><code>application/javascript; charset=utf-8</code></td></tr>
                                     </tbody>
                                 </table>
+
+                                <?php if ( $this->has_mati_bluesky_did() ) : ?>
+                                <h4>ルール5: Blueskyドメイン認証</h4>
+                                <ul>
+                                    <li>条件: <strong>カスタムフィルタ式</strong></li>
+                                    <li>式: <code>http.request.uri.path eq "/.well-known/atproto-did"</code></li>
+                                    <li>操作: <strong>静的を追加</strong></li>
+                                </ul>
+                                <table class="cp-guide-headers-table">
+                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                                    <tbody>
+                                        <tr><td><code>Content-Type</code></td><td><code>text/plain; charset=utf-8</code></td></tr>
+                                    </tbody>
+                                </table>
+                                <?php endif; ?>
 
                                 <p class="description">※ Matiの設定を変更した場合は、ルール1のX-Robots-Tagの値も更新してください。</p>
                                 <p class="description"><a href="https://developers.cloudflare.com/rules/transform/response-header-modification/" target="_blank" rel="noopener noreferrer">Cloudflare Transform Rules ドキュメント →</a></p>
@@ -2173,9 +2188,71 @@ class CP_Admin {
     }
 
     /**
+     * MatiにBluesky DIDが設定されているか確認
+     */
+    private function has_mati_bluesky_did() {
+        if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
+            return false;
+        }
+
+        try {
+            if ( ! method_exists( 'Mati_Settings', 'get_instance' ) ) {
+                return false;
+            }
+
+            $mati_settings_instance = Mati_Settings::get_instance();
+
+            if ( ! method_exists( $mati_settings_instance, 'get_settings' ) ) {
+                return false;
+            }
+
+            $mati_settings = $mati_settings_instance->get_settings();
+            return ! empty( $mati_settings['bluesky_did'] );
+        } catch ( Exception $e ) {
+            return false;
+        }
+    }
+
+    /**
+     * Mati設定からframe-ancestorsの値を取得
+     */
+    private function get_mati_frame_ancestors_value() {
+        if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
+            return "frame-ancestors 'self'";
+        }
+
+        try {
+            if ( ! method_exists( 'Mati_Settings', 'get_instance' ) ) {
+                return "frame-ancestors 'self'";
+            }
+
+            $mati_settings_instance = Mati_Settings::get_instance();
+
+            if ( ! method_exists( $mati_settings_instance, 'get_settings' ) ) {
+                return "frame-ancestors 'self'";
+            }
+
+            $mati_settings   = $mati_settings_instance->get_settings();
+            $frame_ancestors = "'self'";
+            $custom_domains  = isset( $mati_settings['frame_ancestors_domains'] ) ? $mati_settings['frame_ancestors_domains'] : '';
+
+            if ( ! empty( $custom_domains ) ) {
+                $domains = array_filter( array_map( 'trim', explode( "\n", $custom_domains ) ) );
+                if ( ! empty( $domains ) ) {
+                    $frame_ancestors .= ' ' . implode( ' ', $domains );
+                }
+            }
+
+            return 'frame-ancestors ' . $frame_ancestors;
+        } catch ( Exception $e ) {
+            return "frame-ancestors 'self'";
+        }
+    }
+
+    /**
      * Mati互換性チェック
      *
-     * Matiがインストールされており、バージョンが1.3.0未満の場合に警告を表示
+     * Matiがインストールされており、バージョンが1.7.0未満の場合に警告を表示
      */
     public function check_mati_compatibility() {
         // Matiがインストールされていない場合は何も表示しない
@@ -2185,8 +2262,8 @@ class CP_Admin {
 
         $mati_version = MATI_VERSION;
 
-        // Mati 1.3.0以降の場合は何も表示しない（正常に連携可能）
-        if ( version_compare( $mati_version, '1.3.0', '>=' ) ) {
+        // Mati 1.7.0以降の場合は何も表示しない（正常に連携可能）
+        if ( version_compare( $mati_version, '1.7.0', '>=' ) ) {
             return;
         }
 
@@ -2195,8 +2272,8 @@ class CP_Admin {
         <div class="notice notice-warning">
             <p>
                 <strong>⚠️ Mati連携</strong><br>
-                Mati 1.3.0以降にアップデートすると、双方向連携機能が有効になります。<br>
-                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 1.3.0+</small>
+                Mati 1.7.0以降にアップデートすると、すべての連携機能が有効になります。<br>
+                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 1.7.0+</small>
             </p>
         </div>
         <?php
