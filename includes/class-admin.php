@@ -892,6 +892,10 @@ class CP_Admin {
                                     <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
                                     <tbody>
                                         <tr><td><code>Content-Type</code></td><td><code>text/plain; charset=utf-8</code></td></tr>
+                                        <tr><td><code>Cache-Control</code></td><td><code>no-cache, no-store, must-revalidate</code></td></tr>
+                                        <tr><td><code>Pragma</code></td><td><code>no-cache</code></td></tr>
+                                        <tr><td><code>Expires</code></td><td><code>0</code></td></tr>
+                                        <tr><td><code>Content-Disposition</code></td><td><code>inline</code></td></tr>
                                     </tbody>
                                 </table>
                                 <?php endif; ?>

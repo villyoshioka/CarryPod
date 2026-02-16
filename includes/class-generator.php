@@ -3183,11 +3183,15 @@ JS;
                 $headers_content .= '  X-Robots-Tag: ' . implode( ', ', $robots_tags ) . "\n";
             }
 
-            // .well-known/atproto-did のContent-Type（DID設定がある場合のみ）
+            // .well-known/atproto-did のヘッダー（DID設定がある場合のみ）
             $bluesky_did = isset( $mati_settings['bluesky_did'] ) ? $mati_settings['bluesky_did'] : '';
             if ( ! empty( $bluesky_did ) ) {
                 $headers_content .= "/.well-known/atproto-did\n";
                 $headers_content .= "  Content-Type: text/plain; charset=utf-8\n";
+                $headers_content .= "  Cache-Control: no-cache, no-store, must-revalidate\n";
+                $headers_content .= "  Pragma: no-cache\n";
+                $headers_content .= "  Expires: 0\n";
+                $headers_content .= "  Content-Disposition: inline\n";
             }
 
             // _headersファイルパス
