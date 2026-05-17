@@ -9,15 +9,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CP_Asset_Detector {
 
-    /**
-     * ロガーインスタンス
-     */
-    private $logger;
+    private CP_Logger $logger;
 
-    /**
-     * 除外するファイル拡張子
-     */
-    private $exclude_extensions = array(
+    private array $exclude_extensions = array(
         'php',
         'php5',
         'php7',
@@ -28,10 +22,7 @@ class CP_Asset_Detector {
         'log',
     );
 
-    /**
-     * 含めるファイル拡張子
-     */
-    private $include_extensions = array(
+    private array $include_extensions = array(
         'css',
         'js',
         'json',
@@ -55,19 +46,11 @@ class CP_Asset_Detector {
         'xml',
     );
 
-    /**
-     * コンストラクタ
-     */
     public function __construct() {
         $this->logger = CP_Logger::get_instance();
     }
 
-    /**
-     * wp-includesアセットを検出
-     *
-     * @return array ファイルパスの配列
-     */
-    public function detect_wp_includes() {
+    public function detect_wp_includes(): array {
         $files = array();
         $wp_includes_dir = ABSPATH . 'wp-includes';
 
@@ -76,7 +59,6 @@ class CP_Asset_Detector {
             return $files;
         }
 
-        // 重要なディレクトリのみをスキャン（パフォーマンス最適化）
         $important_dirs = array(
             'css',
             'js',
@@ -99,13 +81,7 @@ class CP_Asset_Detector {
         return $files;
     }
 
-    /**
-     * テーマアセットを検出
-     *
-     * @param string $type 'parent' または 'child'
-     * @return array ファイルパスの配列
-     */
-    public function detect_theme_assets( $type = 'child' ) {
+    public function detect_theme_assets( string $type = 'child' ): array {
         $files = array();
 
         if ( $type === 'parent' ) {
@@ -125,12 +101,7 @@ class CP_Asset_Detector {
         return $files;
     }
 
-    /**
-     * プラグインアセットを検出
-     *
-     * @return array ファイルパスの配列
-     */
-    public function detect_plugin_assets() {
+    public function detect_plugin_assets(): array {
         $files = array();
         $plugins_dir = WP_PLUGIN_DIR;
 
@@ -139,7 +110,6 @@ class CP_Asset_Detector {
             return $files;
         }
 
-        // アクティブなプラグインのみをスキャン
         $active_plugins = get_option( 'active_plugins', array() );
 
         if ( is_multisite() ) {
@@ -151,8 +121,7 @@ class CP_Asset_Detector {
             $plugin_dir = dirname( $plugins_dir . '/' . $plugin );
 
             if ( is_dir( $plugin_dir ) ) {
-                // このプラグイン自体は除外
-                if ( strpos( $plugin_dir, 'carry-pod' ) !== false ) {
+                if ( str_contains( $plugin_dir, 'carry-pod' ) ) {
                     continue;
                 }
 
@@ -166,12 +135,7 @@ class CP_Asset_Detector {
         return $files;
     }
 
-    /**
-     * アップロードファイルを検出
-     *
-     * @return array ファイルパスの配列
-     */
-    public function detect_uploads() {
+    public function detect_uploads(): array {
         $files = array();
         $upload_dir = wp_upload_dir();
         $uploads_path = $upload_dir['basedir'];
@@ -188,13 +152,7 @@ class CP_Asset_Detector {
         return $files;
     }
 
-    /**
-     * ディレクトリを再帰的にスキャン
-     *
-     * @param string $dir ディレクトリパス
-     * @return array ファイルパスの配列
-     */
-    private function scan_directory( $dir ) {
+    private function scan_directory( string $dir ): array {
         $files = array();
 
         if ( ! is_dir( $dir ) ) {
@@ -214,7 +172,6 @@ class CP_Asset_Detector {
                 $filepath = $file->getPathname();
                 $extension = strtolower( pathinfo( $filepath, PATHINFO_EXTENSION ) );
 
-                // 拡張子チェック
                 if ( in_array( $extension, $this->exclude_extensions ) ) {
                     continue;
                 }
@@ -224,13 +181,11 @@ class CP_Asset_Detector {
                     continue;
                 }
 
-                // 隠しファイルを除外
                 $filename = basename( $filepath );
-                if ( strpos( $filename, '.' ) === 0 ) {
+                if ( str_starts_with( $filename, '.' ) ) {
                     continue;
                 }
 
-                // WordPressルートからの相対パス
                 $relative_path = str_replace( ABSPATH, '/', $filepath );
                 $relative_path = str_replace( '//', '/', $relative_path );
 
@@ -241,30 +196,18 @@ class CP_Asset_Detector {
         return $files;
     }
 
-    /**
-     * すべてのアセットを検出
-     *
-     * @return array ファイルパスの配列
-     */
-    public function detect_all_assets() {
+    public function detect_all_assets(): array {
         $all_files = array();
 
-        // wp-includes
         $all_files = array_merge( $all_files, $this->detect_wp_includes() );
 
-        // テーマ
         if ( is_child_theme() ) {
             $all_files = array_merge( $all_files, $this->detect_theme_assets( 'parent' ) );
         }
         $all_files = array_merge( $all_files, $this->detect_theme_assets( 'child' ) );
 
-        // プラグイン
         $all_files = array_merge( $all_files, $this->detect_plugin_assets() );
-
-        // アップロード
         $all_files = array_merge( $all_files, $this->detect_uploads() );
-
-        // 重複を削除
         $all_files = array_unique( $all_files );
 
         $this->logger->add_log( '合計 ' . count( $all_files ) . ' 個のアセットを検出しました' );

@@ -1,14 +1,14 @@
 /**
  * Carry Pod 管理画面JavaScript
- * Updated: 2025-12-22 - Footer positioning fix
  */
 
 jQuery(document).ready(function($) {
     'use strict';
 
     let progressPollInterval = null;
-    // 未保存の変更フラグ
     let hasUnsavedChanges = false;
+    var motionDuration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 120;
+    var motionDurationLong = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 200;
 
     // HTMLエスケープ関数（XSS対策）
     function escapeHtml(text) {
@@ -17,81 +17,77 @@ jQuery(document).ready(function($) {
         return div.innerHTML;
     }
 
-    // 通知表示用のヘルパー関数
     function showNotice(message, type = 'success') {
-        // 既存の通知を削除
         $('.cp-notice').remove();
 
-        // 通知タイプのクラス名を決定
-        const noticeClass = type === 'error' ? 'notice-error' : 'notice-success';
+        var noticeClass = type === 'error' ? 'notice-error' : 'notice-success';
 
-        // メッセージをエスケープしてXSS対策
-        const safeMessage = escapeHtml(message);
+        var contentHtml;
+        if (Array.isArray(message) && message.length > 1) {
+            contentHtml = '<ul class="cp-notice-list">';
+            message.forEach(function(msg) {
+                contentHtml += '<li>' + escapeHtml(msg) + '</li>';
+            });
+            contentHtml += '</ul>';
+        } else {
+            var singleMsg = Array.isArray(message) ? message[0] : message;
+            contentHtml = '<p>' + escapeHtml(singleMsg) + '</p>';
+        }
 
-        // 通知HTMLを作成
-        const $notice = $('<div class="notice cp-notice ' + noticeClass + ' is-dismissible">' +
-            '<p>' + safeMessage + '</p>' +
+        var $notice = $('<div class="notice cp-notice ' + noticeClass + ' is-dismissible">' +
+            contentHtml +
             '<button type="button" class="notice-dismiss">' +
             '<span class="screen-reader-text">この通知を無視</span>' +
             '</button>' +
             '</div>');
 
-        // 通知を追加
         if ($('.wrap h1').length > 0) {
             $('.wrap h1').first().after($notice);
         } else {
-            $('.cp-admin-wrap').prepend($notice);
+            $('.nau-admin-wrap').prepend($notice);
         }
 
-        // 自動的に5秒後にフェードアウト
+        var duration = type === 'error' ? 10000 : 5000;
         setTimeout(function() {
-            $notice.fadeOut(function() {
+            $notice.fadeOut(motionDurationLong, function() {
                 $(this).remove();
             });
-        }, 5000);
+        }, duration);
 
-        // 閉じるボタンのイベント
         $notice.find('.notice-dismiss').on('click', function() {
-            $notice.fadeOut(function() {
+            $notice.fadeOut(motionDurationLong, function() {
                 $(this).remove();
             });
         });
 
-        // ページ上部にスクロール
         $('html, body').animate({ scrollTop: 0 }, 300);
     }
 
-    // 確認ダイアログ用の関数
     function showConfirm(message, onConfirm, onCancel) {
-        // 既存の確認ダイアログを削除
-        $('.cp-confirm-dialog').remove();
+        $('.nau-confirm-dialog').remove();
 
-        // ダイアログHTMLを作成
-        const $dialog = $('<div class="cp-confirm-dialog">' +
-            '<div class="cp-confirm-overlay"></div>' +
-            '<div class="cp-confirm-box">' +
+        const $dialog = $('<div class="nau-confirm-dialog">' +
+            '<div class="nau-confirm-overlay"></div>' +
+            '<div class="nau-confirm-box">' +
             '<h3>確認</h3>' +
             '<p>' + message + '</p>' +
-            '<div class="cp-confirm-buttons">' +
-            '<button class="button button-primary cp-confirm-yes">はい</button>' +
-            '<button class="button cp-confirm-no">いいえ</button>' +
+            '<div class="nau-confirm-buttons">' +
+            '<button class="button button-primary nau-confirm-yes">はい</button>' +
+            '<button class="button nau-confirm-no">いいえ</button>' +
             '</div>' +
             '</div>' +
             '</div>');
 
-        // ダイアログを追加
         $('body').append($dialog);
 
-        // はいボタンのイベント
-        $dialog.find('.cp-confirm-yes').on('click', function() {
+        $dialog.find('.nau-confirm-yes').on('click', function() {
             $dialog.remove();
             if (typeof onConfirm === 'function') {
                 onConfirm();
             }
         });
 
-        // いいえボタンのイベント
-        $dialog.find('.cp-confirm-no, .cp-confirm-overlay').on('click', function() {
+        $dialog.find('.nau-confirm-no, .nau-confirm-overlay').on('click', function() {
             $dialog.remove();
             if (typeof onCancel === 'function') {
                 onCancel();
@@ -99,55 +95,63 @@ jQuery(document).ready(function($) {
         });
     }
 
-    // チェックボックスの連動
     $('#cp-github-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-github-settings').slideDown(200);
+            $('#cp-github-settings').slideDown(motionDurationLong);
         } else {
-            $('#cp-github-settings').slideUp(200);
+            $('#cp-github-settings').slideUp(motionDurationLong);
         }
         updateExecuteButton();
     });
 
     $('#cp-git-local-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-git-local-settings').slideDown(200);
+            $('#cp-git-local-settings').slideDown(motionDurationLong);
         } else {
-            $('#cp-git-local-settings').slideUp(200);
+            $('#cp-git-local-settings').slideUp(motionDurationLong);
         }
         updateExecuteButton();
     });
 
     $('#cp-local-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-local-settings').slideDown(200);
+            $('#cp-local-settings').slideDown(motionDurationLong);
         } else {
-            $('#cp-local-settings').slideUp(200);
+            $('#cp-local-settings').slideUp(motionDurationLong);
         }
         updateExecuteButton();
     });
 
-    // ZIP出力チェックボックスの連動
     $('#cp-zip-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-zip-settings').slideDown(200);
+            $('#cp-zip-settings').slideDown(motionDurationLong);
         } else {
-            $('#cp-zip-settings').slideUp(200);
+            $('#cp-zip-settings').slideUp(motionDurationLong);
         }
         updateExecuteButton();
     });
 
-    // Cloudflare出力チェックボックスの連動
+    $('#cp-zip-mode').on('change', function() {
+        if ($(this).val() === 'local') {
+            $('#cp-zip-local-settings').slideDown(motionDurationLong);
+        } else {
+            $('#cp-zip-local-settings').slideUp(motionDurationLong);
+        }
+    });
+
     $('#cp-cloudflare-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-cloudflare-settings').slideDown(200);
+            $('#cp-cloudflare-settings').slideDown(motionDurationLong);
         } else {
-            $('#cp-cloudflare-settings').slideUp(200);
+            $('#cp-cloudflare-settings').slideUp(motionDurationLong);
         }
         updateExecuteButton();
     });
 
-    // Cloudflare Workers ガイド表示・_headersチェックボックス制御
+    $('input[name="auto_generate"]').on('change', function() {
+        updateExecuteButton();
+    });
+
     function updateCfGuide(noTransition) {
         var cfEnabled = $('#cp-cloudflare-enabled').is(':checked');
         var useWrangler = $('#cp-cloudflare-use-wrangler').val() === '1';
@@ -155,15 +159,11 @@ jQuery(document).ready(function($) {
             .filter(':checked').length > 0;
 
         var $transformGuide = $('#cp-cf-transform-guide');
-        var $headersGroup = $('#cp-mati-headers').closest('.cp-form-group');
 
         if (cfEnabled && !useWrangler) {
-            // Direct Upload API: Transform Rulesガイドを表示
-            if (noTransition) { $transformGuide.show(); } else { $transformGuide.slideDown(200); }
-            $headersGroup.addClass('cp-form-group--has-guide');
+            if (noTransition) { $transformGuide.show(); } else { $transformGuide.slideDown(motionDurationLong); }
         } else {
-            if (noTransition) { $transformGuide.hide(); } else { $transformGuide.slideUp(200); }
-            $headersGroup.removeClass('cp-form-group--has-guide');
+            if (noTransition) { $transformGuide.hide(); } else { $transformGuide.slideUp(motionDurationLong); }
         }
 
         // _headersチェックボックスグレーアウト: Workers（Direct Upload API）のみ有効時
@@ -175,99 +175,98 @@ jQuery(document).ready(function($) {
             } else {
                 $headersCheckbox.prop('disabled', false);
             }
-            $headersCheckbox.closest('label').find('.cp-tooltip-trigger').toggleClass('disabled', workersOnlyDirectApi);
+            $headersCheckbox.closest('label').find('.nau-tooltip-trigger').toggleClass('disabled', workersOnlyDirectApi);
         }
 
-        // Wranglerガイド表示
         var $guide = $('#cp-wrangler-guide');
-        var $wranglerGroup = $('#cp-cloudflare-use-wrangler').closest('.cp-form-group');
         if (cfEnabled && useWrangler && sgeData.wranglerInfo) {
             var data = sgeData.wranglerInfo;
             var html = '';
 
             if (!data.found) {
                 html = '<details class="cp-guide-details"' + (getAccordionState('cf-wrangler-guide') ? ' open' : '') + '>' +
-                    '<summary>Wrangler CLIのインストールが必要です</summary>' +
+                    '<summary>Wranglerが見つかりません</summary>' +
                     '<div class="cp-guide-content">' +
-                    '<p>Wrangler CLIが検出できませんでした。以下のいずれかのコマンドでインストールしてください。</p>' +
+                    '<p>サーバーにWrangler CLIが入っていないようです。</p>' +
+                    '<p>以下のコマンドでインストールできます。</p>' +
                     '<pre><code>npm install -g wrangler</code></pre>' +
-                    '<p>または</p>' +
-                    '<pre><code>pnpm add -g wrangler</code></pre>' +
+                    '<p class="description">インストールできない環境では「使用しない」に切り替えてください。</p>' +
                     '<p class="description"><a href="https://developers.cloudflare.com/workers/wrangler/install-and-update/" target="_blank" rel="noopener noreferrer">Wrangler公式ドキュメント →</a></p>' +
                     '</div></details>';
             } else if (data.needs_update) {
                 html = '<details class="cp-guide-details"' + (getAccordionState('cf-wrangler-guide') ? ' open' : '') + '>' +
-                    '<summary>Wrangler CLIのアップデートが必要です</summary>' +
+                    '<summary>Wranglerのアップデートが必要です</summary>' +
                     '<div class="cp-guide-content">' +
-                    '<p>Wrangler v4以上が必要です（現在: v' + escapeHtml(data.version) + '）。以下のいずれかのコマンドでアップデートしてください。</p>' +
+                    '<p>現在のバージョンは v' + escapeHtml(data.version) + ' です。</p>' +
+                    '<p>v4以上へ更新してください。</p>' +
                     '<pre><code>npm install -g wrangler@latest</code></pre>' +
-                    '<p>または</p>' +
-                    '<pre><code>pnpm add -g wrangler@latest</code></pre>' +
                     '</div></details>';
             }
 
             if (html) {
                 $guide.html(html);
-                $wranglerGroup.addClass('cp-form-group--has-guide');
+                syncWranglerGuideWidth();
                 $guide.find('.cp-guide-details').on('toggle', function() {
                     saveAllAccordionStates();
                 });
+                $('#cp-cloudflare-use-wrangler').css({
+                    'border-bottom-left-radius': '0',
+                    'border-bottom-right-radius': '0'
+                });
             } else {
                 $guide.empty();
-                $wranglerGroup.removeClass('cp-form-group--has-guide');
+                $('#cp-cloudflare-use-wrangler').css({
+                    'border-bottom-left-radius': '',
+                    'border-bottom-right-radius': ''
+                });
             }
         } else {
             $guide.empty();
-            $wranglerGroup.removeClass('cp-form-group--has-guide');
+            $('#cp-cloudflare-use-wrangler').css({
+                'border-bottom-left-radius': '',
+                'border-bottom-right-radius': ''
+            });
         }
     }
 
-    // Wranglerドロップダウンの変更を監視
+    function syncWranglerGuideWidth() {
+        var $select = $('#cp-cloudflare-use-wrangler');
+        var $details = $('#cp-wrangler-guide .cp-guide-details');
+        if ($details.length && $select.length) {
+            $details.css('width', $select.outerWidth() + 'px');
+        }
+    }
+
+    $(window).on('resize', syncWranglerGuideWidth);
+
     $('#cp-cloudflare-use-wrangler').on('change', function() {
         updateCfGuide(false);
     });
 
-    // 全出力先チェックボックスの変更を監視
     $('#cp-cloudflare-enabled, #cp-github-enabled, #cp-gitlab-enabled, #cp-netlify-enabled, #cp-git-local-enabled, #cp-local-enabled, #cp-zip-enabled')
         .on('change', function() { updateCfGuide(false); });
 
-    // 初期状態を設定（アニメーションなし）
     updateCfGuide(true);
 
-    // Transform Rulesガイドの<details>開閉状態をLocalStorageで保持
-    var $guideDetails = $('#cp-cf-transform-guide .cp-guide-details');
-    if ($guideDetails.length) {
-        // 復元
-        if (getAccordionState('cf-transform-guide')) {
-            $guideDetails.attr('open', '');
-        }
-        // 変更を監視
-        $guideDetails.on('toggle', function() {
-            // saveAllAccordionStatesで一括保存されるため、ここでは何もしない
-        });
-    }
 
-    // GitLab出力チェックボックスの連動
     $('#cp-gitlab-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-gitlab-settings').slideDown(200);
+            $('#cp-gitlab-settings').slideDown(motionDurationLong);
         } else {
-            $('#cp-gitlab-settings').slideUp(200);
+            $('#cp-gitlab-settings').slideUp(motionDurationLong);
         }
         updateExecuteButton();
     });
 
-    // Netlify出力チェックボックスの連動
     $('#cp-netlify-enabled').on('change', function() {
         if ($(this).is(':checked')) {
-            $('#cp-netlify-settings').slideDown(200);
+            $('#cp-netlify-settings').slideDown(motionDurationLong);
         } else {
-            $('#cp-netlify-settings').slideUp(200);
+            $('#cp-netlify-settings').slideUp(motionDurationLong);
         }
         updateExecuteButton();
     });
 
-    // ブランチモードのラジオボタン連動（GitHub）
     const $branchModeRadio = $('input[name="github_branch_mode"]');
     if ($branchModeRadio.length > 0) {
         $branchModeRadio.on('change', function() {
@@ -282,7 +281,6 @@ jQuery(document).ready(function($) {
         });
     }
 
-    // ブランチモードのラジオボタン連動（GitLab）
     const $gitlabBranchModeRadio = $('input[name="gitlab_branch_mode"]');
     if ($gitlabBranchModeRadio.length > 0) {
         $gitlabBranchModeRadio.on('change', function() {
@@ -297,7 +295,6 @@ jQuery(document).ready(function($) {
         });
     }
 
-    // 実行ボタンの有効/無効を更新
     function updateExecuteButton() {
         const $githubCheckbox = $('#cp-github-enabled');
         const $gitLocalCheckbox = $('#cp-git-local-enabled');
@@ -307,10 +304,12 @@ jQuery(document).ready(function($) {
         const $commitSection = $('.cp-commit-section');
         const $commitMessage = $('#cp-commit-message');
 
-        // チェックボックスが存在しない場合（実行画面）は初期状態を維持
         if ($githubCheckbox.length === 0 && $gitLocalCheckbox.length === 0 && $localCheckbox.length === 0) {
-            // 実行画面では、PHPで設定された初期状態（activeクラス）を維持
-            // コミットメッセージの有無だけチェック
+            if (sgeData.settingsError) {
+                $executeButton.prop('disabled', true);
+                return;
+            }
+            // 実行画面ではPHPで設定された初期状態を維持し、コミットメッセージの有無だけチェック
             if ($commitSection.hasClass('active')) {
                 if ($commitMessage.val() && $commitMessage.val().trim() !== '') {
                     $executeButton.addClass('has-commit-message');
@@ -321,26 +320,23 @@ jQuery(document).ready(function($) {
             return;
         }
 
-        // 設定画面での動作
         const githubEnabled = $githubCheckbox.is(':checked');
         const gitLocalEnabled = $gitLocalCheckbox.is(':checked');
         const localEnabled = $localCheckbox.is(':checked');
         const gitlabEnabled = $gitlabCheckbox.is(':checked');
 
-        // 出力先が選択されていなくても静的化は実行可能（デフォルトで有効）
+        const autoGenerate = $('input[name="auto_generate"]').is(':checked');
 
-        // GitHub出力またはローカルGit出力またはGitLab出力が有効な場合はコミットメッセージセクションを表示
-        if (githubEnabled || gitLocalEnabled || gitlabEnabled) {
+        // Git出力が有効かつ自動実行が無効な場合はコミットメッセージセクションを表示
+        if ((githubEnabled || gitLocalEnabled || gitlabEnabled) && !autoGenerate) {
             $commitSection.addClass('active');
             $executeButton.addClass('commit-required');
 
-            // コミットメッセージの有無をクラスで管理（ボタンは常に有効）
             if ($commitMessage.val() && $commitMessage.val().trim() !== '') {
                 $executeButton.addClass('has-commit-message');
             } else {
                 $executeButton.removeClass('has-commit-message');
             }
-            // ボタンは常に有効
             $executeButton.prop('disabled', false);
         } else {
             $commitSection.removeClass('active');
@@ -353,30 +349,26 @@ jQuery(document).ready(function($) {
      * アコーディオン機能の初期化
      */
     function initAccordions() {
-        const accordions = document.querySelectorAll('.cp-accordion-section');
+        const accordions = document.querySelectorAll('.nau-accordion-section');
 
         accordions.forEach(function(accordion) {
-            const header = accordion.querySelector('.cp-accordion-header');
-            const content = accordion.querySelector('.cp-accordion-content');
+            const header = accordion.querySelector('.nau-accordion-header');
+            const content = accordion.querySelector('.nau-accordion-content');
             const sectionId = accordion.dataset.section;
 
             if (!header || !content) return;
 
-            // LocalStorageから状態を取得
             const savedState = getAccordionState(sectionId);
             const isExpanded = savedState !== null ? savedState : getDefaultState(sectionId);
 
-            // 初期状態を設定（アニメーションなし）
             // トランジションを一時的に無効化
-            content.classList.add('cp-no-transition');
+            content.classList.add('nau-no-transition');
             setAccordionState(header, content, isExpanded, true);
 
-            // 次のフレームでトランジションを再有効化
             requestAnimationFrame(function() {
-                content.classList.remove('cp-no-transition');
+                content.classList.remove('nau-no-transition');
             });
 
-            // クリックイベント
             header.addEventListener('click', function() {
                 const currentState = header.getAttribute('aria-expanded') === 'true';
                 const newState = !currentState;
@@ -385,7 +377,6 @@ jQuery(document).ready(function($) {
                 // LocalStorageへの保存はフォーム保存時のみ行う
             });
 
-            // キーボード操作（Enter/Space）
             header.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
@@ -407,18 +398,16 @@ jQuery(document).ready(function($) {
         $content.attr('aria-hidden', !isExpanded);
 
         if (noTransition) {
-            // 初期表示時: トランジションなしで即座に状態を設定
             if (isExpanded) {
                 $content.show();
             } else {
                 $content.hide();
             }
         } else {
-            // ユーザー操作時: jQueryのslideアニメーション
             if (isExpanded) {
-                $content.slideDown(200);
+                $content.slideDown(motionDuration);
             } else {
-                $content.slideUp(200);
+                $content.slideUp(motionDuration);
             }
         }
     }
@@ -472,17 +461,11 @@ jQuery(document).ready(function($) {
     function saveAllAccordionStates() {
         try {
             const states = {};
-            $('.cp-accordion-header').each(function() {
-                // data-section属性は親の.cp-accordion-sectionにある
-                const sectionId = $(this).closest('.cp-accordion-section').data('section');
+            $('.nau-accordion-header').each(function() {
+                const sectionId = $(this).closest('.nau-accordion-section').data('section');
                 const isExpanded = $(this).attr('aria-expanded') === 'true';
                 states[sectionId] = isExpanded;
             });
-            // Transform Rulesガイドの<details>開閉状態
-            var $guideDetails = $('#cp-cf-transform-guide .cp-guide-details');
-            if ($guideDetails.length) {
-                states['cf-transform-guide'] = $guideDetails.prop('open');
-            }
             // Wranglerガイドの<details>開閉状態
             var $wranglerGuideDetails = $('#cp-wrangler-guide .cp-guide-details');
             if ($wranglerGuideDetails.length) {
@@ -494,15 +477,12 @@ jQuery(document).ready(function($) {
         }
     }
 
-    // コミットメッセージ入力欄の監視
     $('#cp-commit-message').on('input change', function() {
         const $executeButton = $('#cp-execute-button');
         const $githubCheckbox = $('#cp-github-enabled');
         const $commitSection = $('.cp-commit-section');
 
-        // 実行画面の場合（チェックボックスが存在しない）
         if ($githubCheckbox.length === 0) {
-            // コミットセクションがactiveの場合のみ処理
             if ($commitSection.hasClass('active')) {
                 if ($(this).val() && $(this).val().trim() !== '') {
                     $executeButton.addClass('has-commit-message');
@@ -513,7 +493,6 @@ jQuery(document).ready(function($) {
             return;
         }
 
-        // 設定画面の場合
         const githubEnabled = $githubCheckbox.is(':checked');
         if (githubEnabled) {
             if ($(this).val() && $(this).val().trim() !== '') {
@@ -521,12 +500,10 @@ jQuery(document).ready(function($) {
             } else {
                 $executeButton.removeClass('has-commit-message');
             }
-            // GitHub有効時でも、コミットメッセージが空でも実行可能にする（サーバー側でデフォルト値を設定）
             $executeButton.prop('disabled', false);
         }
     });
 
-    // コミットメッセージのリセット
     $('#cp-reset-commit-message').on('click', function() {
         const $commitMessage = $('#cp-commit-message');
         if ($commitMessage.length === 0) {
@@ -542,17 +519,14 @@ jQuery(document).ready(function($) {
         const defaultMessage = 'update:' + year + month + day + '_' + hours + minutes + seconds;
         $commitMessage.val(defaultMessage);
 
-        // ボタンの状態を更新
         updateExecuteButton();
     });
 
-    // 静的化を中止
     $('#cp-cancel-button').on('click', function(e) {
         e.preventDefault();
 
         const $button = $(this);
 
-        // 確認ダイアログを表示
         showConfirm('静的化の実行を中止しますか？', function() {
             $button.prop('disabled', true).text('中止中...');
 
@@ -564,21 +538,17 @@ jQuery(document).ready(function($) {
                     nonce: sgeData.nonce
                 },
                 success: function(response) {
-                    console.log('キャンセル成功:', response);
                     if (response.success) {
                         showNotice(response.data.message, 'success');
 
-                        // ボタンを元に戻す
                         $('#cp-execute-button').prop('disabled', false).text('静的化を実行');
                         $('#cp-cancel-button').prop('disabled', true).text('実行中止');
                         $('#cp-download-log').prop('disabled', false);
 
-                        // 進捗をリセット
                         $('#cp-progress-bar').css('width', '0%');
                         $('#cp-progress-percentage').text('0%');
                         $('#cp-progress-status').text('待機中...');
 
-                        // ポーリングを停止
                         stopProgressPolling();
 
                         updateExecuteButton();
@@ -595,23 +565,18 @@ jQuery(document).ready(function($) {
                 }
             });
         }, function() {
-            // キャンセル時は何もしない
         });
     });
 
-    // 静的化を実行
     $('#cp-execute-button').on('click', function(e) {
         e.preventDefault();
 
         const $button = $(this);
 
-        // 既に無効化されている場合は何もしない（二重実行防止）
         if ($button.prop('disabled')) {
-            console.log('ボタンが既に無効化されているため、処理をスキップします');
             return false;
         }
 
-        // sgeDataが定義されているかチェック
         if (typeof sgeData === 'undefined') {
             console.error('sgeDataが未定義です。JavaScriptの読み込みに問題がある可能性があります。');
             showNotice('JavaScriptの読み込みエラーが発生しました。ページを再読み込みしてください。', 'error');
@@ -622,21 +587,14 @@ jQuery(document).ready(function($) {
         const githubEnabled = $('#cp-github-enabled').is(':checked');
         let commitMessage = '';
 
-        // GitHub出力が有効な場合のみコミットメッセージを取得（空でもOK、サーバー側でデフォルト値を設定）
+        // コミットメッセージが空でもサーバー側でデフォルト値が自動設定される
         if (githubEnabled && $commitMessage.length > 0) {
             commitMessage = $commitMessage.val();
-            // 空の場合でもエラーにせず、サーバー側でデフォルト値が自動設定される
         }
 
-        // 進捗セクションは常に表示されているため、activeクラスの追加は不要
-
         $button.prop('disabled', true).text('静的化中...');
-
-        console.log('静的化を実行します', {
-            url: sgeData.ajaxurl,
-            nonce: sgeData.nonce,
-            commit_message: commitMessage
-        });
+        $('#cp-import-settings').prop('disabled', true);
+        $('#cp-reset-commit-message').prop('disabled', true);
 
         $.ajax({
             url: sgeData.ajaxurl,
@@ -647,14 +605,10 @@ jQuery(document).ready(function($) {
                 commit_message: commitMessage
             },
             success: function(response) {
-                console.log('AJAX成功:', response);
                 if (response.success) {
-                    // 停止ボタンを有効化
                     $('#cp-cancel-button').prop('disabled', false).text('実行中止');
 
-                    // 進捗のポーリングを開始
                     startProgressPolling();
-                    // Action Schedulerのタスクが開始されるまで少し待機してから進捗チェック
                     setTimeout(function() {
                         loadProgress();
                     }, 500);
@@ -674,7 +628,6 @@ jQuery(document).ready(function($) {
         });
     });
 
-    // 進捗を読み込み
     function loadProgress() {
         $.ajax({
             url: sgeData.ajaxurl,
@@ -684,43 +637,33 @@ jQuery(document).ready(function($) {
                 nonce: sgeData.nonce
             },
             success: function(response) {
-                console.log('進捗情報を取得:', response);
                 if (response.success) {
                     const progress = response.data.progress;
                     const isRunning = response.data.is_running;
                     const $progressSection = $('.cp-progress-section');
 
-                    console.log('進捗状態:', {
-                        isRunning: isRunning,
-                        progress: progress,
-                        percentage: progress.percentage,
-                        current: progress.current,
-                        total: progress.total
-                    });
-
-                    // 進捗セクションを表示
                     if (isRunning || progress.total > 0) {
                         $progressSection.addClass('active');
                     }
 
-                    // プログレスバーを更新
                     $('#cp-progress-bar').css('width', progress.percentage + '%');
                     $('#cp-progress-percentage').text(progress.percentage + '%');
 
-                    // 実行中でなければボタンを有効化
                     if (!isRunning) {
-                        console.log('実行中ではないため、ボタンを有効化します');
                         $('#cp-execute-button').prop('disabled', false).text('静的化を実行');
                         $('#cp-cancel-button').prop('disabled', true).text('実行中止');
                         $('#cp-download-log').prop('disabled', false);
+                        $('#cp-import-settings').prop('disabled', false);
+                        $('#cp-reset-commit-message').prop('disabled', false);
                         stopProgressPolling();
 
-                        // ボタンの状態を更新（GitHub有効時のコミットメッセージチェック含む）
                         updateExecuteButton();
 
-                        // 完了時は100%に設定
                         if (progress.percentage === 100 && progress.current === progress.total && progress.total > 0) {
-                            // エラー通知があるか確認
+                            if (response.data.zip_download_available) {
+                                window.location.href = sgeData.ajaxurl + '?action=cp_download_zip&nonce=' + encodeURIComponent(sgeData.nonce);
+                            }
+
                             $.ajax({
                                 url: sgeData.ajaxurl,
                                 type: 'POST',
@@ -743,10 +686,8 @@ jQuery(document).ready(function($) {
                             $('#cp-progress-status').text('待機中...');
                         }
                     } else {
-                        // 実行中の場合は進捗セクションを表示
                         $progressSection.addClass('active');
 
-                        // 実行中の場合はステータスメッセージと進捗を表示
                         let statusMessage = progress.status || '処理中...';
                         if (progress.current > 0 && progress.total > 0) {
                             statusMessage += ' (' + progress.current + ' / ' + progress.total + ' 完了)';
@@ -759,7 +700,6 @@ jQuery(document).ready(function($) {
         });
     }
 
-    // 進捗のポーリングを開始
     function startProgressPolling() {
         if (progressPollInterval) {
             return;
@@ -767,7 +707,6 @@ jQuery(document).ready(function($) {
         progressPollInterval = setInterval(loadProgress, 1000); // 1秒間隔
     }
 
-    // 進捗のポーリングを停止
     function stopProgressPolling() {
         if (progressPollInterval) {
             clearInterval(progressPollInterval);
@@ -775,7 +714,12 @@ jQuery(document).ready(function($) {
         }
     }
 
-    // 設定を保存
+    $('#cp-settings-form').on('keydown', 'input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]), textarea, select', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+        }
+    });
+
     $('#cp-settings-form').on('submit', function(e) {
         e.preventDefault();
 
@@ -787,9 +731,8 @@ jQuery(document).ready(function($) {
             data: formData + '&action=cp_save_settings&nonce=' + sgeData.nonce,
             success: function(response) {
                 if (response.success) {
-                    // 保存成功時は未保存フラグをクリア
                     hasUnsavedChanges = false;
-                    // 設定保存成功時にアコーディオンの状態をLocalStorageに保存
+                    // アコーディオンの状態をLocalStorageに保存
                     saveAllAccordionStates();
 
                     showNotice(response.data.message, 'success');
@@ -797,7 +740,7 @@ jQuery(document).ready(function($) {
                         location.reload();
                     }, 1000);
                 } else {
-                    showNotice(response.data.message, 'error');
+                    showNotice(response.data.messages || response.data.message, 'error');
                 }
             },
             error: function() {
@@ -806,7 +749,6 @@ jQuery(document).ready(function($) {
         });
     });
 
-    // 設定をリセット
     $('#cp-reset-settings').on('click', function() {
         showConfirm('設定をリセットしますか？', function() {
             $.ajax({
@@ -818,9 +760,8 @@ jQuery(document).ready(function($) {
                 },
                 success: function(response) {
                     if (response.success) {
-                        // リセット成功時は未保存フラグをクリア（リロード前に）
                         hasUnsavedChanges = false;
-                        // 設定リセット時にアコーディオンの状態もリセット
+                        // アコーディオンの状態もリセット
                         localStorage.removeItem('cp_accordion_states');
 
                         showNotice(response.data.message, 'success');
@@ -838,7 +779,6 @@ jQuery(document).ready(function($) {
         });
     });
 
-    // キャッシュをクリア
     $('#cp-clear-cache').on('click', function() {
         const $button = $(this);
         showConfirm('キャッシュをクリアしますか？', function() {
@@ -867,7 +807,6 @@ jQuery(document).ready(function($) {
         });
     });
 
-    // ログをクリア
     $('#cp-clear-logs').on('click', function() {
         const $button = $(this);
         showConfirm('ログをクリアしますか？', function() {
@@ -896,10 +835,12 @@ jQuery(document).ready(function($) {
         });
     });
 
-    // Scheduled Actionsをリセット
     $('#cp-reset-scheduler').on('click', function() {
         const $button = $(this);
-        showConfirm('Scheduled Actionsをリセットしますか？すべてのスケジュールされたタスクが削除されます。', function() {
+        const confirmMsg = sgeData.isRunning
+            ? '⚠ 静的化を実行中です。Scheduled Actionsをリセットすると実行中のタスクがすべて中断されます。本当にリセットしますか？'
+            : 'Scheduled Actionsをリセットしますか？すべてのスケジュールされたタスクが削除されます。';
+        showConfirm(confirmMsg, function() {
             $button.prop('disabled', true).text('リセット中...');
 
             $.ajax({
@@ -923,14 +864,10 @@ jQuery(document).ready(function($) {
                 }
             });
         }, function() {
-            // キャンセル時は何もしない
         });
     });
 
-    // ログをダウンロード
     $('#cp-download-log').on('click', function() {
-        console.log('ログダウンロードボタンがクリックされました');
-
         const $button = $(this);
         $button.prop('disabled', true).text('ダウンロード中...');
 
@@ -942,11 +879,8 @@ jQuery(document).ready(function($) {
                 nonce: sgeData.nonce
             },
             success: function(response) {
-                console.log('AJAX成功:', response);
-
                 if (response.success) {
                     try {
-                        // テキストファイルとしてダウンロード
                         const blob = new Blob([response.data.log], { type: 'text/plain; charset=utf-8' });
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
@@ -956,7 +890,6 @@ jQuery(document).ready(function($) {
                         a.click();
                         document.body.removeChild(a);
                         URL.revokeObjectURL(url);
-                        console.log('ログのダウンロードが完了しました');
                     } catch (error) {
                         console.error('ダウンロード処理でエラー:', error);
                         showNotice('ダウンロード処理でエラーが発生しました: ' + error.message, 'error');
@@ -975,7 +908,6 @@ jQuery(document).ready(function($) {
         });
     });
 
-    // 設定をエクスポート
     $('#cp-export-settings').on('click', function() {
         $.ajax({
             url: sgeData.ajaxurl,
@@ -1005,7 +937,6 @@ jQuery(document).ready(function($) {
         });
     });
 
-    // 設定をインポート
     $('#cp-import-settings').on('click', function() {
         $('#cp-import-file').click();
     });
@@ -1034,7 +965,6 @@ jQuery(document).ready(function($) {
                 },
                 success: function(response) {
                     if (response.success) {
-                        // インポート成功時は未保存フラグをクリア（リロード前に）
                         hasUnsavedChanges = false;
                         alert(response.data.message);
                         location.reload();
@@ -1049,27 +979,20 @@ jQuery(document).ready(function($) {
         };
         reader.readAsText(file);
 
-        // ファイル選択をリセット
         $(this).val('');
     });
 
-    // 初期表示時に進捗を読み込み（実行ページの場合）
     if ($('#cp-progress-bar').length > 0) {
         loadProgress();
         startProgressPolling();
     }
 
-    // アコーディオンを初期化
     initAccordions();
 
-    // ========================================
-    // 設定フォームの変更を監視（離脱確認用）
-    // ========================================
     $('#cp-settings-form').on('change', 'input, textarea, select', function() {
         hasUnsavedChanges = true;
     });
 
-    // ページ離脱時の確認ダイアログ
     $(window).on('beforeunload', function(e) {
         if (hasUnsavedChanges) {
             const message = '変更が保存されていません。このページを離れますか？';
@@ -1078,94 +1001,53 @@ jQuery(document).ready(function($) {
         }
     });
 
-    // 初期化時に実行ボタンの状態を更新
     updateExecuteButton();
 
-    // ページ読み込み時にGitHub設定が有効な場合、コミットメッセージにデフォルト値を設定
     if ($('#cp-github-enabled').is(':checked') && $('#cp-commit-message').length > 0) {
         const $commitMessage = $('#cp-commit-message');
         if (!$commitMessage.val()) {
-            // デフォルトメッセージを設定
             $('#cp-reset-commit-message').trigger('click');
         }
     }
 
-    // ========================================
-    // ベースURL説明文の切り替え制御
-    // ========================================
-
-    function toggleBaseUrlDescription() {
-        const urlMode = $('#cp-url-mode').val();
-        const $descAbsolute = $('#cp-base-url-description-absolute');
-        const $descRelative = $('#cp-base-url-description-relative');
-
-        if (urlMode === 'absolute') {
-            $descAbsolute.show();
-            $descRelative.hide();
-        } else {
-            $descAbsolute.hide();
-            $descRelative.show();
-        }
-    }
-
-    // 初期表示時の制御
-    toggleBaseUrlDescription();
-
-    // URL形式の変更を監視
-    $('#cp-url-mode').on('change', function() {
-        toggleBaseUrlDescription();
-    });
-
-    // ========================================
-    // ツールチップ機能
-    // ========================================
-
-    // ツールチップトリガーのクリックイベント
-    $(document).on('click', '.cp-tooltip-trigger', function(e) {
+    $(document).on('click', '.nau-tooltip-trigger', function(e) {
         e.preventDefault();
         e.stopPropagation();
 
-        const $wrapper = $(this).closest('.cp-tooltip-wrapper');
+        const $wrapper = $(this).closest('.nau-tooltip-wrapper');
         const isOpen = $wrapper.hasClass('show');
 
-        // 他のツールチップを全て閉じる
-        $('.cp-tooltip-wrapper').removeClass('show');
-        $('.cp-tooltip-trigger').attr('aria-expanded', 'false');
+        $('.nau-tooltip-wrapper').removeClass('show');
+        $('.nau-tooltip-trigger').attr('aria-expanded', 'false');
 
-        // このツールチップのトグル
         if (!isOpen) {
             $wrapper.addClass('show');
             $(this).attr('aria-expanded', 'true');
         }
     });
 
-    // ツールチップトリガーのキーボードイベント（Enter/Space）
-    $(document).on('keydown', '.cp-tooltip-trigger', function(e) {
+    $(document).on('keydown', '.nau-tooltip-trigger', function(e) {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             $(this).trigger('click');
         } else if (e.key === 'Escape') {
-            const $wrapper = $(this).closest('.cp-tooltip-wrapper');
+            const $wrapper = $(this).closest('.nau-tooltip-wrapper');
             $wrapper.removeClass('show');
             $(this).attr('aria-expanded', 'false');
         }
     });
 
-    // ツールチップの外側をクリックしたら閉じる
     $(document).on('click', function(e) {
-        if (!$(e.target).closest('.cp-tooltip-wrapper').length) {
-            $('.cp-tooltip-wrapper').removeClass('show');
-            $('.cp-tooltip-trigger').attr('aria-expanded', 'false');
+        if (!$(e.target).closest('.nau-tooltip-wrapper').length) {
+            $('.nau-tooltip-wrapper').removeClass('show');
+            $('.nau-tooltip-trigger').attr('aria-expanded', 'false');
         }
     });
 
-    // ツールチップトリガーのフォーカス喪失時に閉じる
-    $(document).on('blur', '.cp-tooltip-trigger', function(e) {
-        // 少し遅延させて、他の要素へのフォーカス移動を待つ
+    $(document).on('blur', '.nau-tooltip-trigger', function(e) {
         setTimeout(() => {
-            // フォーカスがツールチップ内にない場合のみ閉じる
-            if (!$(document.activeElement).closest('.cp-tooltip-wrapper').length) {
-                const $wrapper = $(this).closest('.cp-tooltip-wrapper');
+            if (!$(document.activeElement).closest('.nau-tooltip-wrapper').length) {
+                const $wrapper = $(this).closest('.nau-tooltip-wrapper');
                 $wrapper.removeClass('show');
                 $(this).attr('aria-expanded', 'false');
             }

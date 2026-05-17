@@ -1,8 +1,6 @@
 <?php
 /**
  * Netlify API連携クラス
- *
- * Netlify Deploy APIを使用して静的サイトをデプロイ
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -10,45 +8,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class CP_Netlify_API {
-	/**
-	 * APIトークン
-	 */
-	private $api_token;
 
-	/**
-	 * サイトID
-	 */
-	private $site_id;
+	private CP_Logger $logger;
+	const string API_BASE_URL = 'https://api.netlify.com/api/v1';
 
-	/**
-	 * ロガーインスタンス
-	 */
-	private $logger;
-
-	/**
-	 * API ベースURL
-	 */
-	const API_BASE_URL = 'https://api.netlify.com/api/v1';
-
-	/**
-	 * コンストラクタ
-	 *
-	 * @param string $api_token APIトークン
-	 * @param string $site_id サイトID
-	 */
-	public function __construct( $api_token, $site_id ) {
-		$this->api_token = $api_token;
-		$this->site_id = $site_id;
+	public function __construct(
+		private readonly string $api_token,
+		private readonly string $site_id,
+	) {
 		$this->logger = CP_Logger::get_instance();
 	}
 
-	/**
-	 * 接続テスト
-	 * GET /sites/{site_id}
-	 *
-	 * @return true|WP_Error 成功時true、失敗時WP_Error
-	 */
-	public function test_connection() {
+	public function test_connection(): true|\WP_Error {
 		$response = wp_remote_get(
 			self::API_BASE_URL . '/sites/' . $this->site_id,
 			array(

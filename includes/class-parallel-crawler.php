@@ -9,51 +9,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CP_Parallel_Crawler {
 
-    /**
-     * 並列処理の同時実行数
-     */
-    private $concurrency = 5;
+    private int $concurrency = 5;
+    private int $timeout = 30;
+    private string $user_agent = 'Carry Pod/1.0';
+    private CP_Logger $logger;
+    private CP_Cache $cache;
+    private array $url_to_dependent_posts_map = array();
 
-    /**
-     * タイムアウト（秒）
-     */
-    private $timeout = 30;
-
-    /**
-     * ユーザーエージェント
-     */
-    private $user_agent = 'Carry Pod/1.0';
-
-    /**
-     * ロガーインスタンス
-     */
-    private $logger;
-
-    /**
-     * キャッシュインスタンス
-     */
-    private $cache;
-
-    /**
-     * URL→依存投稿IDリストマップ
-     */
-    private $url_to_dependent_posts_map = array();
-
-    /**
-     * コンストラクタ
-     */
     public function __construct() {
         $this->logger = CP_Logger::get_instance();
         $this->cache = CP_Cache::get_instance();
     }
 
-    /**
-     * URLリストを並列でクロール
-     *
-     * @param array $urls URLの配列
-     * @return array 結果の配列
-     */
-    public function crawl_urls( $urls ) {
+    public function crawl_urls( array $urls ): array {
         $results = array();
         $chunks = array_chunk( $urls, $this->concurrency );
 
@@ -61,7 +29,6 @@ class CP_Parallel_Crawler {
             $multi_handle = curl_multi_init();
             $curl_handles = array();
 
-            // 各URLに対してcURLハンドルを作成
             foreach ( $chunk as $index => $url ) {
                 $ch = curl_init();
                 curl_setopt( $ch, CURLOPT_URL, $url );
@@ -71,7 +38,6 @@ class CP_Parallel_Crawler {
                 curl_setopt( $ch, CURLOPT_TIMEOUT, $this->timeout );
                 curl_setopt( $ch, CURLOPT_USERAGENT, $this->user_agent );
 
-                // ローカルホスト判定
                 $parsed_url = parse_url( $url );
                 $is_localhost = in_array(
                     $parsed_url['host'] ?? '',
@@ -79,15 +45,12 @@ class CP_Parallel_Crawler {
                     true
                 );
 
-                // ローカルホスト以外ではSSL検証を有効化
                 curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, ! $is_localhost );
                 curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, $is_localhost ? 0 : 2 );
 
-                // Basic認証が設定されている場合
                 $auth_user = get_option( 'cp_basic_auth_user' );
                 if ( $auth_user ) {
                     $encrypted_pass = get_option( 'cp_basic_auth_pass' );
-                    // 暗号化されたパスワードを復号化
                     $settings_manager = CP_Settings::get_instance();
                     $auth_pass = $settings_manager->decrypt_basic_auth( $encrypted_pass );
                     if ( ! is_wp_error( $auth_pass ) ) {
@@ -100,7 +63,6 @@ class CP_Parallel_Crawler {
                 $curl_handles[ $index ] = $ch;
             }
 
-            // 並列実行
             $running = null;
             do {
                 $mrc = curl_multi_exec( $multi_handle, $running );
@@ -116,7 +78,6 @@ class CP_Parallel_Crawler {
                 } while ( $mrc == CURLM_CALL_MULTI_PERFORM );
             }
 
-            // 結果を取得
             foreach ( $curl_handles as $index => $ch ) {
                 $info = curl_getinfo( $ch );
                 $content = curl_multi_getcontent( $ch );
@@ -131,7 +92,6 @@ class CP_Parallel_Crawler {
                 );
 
                 curl_multi_remove_handle( $multi_handle, $ch );
-                curl_close( $ch );
             }
 
             curl_multi_close( $multi_handle );
@@ -140,26 +100,17 @@ class CP_Parallel_Crawler {
         return $results;
     }
 
-    /**
-     * キャッシュを使用した並列クロール
-     *
-     * @param array $urls URLの配列
-     * @return array 結果の配列
-     */
-    public function crawl_with_cache( $urls ) {
+    public function crawl_with_cache( array $urls ): array {
         $results = array();
         $urls_to_crawl = array();
 
-        // キャッシュチェック
         foreach ( $urls as $url ) {
             $post_id = url_to_postid( $url );
 
-            // 依存投稿IDを記録
             if ( $post_id > 0 ) {
                 $this->cache->add_dependent_post( $post_id );
             }
 
-            // アーカイブページの依存投稿を記録
             if ( isset( $this->url_to_dependent_posts_map[ $url ] ) ) {
                 foreach ( $this->url_to_dependent_posts_map[ $url ] as $dependent_id ) {
                     $this->cache->add_dependent_post( $dependent_id );
@@ -185,21 +136,17 @@ class CP_Parallel_Crawler {
             }
         }
 
-        // キャッシュにないURLをクロール
         if ( ! empty( $urls_to_crawl ) ) {
             $crawl_results = $this->crawl_urls( $urls_to_crawl );
 
-            // キャッシュに保存
             foreach ( $crawl_results as $url => $result ) {
                 if ( $result['status_code'] == 200 && ! empty( $result['content'] ) ) {
                     $post_id = url_to_postid( $url );
 
-                    // 依存投稿IDを記録
                     if ( $post_id > 0 ) {
                         $this->cache->add_dependent_post( $post_id );
                     }
 
-                    // アーカイブページの依存投稿を記録
                     if ( isset( $this->url_to_dependent_posts_map[ $url ] ) ) {
                         foreach ( $this->url_to_dependent_posts_map[ $url ] as $dependent_id ) {
                             $this->cache->add_dependent_post( $dependent_id );
@@ -216,30 +163,15 @@ class CP_Parallel_Crawler {
         return $results;
     }
 
-    /**
-     * 同時実行数を設定
-     *
-     * @param int $concurrency 同時実行数
-     */
-    public function set_concurrency( $concurrency ) {
-        $this->concurrency = max( 1, min( 10, intval( $concurrency ) ) );
+    public function set_concurrency( int $concurrency ): void {
+        $this->concurrency = max( 1, min( 10, $concurrency ) );
     }
 
-    /**
-     * タイムアウトを設定
-     *
-     * @param int $timeout タイムアウト（秒）
-     */
-    public function set_timeout( $timeout ) {
-        $this->timeout = max( 10, intval( $timeout ) );
+    public function set_timeout( int $timeout ): void {
+        $this->timeout = max( 10, $timeout );
     }
 
-    /**
-     * URL→依存投稿IDリストマップを設定
-     *
-     * @param array $map URL→依存投稿IDリストのマップ
-     */
-    public function set_url_to_dependent_posts_map( $map ) {
+    public function set_url_to_dependent_posts_map( array $map ): void {
         $this->url_to_dependent_posts_map = $map;
     }
 }

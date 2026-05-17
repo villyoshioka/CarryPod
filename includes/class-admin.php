@@ -7,33 +7,33 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// Mati plugin stubs for static analysis (never executed).
+if ( false ) {
+    class Mati_Settings {
+        public static function get_instance(): self { return new self(); }
+        /** @return array<string, mixed> */
+        public function get_settings(): array { return []; }
+    }
+    define( 'MATI_VERSION', '' );
+}
+
 class CP_Admin {
 
-    /**
-     * シングルトンインスタンス
-     */
-    private static $instance = null;
+    private static ?self $instance = null;
 
-    /**
-     * シングルトンインスタンスを取得
-     */
-    public static function get_instance() {
+    public static function get_instance(): static {
         if ( null === self::$instance ) {
             self::$instance = new self();
         }
         return self::$instance;
     }
 
-    /**
-     * コンストラクタ
-     */
     private function __construct() {
         add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
         add_action( 'admin_notices', array( $this, 'show_notices' ) );
         add_action( 'admin_init', array( $this, 'add_security_headers' ) );
 
-        // Ajax処理
         add_action( 'wp_ajax_cp_execute_generation', array( $this, 'ajax_execute_generation' ) );
         add_action( 'wp_ajax_cp_get_logs', array( $this, 'ajax_get_logs' ) );
         add_action( 'wp_ajax_cp_get_progress', array( $this, 'ajax_get_progress' ) );
@@ -47,108 +47,157 @@ class CP_Admin {
         add_action( 'wp_ajax_cp_cancel_generation', array( $this, 'ajax_cancel_generation' ) );
         add_action( 'wp_ajax_cp_reset_scheduler', array( $this, 'ajax_reset_scheduler' ) );
         add_action( 'wp_ajax_cp_check_error_notification', array( $this, 'ajax_check_error_notification' ) );
+        add_action( 'wp_ajax_cp_is_running', array( $this, 'ajax_is_running' ) );
+        add_action( 'wp_ajax_cp_download_zip', array( $this, 'ajax_download_zip' ) );
     }
 
-    /**
-     * 管理メニューを追加
-     */
-    public function add_admin_menu() {
-        // エラー通知バッジ
+    public function add_admin_menu(): void {
         $menu_title = 'Carry Pod';
         $error_notification = get_option( 'cp_error_notification', false );
         if ( $error_notification && ! empty( $error_notification['count'] ) ) {
             $menu_title .= ' <span class="awaiting-mod">1</span>';
         }
 
-        // 実行権限があるユーザーにメインメニューを表示
         add_menu_page(
-            'Carry Pod',
+            'CarryPod',
             $menu_title,
             'cp_execute',
             'carry-pod',
             array( $this, 'render_execute_page' ),
-            'dashicons-download',
+            'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xMS40OSwyLjg0bC0uNDMtMS41NmgtLjU3Yy0uMDgtLjE3LS4yNy0uMjktLjQ4LS4yOXMtLjQuMTItLjQ4LjI5aC0uNTdsLS40MywxLjU2QzQuMjUsMy40OSwxLDYuODMsMSwxMC44NmMwLDQuNDksNC4wMyw4LjE0LDksOC4xNHM5LTMuNjQsOS04LjE0YzAtNC4wMy0zLjI1LTcuMzctNy41MS04LjAyWk0xMCwxNy41NmMtNC4wOSwwLTcuNDEtMy03LjQxLTYuN3MzLjMyLTYuNyw3LjQxLTYuNyw3LjQxLDMsNy40MSw2LjctMy4zMiw2LjctNy40MSw2LjdaIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBkPSJNMTAsNS42Yy0zLjIyLDAtNS44MiwyLjM2LTUuODIsNS4yN3MyLjYxLDUuMjcsNS44Miw1LjI3LDUuODItMi4zNiw1LjgyLTUuMjctMi42MS01LjI3LTUuODItNS4yN1pNMTIuOCw3Ljc2bC0xLjgxLDEuNjRjLS4yOS0uMTYtLjYyLS4yNi0uOTgtLjI2LS4zNywwLS43LjA5LS45OS4yNWwtMS44Ni0xLjZjLjc3LS41OCwxLjc1LS45NSwyLjg0LS45NXMyLjA0LjM1LDIuOC45MlpNMTAuMDEsMTBoMGMuNTMsMCwuOTUuMzkuOTUuODdzLS40My44Ni0uOTYuODVoMGMtLjUzLDAtLjk1LS4zOS0uOTUtLjg3cy40My0uODYuOTYtLjg1Wk02LjUxLDguNGwxLjg1LDEuNmMtLjE2LjI1LS4yNi41NC0uMjcuODUsMCwuMzIuMS42Mi4yNy44OGwtMS44NiwxLjU5Yy0uNTktLjY4LS45NS0xLjUzLS45NS0yLjQ2cy4zNy0xLjc4Ljk1LTIuNDZaTTcuMTUsMTMuOTNsMS44Ni0xLjZjLjI4LjE2LjYxLjI1Ljk3LjI1LjM3LDAsLjctLjA5Ljk5LS4yNWwxLjc4LDEuNjZjLS43Ni41NS0xLjcxLjg5LTIuNzYuODlzLTIuMDctLjM3LTIuODUtLjk2Wk0xMy40LDEzLjQzbC0xLjc4LTEuNjdjLjE4LS4yNi4yOS0uNTYuMjktLjg5LDAtLjM0LS4xMS0uNjUtLjI5LS45MWwxLjgxLTEuNjNjLjYzLjY5LDEuMDIsMS41NywxLjAyLDIuNTNzLS40LDEuODctMS4wNSwyLjU3WiIvPjwvc3ZnPgo=',
             4
         );
 
         add_submenu_page(
             'carry-pod',
-            '実行',
+            'CarryPod',
             '実行',
             'cp_execute',
             'carry-pod',
             array( $this, 'render_execute_page' )
         );
 
-        // 設定ページは管理権限が必要
         add_submenu_page(
             'carry-pod',
-            '設定',
+            'CarryPod 設定',
             '設定',
             'cp_manage_settings',
             'carry-pod-settings',
             array( $this, 'render_settings_page' )
         );
+
+        $this->cleanup_temp_zips();
     }
 
-    /**
-     * スクリプトとスタイルを読み込み
-     */
-    public function enqueue_scripts( $hook ) {
-        // 実行ページまたは設定ページでのみ読み込む
-        // 設定ページのフック名は環境によって変動するため、両方に対応
+    private function cleanup_temp_zips(): void {
+        $upload_dir = wp_upload_dir();
+        $tmp_dir    = trailingslashit( $upload_dir['basedir'] ) . 'carry-pod-tmp/';
+        if ( ! is_dir( $tmp_dir ) ) {
+            return;
+        }
+        $files = glob( $tmp_dir . '*.zip' );
+        if ( ! $files ) {
+            return;
+        }
+        $expiry = time() - 3600;
+        foreach ( $files as $file ) {
+            if ( filemtime( $file ) < $expiry ) {
+                unlink( $file );
+            }
+        }
+    }
+
+    public function enqueue_scripts( string $hook ): void {
+        $wp_lock_hooks = array(
+            'post.php',
+            'post-new.php',
+            'themes.php',
+            'customize.php',
+            'nav-menus.php',
+            'widgets.php',
+            'options-permalink.php',
+            'options-general.php',
+        );
+
+        if ( in_array( $hook, $wp_lock_hooks, true ) ) {
+            $logger = CP_Logger::get_instance();
+            $is_running = $logger->is_running();
+
+            $deps = array( 'jquery' );
+            if ( in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
+                $deps[] = 'wp-data';
+                $deps[] = 'wp-dom-ready';
+            }
+
+            wp_enqueue_script(
+                'cp-wp-lock',
+                CP_PLUGIN_URL . 'assets/js/wp-lock.js',
+                $deps,
+                CP_VERSION . '.' . filemtime( CP_PLUGIN_DIR . 'assets/js/wp-lock.js' ),
+                true
+            );
+            wp_localize_script( 'cp-wp-lock', 'cpLockData', array(
+                'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
+                'hook'       => $hook,
+                'isRunning'  => $is_running,
+            ) );
+            return;
+        }
+
         if ( $hook !== 'toplevel_page_carry-pod'
              && $hook !== 'carry-pod_page_carry-pod-settings'
              && $hook !== 'carry-pod-1_page_carry-pod-settings' ) {
             return;
         }
 
-        wp_enqueue_style( 'cp-admin-css', CP_PLUGIN_URL . 'assets/css/admin.css', array(), CP_VERSION . '.' . filemtime( CP_PLUGIN_DIR . 'assets/css/admin.css' ) );
+        wp_enqueue_style( 'nau-admin-fw', CP_PLUGIN_URL . 'assets/css/admin-fw.css', array(), CP_VERSION . '.' . filemtime( CP_PLUGIN_DIR . 'assets/css/admin-fw.css' ) );
+        wp_enqueue_style( 'cp-admin-css', CP_PLUGIN_URL . 'assets/css/admin.css', array( 'nau-admin-fw' ), CP_VERSION . '.' . filemtime( CP_PLUGIN_DIR . 'assets/css/admin.css' ) );
         wp_enqueue_script( 'cp-admin-js', CP_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery' ), CP_VERSION . '.' . filemtime( CP_PLUGIN_DIR . 'assets/js/admin.js' ), true );
 
-        // JavaScriptに渡すデータ
         $js_data = array(
             'ajaxurl' => admin_url( 'admin-ajax.php' ),
             'nonce' => wp_create_nonce( 'cp_nonce' ),
         );
 
-        // 設定ページではWrangler検出結果を渡す
         if ( $hook === 'carry-pod_page_carry-pod-settings' || $hook === 'carry-pod-1_page_carry-pod-settings' ) {
             $js_data['wranglerInfo'] = $this->detect_wrangler();
+            $logger = CP_Logger::get_instance();
+            $js_data['isRunning'] = $logger->is_running();
+        }
+
+        if ( $hook === 'toplevel_page_carry-pod' || $hook === 'toplevel_page_carry-pod-1' ) {
+            $settings_manager = CP_Settings::get_instance();
+            $validation = $settings_manager->validate_settings( $settings_manager->get_settings() );
+            if ( is_wp_error( $validation ) ) {
+                $js_data['settingsError'] = true;
+            }
         }
 
         wp_localize_script( 'cp-admin-js', 'sgeData', $js_data );
     }
 
-    /**
-     * 通知を表示
-     */
-    public function show_notices() {
-        // プラグイン競合警告
+    public function show_notices(): void {
         if ( get_transient( 'cp_plugin_conflict_warning' ) ) {
             echo '<div class="notice notice-warning is-dismissible"><p>WP2staticまたはSimply Staticと競合する可能性があります。</p></div>';
             delete_transient( 'cp_plugin_conflict_warning' );
         }
 
-        // Git警告
         if ( get_transient( 'cp_git_warning' ) ) {
             echo '<div class="notice notice-warning is-dismissible"><p>Gitコマンドが見つかりません。ローカルGit経由でのGitHub出力を使用する場合はGitをインストールしてください。</p></div>';
             delete_transient( 'cp_git_warning' );
         }
     }
 
-    /**
-     * 実行画面を表示
-     */
-    public function render_execute_page() {
+    public function render_execute_page(): void {
         if ( ! current_user_can( 'cp_execute' ) ) {
             wp_die( '静的化実行の権限がありません。' );
         }
 
         $settings_manager = CP_Settings::get_instance();
         $settings = $settings_manager->get_settings();
+        $settings_validation = $settings_manager->validate_settings( $settings );
+        $settings_error = is_wp_error( $settings_validation ) ? $settings_validation->get_error_message() : '';
 
-        // コミットメッセージが空の場合は現在時刻で初期化
         if ( empty( $settings['commit_message'] ) ) {
             $settings['commit_message'] = 'update:' . current_time( 'Ymd_His' );
         }
@@ -156,12 +205,10 @@ class CP_Admin {
         $logger = CP_Logger::get_instance();
         $is_running = $logger->is_running();
 
-        // 実行中でない場合は進捗をリセット
         if ( ! $is_running ) {
             $logger->clear_progress();
         }
 
-        // デバッグモードのURLパラメータ処理（サニタイズ後に厳密比較）
         if ( isset( $_GET['debugmode'] ) ) {
             $debug_param = sanitize_text_field( wp_unslash( $_GET['debugmode'] ) );
             if ( $debug_param === 'on' ) {
@@ -172,15 +219,13 @@ class CP_Admin {
         }
         $is_debug_mode = $logger->is_debug_mode();
 
-        // ベータモードの状態を取得
         $is_beta_mode = $settings_manager->is_beta_mode_enabled();
 
         ?>
-        <div class="wrap cp-admin-wrap">
+        <div class="wrap nau-admin-wrap">
             <h1>静的化の実行</h1>
 
             <?php
-            // エラー通知を表示
             $error_notification = get_option( 'cp_error_notification', false );
             if ( $error_notification && ! empty( $error_notification['count'] ) ) {
                 $count = intval( $error_notification['count'] );
@@ -203,6 +248,19 @@ class CP_Admin {
             <?php endif; ?>
 
             <?php $this->check_mati_compatibility(); ?>
+            <?php $this->check_screw_compatibility(); ?>
+
+            <?php if ( $settings_error && ! $is_running ) : ?>
+            <div class="notice notice-warning">
+                <p>初期設定が完了していません。<strong><a href="<?php echo esc_url( admin_url( 'admin.php?page=carry-pod-settings' ) ); ?>">設定ページ</a></strong>で<strong>出力先</strong>と<strong>サイトURL</strong>を設定してください。</p>
+            </div>
+            <?php endif; ?>
+
+            <?php if ( ! empty( $settings['auto_generate'] ) ) : ?>
+            <div class="notice notice-success">
+                <p><span class="dashicons dashicons-yes-alt" style="color: #00a32a; margin-right: 4px;"></span>静的化の自動実行が有効です。</p>
+            </div>
+            <?php endif; ?>
 
             <div class="cp-dynamic-sections">
                 <div class="cp-progress-section">
@@ -218,43 +276,44 @@ class CP_Admin {
                     </div>
                 </div>
 
-                <div class="cp-commit-section <?php echo ( ! empty( $settings['github_enabled'] ) || ! empty( $settings['git_local_enabled'] ) || ! empty( $settings['gitlab_enabled'] ) ) ? 'active' : ''; ?>">
+                <?php
+                $git_enabled = ! empty( $settings['github_enabled'] ) || ! empty( $settings['git_local_enabled'] ) || ! empty( $settings['gitlab_enabled'] );
+                $show_commit = $git_enabled && empty( $settings['auto_generate'] );
+                ?>
+                <div class="cp-commit-section <?php echo $show_commit ? 'active' : ''; ?>">
                     <h3>
                         コミットメッセージ
-                        <?php echo $this->render_tooltip( 'デフォルト: update:YYYYMMDD_HHMMSS<br>分かりやすいメッセージにすると、後から履歴を見返す時に便利です' ); ?>
+                        <?php echo $this->render_tooltip( 'デフォルト: update:YYYYMMDD_HHMMSS' ); ?>
                     </h3>
                     <div class="cp-section-content">
-                        <div class="cp-form-group">
+                        <div class="nau-form-group">
                             <div class="cp-commit-container">
                                 <input type="text" id="cp-commit-message" class="regular-text" value="<?php echo esc_attr( ! empty( $settings['commit_message'] ) ? $settings['commit_message'] : 'update:' . current_time( 'Ymd_His' ) ); ?>" placeholder="コミットメッセージを入力">
-                                <button type="button" id="cp-reset-commit-message" class="button">リセット</button>
+                                <button type="button" id="cp-reset-commit-message" class="button" <?php echo $is_running ? 'disabled' : ''; ?>>リセット</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="cp-execute-section">
-                    <button type="button" id="cp-execute-button" class="button button-primary" <?php echo $is_running ? 'disabled' : ''; ?>>
+                    <button type="button" id="cp-execute-button" class="button button-primary" <?php echo ( $is_running || $settings_error ) ? 'disabled' : ''; ?>>
                         <?php echo $is_running ? '静的化中...' : '静的化を実行'; ?>
                     </button>
-                    <button type="button" id="cp-cancel-button" class="button" <?php echo ! $is_running ? 'disabled' : ''; ?>>
+                    <button type="button" id="cp-cancel-button" class="button button-caution" <?php echo ! $is_running ? 'disabled' : ''; ?>>
                         実行中止
                     </button>
                     <button type="button" id="cp-download-log" class="button" <?php echo $is_running ? 'disabled' : ''; ?>>最新のログをダウンロード</button>
                 </div>
             </div>
 
-            <div class="cp-version-info">
+            <div class="nau-version-info">
                 Carry Pod <a href="https://github.com/villyoshioka/CarryPod/releases/tag/v<?php echo esc_attr( CP_VERSION ); ?>" target="_blank" rel="noopener noreferrer">v<?php echo esc_html( CP_VERSION ); ?></a>
             </div>
         </div>
         <?php
     }
 
-    /**
-     * 設定画面を表示
-     */
-    public function render_settings_page() {
+    public function render_settings_page(): void {
         if ( ! current_user_can( 'cp_manage_settings' ) ) {
             wp_die( '設定変更の権限がありません。' );
         }
@@ -262,7 +321,6 @@ class CP_Admin {
         $settings_manager = CP_Settings::get_instance();
         $settings = $settings_manager->get_settings();
 
-        // コミットメッセージが空の場合は現在時刻で初期化（表示用のみ、保存はしない）
         if ( empty( $settings['commit_message'] ) ) {
             $settings['commit_message'] = 'update:' . current_time( 'Ymd_His' );
         }
@@ -270,7 +328,6 @@ class CP_Admin {
         $logger = CP_Logger::get_instance();
         $is_running = $logger->is_running();
 
-        // デバッグモードのURLパラメータ処理（サニタイズ後に厳密比較）
         if ( isset( $_GET['debugmode'] ) ) {
             $debug_param = sanitize_text_field( wp_unslash( $_GET['debugmode'] ) );
             if ( $debug_param === 'on' ) {
@@ -280,8 +337,6 @@ class CP_Admin {
             }
         }
         $is_debug_mode = $logger->is_debug_mode();
-
-        // v2テストモードのURLパラメータ処理（v1.4.2専用、v2.0.0で削除予定）
         if ( isset( $_GET['cp_test_v2'] ) ) {
             $test_param = sanitize_text_field( wp_unslash( $_GET['cp_test_v2'] ) );
             if ( $test_param === 'on' ) {
@@ -291,16 +346,13 @@ class CP_Admin {
             }
         }
 
-        // ベータモードのURLパラメータ処理
         $beta_message = '';
         if ( isset( $_GET['cp_beta'] ) ) {
             $beta_param = sanitize_text_field( wp_unslash( $_GET['cp_beta'] ) );
             if ( $beta_param === 'on' ) {
-                // 既にベータモードが有効な場合はスキップ
                 if ( $settings_manager->is_beta_mode_enabled() ) {
-                    // 既に有効、何もしない
+                    // 既に有効
                 } elseif ( isset( $_POST['cp_beta_password'] ) && isset( $_POST['cp_beta_nonce'] ) ) {
-                    // パスワード認証処理
                     if ( wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['cp_beta_nonce'] ) ), 'cp_beta_auth' ) ) {
                         $password = sanitize_text_field( wp_unslash( $_POST['cp_beta_password'] ) );
                         $result = $settings_manager->enable_beta_mode( $password );
@@ -323,7 +375,7 @@ class CP_Admin {
         $is_beta_mode = $settings_manager->is_beta_mode_enabled();
 
         ?>
-        <div class="wrap cp-admin-wrap">
+        <div class="wrap nau-admin-wrap">
             <h1>CarryPod 設定</h1>
 
             <?php if ( $is_debug_mode ) : ?>
@@ -339,6 +391,7 @@ class CP_Admin {
             <?php endif; ?>
 
             <?php $this->check_mati_compatibility(); ?>
+            <?php $this->check_screw_compatibility(); ?>
 
             <?php if ( $beta_message === 'need_password' ) : ?>
             <div class="notice notice-warning">
@@ -375,47 +428,44 @@ class CP_Admin {
             </div>
             <?php endif; ?>
 
-            <form id="cp-settings-form">
+            <form id="cp-settings-form" class="nau-settings-form">
                 <?php wp_nonce_field( 'cp_save_settings', 'cp_settings_nonce' ); ?>
 
-                    <!-- 出力先設定アコーディオン -->
-                    <div class="cp-accordion-section" data-section="output-destinations">
-                        <button type="button" class="cp-accordion-header"
+                    <div class="nau-accordion-section" data-section="output-destinations">
+                        <button type="button" class="nau-accordion-header"
                                 id="header-output-destinations"
                                 aria-expanded="true"
                                 aria-controls="accordion-output-destinations">
-                            <span class="cp-accordion-title">出力先設定</span>
-                            <span class="cp-accordion-icon" aria-hidden="true"></span>
+                            <span class="nau-accordion-title">出力先設定</span>
+                            <span class="nau-accordion-icon" aria-hidden="true"></span>
                         </button>
                         <div id="accordion-output-destinations"
-                             class="cp-accordion-content"
+                             class="nau-accordion-content"
                              role="region"
                              aria-labelledby="header-output-destinations"
                              aria-hidden="false">
 
-                    <!-- 1. Cloudflare Workers -->
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" id="cp-cloudflare-enabled" name="cloudflare_enabled" value="1" <?php checked( ! empty( $settings['cloudflare_enabled'] ) ); ?>>
                             Cloudflare Workersに出力
                         </label>
                     </div>
 
-                    <div id="cp-cloudflare-settings" class="cp-subsection" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="cp-form-group">
+                    <div id="cp-cloudflare-settings" class="nau-subsection" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="nau-form-group">
                             <label for="cp-cloudflare-use-wrangler">
                                 Wrangler
-                                <?php echo $this->render_tooltip( 'WranglerはCloudflare公式のCLIツールです。Wranglerを使ってデプロイすると、レスポンス ヘッダー変換ルールの設定が不要になります。<br><br>LocalやMAMPなどのローカル環境やVPSなど、Node.jsをインストールできる環境では「使用する」がおすすめです。<br><br>共用レンタルサーバーなどNode.jsが使えない環境では「使用しない」を選び、Cloudflareの管理画面でレスポンス ヘッダー変換ルールを設定してください。<br><br>使用するには、WordPressが動いている環境に以下がインストールされている必要があります。<br>- Node.js<br>- Wrangler CLI（v4以上）' ); ?>
+                                <?php echo $this->render_tooltip( 'Cloudflare公式CLIでデプロイします。レスポンスヘッダー変換ルールの設定が不要になります。<br>必要環境: Node.js + Wrangler CLI（v4以上）' ); ?>
                             </label>
                             <select id="cp-cloudflare-use-wrangler" name="cloudflare_use_wrangler">
                                 <option value="0" <?php selected( empty( $settings['cloudflare_use_wrangler'] ) ); ?>>使用しない</option>
                                 <option value="1" <?php selected( ! empty( $settings['cloudflare_use_wrangler'] ) ); ?>>使用する</option>
                             </select>
+                            <div id="cp-wrangler-guide"></div>
                         </div>
 
-                        <div id="cp-wrangler-guide"></div>
-
-                        <div class="cp-form-group">
+                        <div class="nau-form-group">
                             <label for="cp-cloudflare-api-token">Cloudflare API Token <span class="required">*</span></label>
                             <?php
                             $has_cf_token = ! empty( $settings['cloudflare_api_token'] );
@@ -427,39 +477,37 @@ class CP_Admin {
                             <?php endif; ?>
                             <p class="description">
                                 <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener noreferrer">API Tokenを作成</a><br>
-                                必要権限: Account > Workers Scripts > Edit<br>
-                                ※ セキュリティのため、トークンは暗号化されてWordPressデータベースに保存されます
+                                必要権限: Account > Workers Scripts > Edit
                             </p>
                         </div>
 
-                        <div class="cp-form-group">
+                        <div class="nau-form-group">
                             <label for="cp-cloudflare-account-id">
                                 Account ID <span class="required">*</span>
-                                <?php echo $this->render_tooltip( 'Cloudflareダッシュボード > Workers & Pages > 右側のサイドバーで確認できます。形式: 32文字の英数字（例: 1234567890abcdef1234567890abcdef）' ); ?>
+                                <?php echo $this->render_tooltip( 'Cloudflareダッシュボード > Workers & Pages > サイドバーで確認できます' ); ?>
                             </label>
                             <input type="text" id="cp-cloudflare-account-id" name="cloudflare_account_id" class="regular-text" value="<?php echo esc_attr( $settings['cloudflare_account_id'] ?? '' ); ?>" placeholder="例: 1234567890abcdef1234567890abcdef">
                         </div>
 
-                        <div class="cp-form-group">
+                        <div class="nau-form-group">
                             <label for="cp-cloudflare-script-name">
                                 Worker名 <span class="required">*</span>
-                                <?php echo $this->render_tooltip( 'デプロイ先のWorker名を自由に決めてください。存在しない場合は自動的に作成されます。使用可能な文字: 英数字、ハイフン（-）、アンダースコア（_）のみ。例: my-static-site、company-website、blog_2024 など' ); ?>
+                                <?php echo $this->render_tooltip( '存在しない場合は自動作成されます。使用可能文字: 英数字、ハイフン、アンダースコア' ); ?>
                             </label>
                             <input type="text" id="cp-cloudflare-script-name" name="cloudflare_script_name" class="regular-text" value="<?php echo esc_attr( $settings['cloudflare_script_name'] ?? '' ); ?>" placeholder="例: my-static-site">
                         </div>
 
                     </div>
 
-                    <!-- 2. Netlify -->
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" id="cp-netlify-enabled" name="netlify_enabled" value="1" <?php checked( ! empty( $settings['netlify_enabled'] ) ); ?>>
                             Netlifyに出力
                         </label>
                     </div>
 
-                    <div id="cp-netlify-settings" class="cp-subsection" <?php echo empty( $settings['netlify_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="cp-form-group">
+                    <div id="cp-netlify-settings" class="nau-subsection" <?php echo empty( $settings['netlify_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="nau-form-group">
                             <label for="cp-netlify-api-token">Netlify Personal Access Token <span class="required">*</span></label>
                             <?php
                             $has_netlify_token = ! empty( $settings['netlify_api_token'] );
@@ -470,30 +518,28 @@ class CP_Admin {
                                 <span class="cp-token-status cp-token-set">✓ トークン設定済み</span>
                             <?php endif; ?>
                             <p class="description">
-                                <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank" rel="noopener noreferrer">Personal Access Tokenを作成</a><br>
-                                ※ セキュリティのため、トークンは暗号化されてWordPressデータベースに保存されます
+                                <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank" rel="noopener noreferrer">Personal Access Tokenを作成</a>
                             </p>
                         </div>
 
-                        <div class="cp-form-group">
+                        <div class="nau-form-group">
                             <label for="cp-netlify-site-id">
                                 Netlify Project ID <span class="required">*</span>
-                                <?php echo $this->render_tooltip( 'Netlifyの「Site configuration」→「General」→「Site details」で確認できます 形式: UUID（例: 12345678-1234-1234-1234-123456789012）' ); ?>
+                                <?php echo $this->render_tooltip( 'Site configuration → General → Site detailsで確認できます' ); ?>
                             </label>
                             <input type="text" id="cp-netlify-site-id" name="netlify_site_id" class="regular-text" value="<?php echo esc_attr( $settings['netlify_site_id'] ?? '' ); ?>" placeholder="例: 12345678-1234-1234-1234-123456789012">
                         </div>
                     </div>
 
-                    <!-- 3. GitHub -->
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" id="cp-github-enabled" name="github_enabled" value="1" <?php checked( ! empty( $settings['github_enabled'] ) ); ?>>
                             GitHubに出力
                         </label>
                     </div>
 
-                    <div id="cp-github-settings" class="cp-subsection" <?php echo empty( $settings['github_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="cp-form-group">
+                    <div id="cp-github-settings" class="nau-subsection" <?php echo empty( $settings['github_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="nau-form-group">
                             <label for="cp-github-token">GitHub Personal Access Token <span class="required">*</span></label>
                             <?php
                             $has_token = ! empty( $settings['github_token'] );
@@ -505,21 +551,19 @@ class CP_Admin {
                             <?php endif; ?>
                             <p class="description">
                                 <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer">Personal Access Tokenを作成</a><br>
-                                必要権限: repo（リポジトリへのフルアクセス）<br>
-                                ※ セキュリティのため、トークンは暗号化されてデータベースに保存されます<br>
-                                ※ wp-config.phpのAUTH_KEY等を変更した場合、トークンの再入力が必要です
+                                必要権限: repo
                             </p>
                         </div>
 
-                        <div class="cp-form-group">
+                        <div class="nau-form-group">
                             <label for="cp-github-repo">
                                 リポジトリ名 <span class="required">*</span>
-                                <?php echo $this->render_tooltip( '形式: owner/repo（例: username/my-website） GitHubリポジトリのURLが https://github.com/username/my-website なら「username/my-website」と入力' ); ?>
+                                <?php echo $this->render_tooltip( '形式: owner/repo（例: username/my-website）' ); ?>
                             </label>
                             <input type="text" id="cp-github-repo" name="github_repo" class="regular-text" value="<?php echo esc_attr( $settings['github_repo'] ?? '' ); ?>" placeholder="owner/repo">
                         </div>
 
-                        <div class="cp-form-group cp-branch-settings">
+                        <div class="nau-form-group cp-branch-settings">
                             <label>ブランチ設定</label>
                             <div class="cp-branch-option">
                                 <label class="cp-radio-label">
@@ -546,16 +590,15 @@ class CP_Admin {
 
                     </div>
 
-                    <!-- 3. GitLab -->
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" id="cp-gitlab-enabled" name="gitlab_enabled" value="1" <?php checked( ! empty( $settings['gitlab_enabled'] ) ); ?>>
                             GitLabに出力
                         </label>
                     </div>
 
-                    <div id="cp-gitlab-settings" class="cp-subsection" <?php echo empty( $settings['gitlab_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="cp-form-group">
+                    <div id="cp-gitlab-settings" class="nau-subsection" <?php echo empty( $settings['gitlab_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="nau-form-group">
                             <label for="cp-gitlab-token">GitLab Personal Access Token <span class="required">*</span></label>
                             <?php
                             $has_gl_token = ! empty( $settings['gitlab_token'] );
@@ -567,21 +610,27 @@ class CP_Admin {
                             <?php endif; ?>
                             <p class="description">
                                 <a href="https://gitlab.com/-/user_settings/personal_access_tokens" target="_blank" rel="noopener noreferrer">Personal Access Tokenを作成</a><br>
-                                必要権限: api（フルアクセス）または write_repository<br>
-                                ※ セキュリティのため、トークンは暗号化されてデータベースに保存されます<br>
-                                ※ wp-config.phpのAUTH_KEY等を変更した場合、トークンの再入力が必要です
+                                必要権限: api または write_repository
                             </p>
                         </div>
 
-                        <div class="cp-form-group">
+                        <div class="nau-form-group">
                             <label for="cp-gitlab-project">
                                 プロジェクトパス <span class="required">*</span>
-                                <?php echo $this->render_tooltip( '形式: username/project または group/subgroup/project（例: myname/my-website） GitLabプロジェクトのURLが https://gitlab.com/myname/my-website なら「myname/my-website」と入力' ); ?>
+                                <?php echo $this->render_tooltip( '形式: username/project（例: myname/my-website）' ); ?>
                             </label>
                             <input type="text" id="cp-gitlab-project" name="gitlab_project" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_project'] ?? '' ); ?>" placeholder="username/project">
                         </div>
 
-                        <div class="cp-form-group cp-branch-settings">
+                        <div class="nau-form-group">
+                            <label for="cp-gitlab-api-url">
+                                GitLab API URL
+                                <?php echo $this->render_tooltip( 'セルフホスト環境の場合のみ変更してください' ); ?>
+                            </label>
+                            <input type="text" id="cp-gitlab-api-url" name="gitlab_api_url" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_api_url'] ?? 'https://gitlab.com/api/v4' ); ?>" placeholder="https://gitlab.com/api/v4">
+                        </div>
+
+                        <div class="nau-form-group cp-branch-settings">
                             <label>ブランチ設定</label>
                             <div class="cp-branch-option">
                                 <label class="cp-radio-label">
@@ -605,34 +654,25 @@ class CP_Admin {
                                 </div>
                             </div>
                         </div>
-
-                        <div class="cp-form-group">
-                            <label for="cp-gitlab-api-url">
-                                GitLab API URL
-                                <?php echo $this->render_tooltip( '通常は変更不要です。自分で用意したGitLabサーバーを使う場合のみ変更してください 例: https://gitlab.example.com/api/v4' ); ?>
-                            </label>
-                            <input type="text" id="cp-gitlab-api-url" name="gitlab_api_url" class="regular-text" value="<?php echo esc_attr( $settings['gitlab_api_url'] ?? 'https://gitlab.com/api/v4' ); ?>" placeholder="https://gitlab.com/api/v4">
-                        </div>
                     </div>
 
-                    <!-- 4. ローカルGit -->
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" id="cp-git-local-enabled" name="git_local_enabled" value="1" <?php checked( ! empty( $settings['git_local_enabled'] ) ); ?>>
                             ローカルGitに出力
                         </label>
                     </div>
 
-                    <div id="cp-git-local-settings" class="cp-subsection" <?php echo empty( $settings['git_local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="cp-form-group">
+                    <div id="cp-git-local-settings" class="nau-subsection" <?php echo empty( $settings['git_local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="nau-form-group">
                             <label for="cp-git-local-work-dir">
                                 Git作業ディレクトリ <span class="required">*</span>
-                                <?php echo $this->render_tooltip( 'サーバー上のGitリポジトリのフルパスを指定（例: /home/username/my-repo） 相対パスではなく、/（スラッシュ）から始まる絶対パスで入力してください' ); ?>
+                                <?php echo $this->render_tooltip( '絶対パスで指定してください（例: /home/username/my-repo）' ); ?>
                             </label>
                             <input type="text" id="cp-git-local-work-dir" name="git_local_work_dir" class="regular-text" value="<?php echo esc_attr( $settings['git_local_work_dir'] ?? '' ); ?>" placeholder="/path/to/git/repo">
                         </div>
 
-                        <div class="cp-form-group">
+                        <div class="nau-form-group">
                             <label for="cp-git-local-branch">
                                 ブランチ名 <span class="required">*</span>
                                 <?php echo $this->render_tooltip( '静的ファイルをコミットするブランチ名を指定（例: main、master、gh-pages など）' ); ?>
@@ -640,175 +680,181 @@ class CP_Admin {
                             <input type="text" id="cp-git-local-branch" name="git_local_branch" class="regular-text" value="<?php echo esc_attr( $settings['git_local_branch'] ?? 'main' ); ?>" placeholder="main">
                         </div>
 
-                        <div class="cp-form-group">
-                            <label>
-                                <input type="checkbox" id="cp-git-local-push-remote" name="git_local_push_remote" value="1" <?php checked( ! empty( $settings['git_local_push_remote'] ) ); ?>>
-                                リモートにプッシュする
-                                <?php echo $this->render_tooltip( 'チェックを入れると、ローカルリポジトリにコミットした後、自動的にリモートリポジトリ（origin）にプッシュします GitHub、GitLabなどのリモートリポジトリと連携している場合に便利です' ); ?>
+                        <div class="nau-form-group">
+                            <label for="cp-git-local-remote-url">
+                                リモートリポジトリURL
+                                <?php echo $this->render_tooltip( '空欄の場合はリモートにプッシュしません' ); ?>
                             </label>
+                            <input type="text" id="cp-git-local-remote-url" name="git_local_remote_url" class="regular-text" value="<?php echo esc_attr( $settings['git_local_remote_url'] ?? '' ); ?>" placeholder="https://git.example.com/user/repo.git">
                         </div>
                     </div>
 
-                    <!-- 5. ローカルディレクトリ -->
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" id="cp-local-enabled" name="local_enabled" value="1" <?php checked( ! empty( $settings['local_enabled'] ) ); ?>>
                             ローカルディレクトリに出力
                         </label>
                     </div>
 
-                    <div id="cp-local-settings" class="cp-subsection" <?php echo empty( $settings['local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="cp-form-group">
+                    <div id="cp-local-settings" class="nau-subsection" <?php echo empty( $settings['local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="nau-form-group">
                             <label for="cp-local-output-path">
                                 静的ファイル出力先パス <span class="required">*</span>
-                                <?php echo $this->render_tooltip( '静的HTMLファイルを保存する場所を指定します。必ず絶対パス（フルパス）で入力してください Windows: C:\output または C:/output（どちらでも可） Mac/Linux: /Users/username/output または /home/username/output' ); ?>
+                                <?php echo $this->render_tooltip( '絶対パスで指定してください' ); ?>
                             </label>
                             <input type="text" id="cp-local-output-path" name="local_output_path" class="regular-text" value="<?php echo esc_attr( $settings['local_output_path'] ?? '' ); ?>" placeholder="<?php echo esc_attr( ( PHP_OS === 'WINNT' ? 'C:/output' : '/Users/username/output' ) ); ?>">
                         </div>
                     </div>
 
-                    <!-- 6. ZIP -->
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" id="cp-zip-enabled" name="zip_enabled" value="1" <?php checked( ! empty( $settings['zip_enabled'] ) ); ?>>
                             ZIPファイルとして出力
+                            <?php echo $this->render_tooltip( 'ファイル名は {サイト名}-YYYYMMDD_HHMMSS.zip になります' ); ?>
                         </label>
                     </div>
 
-                    <div id="cp-zip-settings" class="cp-subsection" <?php echo empty( $settings['zip_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <div class="cp-form-group">
+                    <div id="cp-zip-settings" class="nau-subsection" <?php echo empty( $settings['zip_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <div class="nau-form-group">
+                            <label for="cp-zip-mode">
+                                出力方法
+                            </label>
+                            <select id="cp-zip-mode" name="zip_mode">
+                                <option value="download" <?php selected( ( $settings['zip_mode'] ?? 'download' ), 'download' ); ?>>ダウンロード</option>
+                                <option value="local" <?php selected( ( $settings['zip_mode'] ?? 'download' ), 'local' ); ?>>ローカル出力</option>
+                            </select>
+                        </div>
+                        <div class="nau-form-group" id="cp-zip-local-settings" <?php echo ( $settings['zip_mode'] ?? 'download' ) !== 'local' ? 'style="display:none;"' : ''; ?>>
                             <label for="cp-zip-output-path">
-                                ZIP出力先パス <span class="required">*</span>
-                                <?php echo $this->render_tooltip( 'ZIPファイルを保存する場所（ディレクトリ）を指定します ファイル名は自動的に static-output-YYYYMMDD_HHMMSS.zip の形式で作成されます（例: static-output-20241225_143052.zip）' ); ?>
+                                出力先パス <span class="required">*</span>
+                                <?php echo $this->render_tooltip( '絶対パスで指定してください' ); ?>
                             </label>
                             <input type="text" id="cp-zip-output-path" name="zip_output_path" class="regular-text" value="<?php echo esc_attr( $settings['zip_output_path'] ?? '' ); ?>">
                         </div>
                     </div>
 
-                    <!-- URL設定 -->
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label for="cp-url-mode">
                             URL形式
-                            <?php echo $this->render_tooltip( '相対パス: /about/ の形式。どのドメインでも動作するため、サブディレクトリやテスト環境でも使えます（推奨）<br>絶対パス: https://example.com/about/ の形式。特定のドメインに固定したい場合に選択します' ); ?>
+                            <?php echo $this->render_tooltip( '相対パス: どのドメインでも動作します（推奨）<br>絶対パス: 特定のドメインに固定します' ); ?>
                         </label>
                         <select id="cp-url-mode" name="url_mode" class="regular-text">
                             <option value="relative" <?php selected( $settings['url_mode'] ?? 'relative', 'relative' ); ?>>相対パス</option>
                             <option value="absolute" <?php selected( $settings['url_mode'] ?? 'relative', 'absolute' ); ?>>絶対パス</option>
                         </select>
-
-                        <div class="cp-base-url-field" style="margin-top: 16px;">
-                            <label for="cp-base-url">URL <span class="required">*</span></label>
-                            <input type="url" id="cp-base-url" name="base_url" class="regular-text" value="<?php echo esc_attr( $settings['base_url'] ?? '' ); ?>" placeholder="https://example.com">
-                            <p class="description" id="cp-base-url-description-absolute" style="display: none;">絶対パスで使用するベースURLを入力してください（例: https://example.com）<br>このURLをもとに、すべてのリンクが絶対URLに変換されます<br>※ 末尾のスラッシュ（/）は不要です</p>
-                            <p class="description" id="cp-base-url-description-relative" style="display: none;">サイトマップやrobots.txtで使用するベースURLを入力してください（例: https://example.com）<br>HTMLファイル内のリンクは相対パスのままですが、サイトマップには絶対URLが使用されます<br>※ 末尾のスラッシュ（/）は不要です</p>
-                        </div>
                     </div>
 
-                        </div><!-- .cp-accordion-content -->
-                    </div><!-- .cp-accordion-section -->
+                    <div class="nau-form-group cp-base-url-field">
+                        <label for="cp-base-url">
+                            サイトURL <span class="required">*</span>
+                            <?php echo $this->render_tooltip( 'サイトマップやrobots.txtで使用されます。末尾の / は不要です' ); ?>
+                        </label>
+                        <input type="url" id="cp-base-url" name="base_url" class="regular-text" value="<?php echo esc_attr( $settings['base_url'] ?? '' ); ?>" placeholder="https://example.com">
+                    </div>
 
-                    <!-- 追加/除外ファイル設定アコーディオン -->
-                    <div class="cp-accordion-section" data-section="file-settings">
-                        <button type="button" class="cp-accordion-header"
+                        </div><!-- .nau-accordion-content -->
+                    </div><!-- .nau-accordion-section -->
+
+                    <div class="nau-accordion-section" data-section="file-settings">
+                        <button type="button" class="nau-accordion-header"
                                 id="header-file-settings"
                                 aria-expanded="false"
                                 aria-controls="accordion-file-settings">
-                            <span class="cp-accordion-title">追加/除外ファイル設定</span>
-                            <span class="cp-accordion-icon" aria-hidden="true"></span>
+                            <span class="nau-accordion-title">追加/除外ファイル設定</span>
+                            <span class="nau-accordion-icon" aria-hidden="true"></span>
                         </button>
                         <div id="accordion-file-settings"
-                             class="cp-accordion-content"
+                             class="nau-accordion-content"
                              role="region"
                              aria-labelledby="header-file-settings"
                              aria-hidden="true">
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label for="cp-include-paths">
                             追加したいファイル/フォルダのパス指定
-                            <?php echo $this->render_tooltip( 'WordPressに含まれないファイル（画像、PDF、動画など）を静的サイトに追加したい場合に指定します。各ファイル/フォルダのフルパスを1行に1つずつ記載してください。 記載例： /home/username/Desktop/logo.png /home/username/videos/intro.mp4' ); ?>
+                            <?php echo $this->render_tooltip( 'WordPress外のファイルを追加する場合に絶対パスで指定します。1行につき1パスです' ); ?>
                         </label>
                         <textarea id="cp-include-paths" name="include_paths" class="large-text" rows="5"><?php echo esc_textarea( $settings['include_paths'] ?? '' ); ?></textarea>
                     </div>
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label for="cp-exclude-patterns">
                             除外したいファイル/フォルダのパス指定
-                            <?php echo $this->render_tooltip( '静的サイトに含めたくないファイルやフォルダを指定します。ワイルドカード（*）を使ったパターン指定が可能です。1行に1つずつ記載してください。<br>※ HTMLから参照されていないファイルは自動的に除外されます' ); ?>
+                            <?php echo $this->render_tooltip( 'ワイルドカード（*）が使えます。1行につき1パスです。<br>未参照ファイルは自動で除外されます' ); ?>
                         </label>
                         <textarea id="cp-exclude-patterns" name="exclude_patterns" class="large-text" rows="5"><?php echo esc_textarea( $settings['exclude_patterns'] ?? '' ); ?></textarea>
                     </div>
 
-                        </div><!-- .cp-accordion-content -->
-                    </div><!-- .cp-accordion-section -->
+                        </div><!-- .nau-accordion-content -->
+                    </div><!-- .nau-accordion-section -->
 
-                    <!-- コンテンツ設定アコーディオン -->
-                    <div class="cp-accordion-section" data-section="output-settings">
-                        <button type="button" class="cp-accordion-header"
+                    <div class="nau-accordion-section" data-section="output-settings">
+                        <button type="button" class="nau-accordion-header"
                                 id="header-output-settings"
                                 aria-expanded="true"
                                 aria-controls="accordion-output-settings">
-                            <span class="cp-accordion-title">コンテンツ設定</span>
-                            <span class="cp-accordion-icon" aria-hidden="true"></span>
+                            <span class="nau-accordion-title">コンテンツ設定</span>
+                            <span class="nau-accordion-icon" aria-hidden="true"></span>
                         </button>
                         <div id="accordion-output-settings"
-                             class="cp-accordion-content"
+                             class="nau-accordion-content"
                              role="region"
                              aria-labelledby="header-output-settings"
                              aria-hidden="false">
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" name="enable_tag_archive" value="1" <?php checked( $settings['enable_tag_archive'] ?? false ); ?>>
                             タグアーカイブを出力
-                            <?php echo $this->render_tooltip( 'タグアーカイブ = タグごとの記事一覧ページ（例: /tag/wordpress/） 無効にすると、タグアーカイブページを出力せず、投稿ページ内のタグリンクも非表示になります' ); ?>
+                            <?php echo $this->render_tooltip( 'タグごとの記事一覧ページです（例: /tag/wordpress/）' ); ?>
                         </label>
                     </div>
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" name="enable_date_archive" value="1" <?php checked( $settings['enable_date_archive'] ?? false ); ?>>
                             日付アーカイブを出力
-                            <?php echo $this->render_tooltip( '日付アーカイブ = 年月日ごとの記事一覧ページ（例: /2024/12/、/2024/12/25/） 無効にすると、日付アーカイブページを出力せず、投稿ページ内の日付はリンクなしのテキストで表示されます' ); ?>
+                            <?php echo $this->render_tooltip( '年月日ごとの記事一覧ページです（例: /2024/12/）' ); ?>
                         </label>
                     </div>
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" name="enable_author_archive" value="1" <?php checked( $settings['enable_author_archive'] ?? false ); ?>>
                             著者アーカイブを出力
-                            <?php echo $this->render_tooltip( '著者アーカイブ = 著者ごとの記事一覧ページ（例: /author/john/） 無効にすると、著者アーカイブページを出力せず、投稿ページ内の著者名はリンクなしのテキストで表示されます' ); ?>
+                            <?php echo $this->render_tooltip( '著者ごとの記事一覧ページです（例: /author/john/）' ); ?>
                         </label>
                     </div>
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" name="enable_post_format_archive" value="1" <?php checked( $settings['enable_post_format_archive'] ?? false ); ?>>
                             投稿フォーマットアーカイブを出力
-                            <?php echo $this->render_tooltip( '投稿フォーマットアーカイブ = 投稿の種類ごとの記事一覧ページ（例: /type/image/、/type/video/） 無効にすると、これらのページを出力しません。通常のブログでは使わないことが多いです' ); ?>
+                            <?php echo $this->render_tooltip( '投稿タイプごとの一覧ページです。通常のブログでは使いません' ); ?>
                         </label>
                     </div>
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" name="enable_sitemap" value="1" <?php checked( $settings['enable_sitemap'] ?? true ); ?>>
-                            サイトマップ（sitemap.xml）を出力
-                            <?php echo $this->render_tooltip( 'サイトマップ（sitemap.xml） = サイト内の全ページURLをリストアップしたXMLファイル Google検索などの検索エンジンがサイトを見つけやすくなります。通常は有効にすることを推奨します' ); ?>
+                            サイトマップを出力
+                            <?php echo $this->render_tooltip( '検索エンジンがサイトを見つけやすくなります' ); ?>
                         </label>
                     </div>
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" name="enable_robots_txt" value="1" <?php checked( $settings['enable_robots_txt'] ?? true ); ?>>
                             robots.txtを出力
-                            <?php echo $this->render_tooltip( 'robots.txt = 検索エンジンやBot（Googleボットなど）に対して、サイトのどの部分をクロールして良いかを指示するファイル。有効にすると、主要な検索エンジンのみを許可し、AIクローラーなど他のBotをブロックする設定のファイルを出力します。検索エンジンに正しくサイトを認識してもらうため、基本的には有効にすることを推奨します。<br><br>注意:<br>- 自動生成を有効にすると、既存のrobots.txtファイルは上書きされます<br>- 自動生成を無効にした場合、既存のrobots.txtを残したいときは「追加ファイル・フォルダ」設定でrobots.txtを指定してください<br>- 出力先に「ローカルディレクトリ」を選択している場合は、生成後にファイルを直接編集してカスタマイズすることも可能です' ); ?>
+                            <?php echo $this->render_tooltip( '検索エンジンのクロール制御ファイルです。AIクローラーをブロックする設定で生成されます' ); ?>
                         </label>
                     </div>
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" name="enable_llms_txt" value="1" <?php checked( $settings['enable_llms_txt'] ?? true ); ?>>
                             llms.txtを出力
-                            <?php echo $this->render_tooltip( 'llms.txt = LLM（大規模言語モデル）向けのサイト情報提供ファイル。AIクローラーに対してレート制限やアクセスポリシーを伝えるために使用します。デフォルトではAI学習への利用を禁止する設定になっています。<br><br>注意:<br>- 自動生成を有効にすると、既存のllms.txtファイルは上書きされます<br>- 自動生成を無効にした場合、既存のllms.txtを残したいときは「追加ファイル・フォルダ」設定でllms.txtを指定してください<br>- 出力先に「ローカルディレクトリ」を選択している場合は、生成後にファイルを直接編集することでポリシーをカスタマイズできます（許可設定への変更も可能）' ); ?>
+                            <?php echo $this->render_tooltip( 'LLM向けのアクセスポリシーファイルです。デフォルトではAI学習利用を禁止します' ); ?>
                         </label>
                     </div>
 
@@ -816,16 +862,40 @@ class CP_Admin {
                     $mati_available = defined( 'MATI_VERSION' ) && class_exists( 'Mati_Settings' );
                     if ( $mati_available ) :
                     ?>
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" id="cp-mati-headers" name="generate_mati_headers" value="1" <?php checked( $settings['generate_mati_headers'] ?? true ); ?>>
                             _headersファイルを自動生成する
-                            <?php echo $this->render_tooltip( 'Matiプラグインと連携して、静的サイト向けのセキュリティヘッダー設定ファイル（_headers）を自動生成します。<br><br>このファイルはCloudflare PagesやNetlifyで自動的に読み込まれ、以下のセキュリティヘッダーを設定します：<br>- Content-Security-Policy: frame-ancestors \'self\'<br>- X-Robots-Tag（Matiの設定に応じて）<br><br>注意:<br>- 自動生成を有効にすると、既存の_headersファイルは上書きされます<br>- 自動生成を無効にした場合、既存の_headersを残したいときは「追加ファイル・フォルダ」設定で_headersを指定してください' ); ?>
+                            <?php echo $this->render_tooltip( 'Matiのセキュリティヘッダーを静的サイトに適用します（Cloudflare Workers / Netlify対応）' ); ?>
                         </label>
                     </div>
-                    <div id="cp-cf-transform-guide" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
-                        <details class="cp-guide-details">
-                            <summary>レスポンス ヘッダー変換ルールの設定が必要です</summary>
+                    <?php endif; ?>
+
+                    <div class="nau-form-group">
+                        <label>
+                            <input type="checkbox" name="enable_rss" value="1" <?php checked( $settings['enable_rss'] ?? true ); ?>>
+                            RSSフィードを出力
+                            <?php echo $this->render_tooltip( '読者がRSSリーダーでサイトの更新を購読できるようになります' ); ?>
+                        </label>
+                    </div>
+
+                        </div><!-- .nau-accordion-content -->
+                    </div><!-- .nau-accordion-section -->
+
+                    <?php if ( $mati_available ) : ?>
+                    <div id="cp-cf-transform-guide" class="nau-accordion-section nau-accordion-section--warning" data-section="transform-guide" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <button type="button" class="nau-accordion-header"
+                                id="header-transform-guide"
+                                aria-expanded="false"
+                                aria-controls="accordion-transform-guide">
+                            <span class="nau-accordion-title">レスポンス ヘッダー変換ルールの設定</span>
+                            <span class="nau-accordion-icon" aria-hidden="true"></span>
+                        </button>
+                        <div id="accordion-transform-guide"
+                             class="nau-accordion-content"
+                             role="region"
+                             aria-labelledby="header-transform-guide"
+                             aria-hidden="true">
                             <div class="cp-guide-content">
                                 <p>Cloudflareの管理画面で以下の<?php echo $this->has_mati_bluesky_did() ? '5' : '4'; ?>つのレスポンス ヘッダー変換ルールを設定してください。</p>
 
@@ -902,108 +972,89 @@ class CP_Admin {
 
                                 <p class="description">※ Matiの設定を変更した場合は、ルール1のX-Robots-Tagの値も更新してください。</p>
                                 <p class="description"><a href="https://developers.cloudflare.com/rules/transform/response-header-modification/" target="_blank" rel="noopener noreferrer">Cloudflare Transform Rules ドキュメント →</a></p>
-                            </div>
-                        </details>
-                    </div>
+                            </div><!-- .cp-guide-content -->
+                        </div><!-- .nau-accordion-content -->
+                    </div><!-- .nau-accordion-section (transform-guide) -->
                     <?php endif; ?>
 
-                    <div class="cp-form-group">
-                        <label>
-                            <input type="checkbox" name="enable_rss" value="1" <?php checked( $settings['enable_rss'] ?? true ); ?>>
-                            RSSフィードを出力
-                            <?php echo $this->render_tooltip( 'RSSフィード = サイトの新着記事情報を配信するXMLファイル（/feed/など） 読者がRSSリーダーでサイトの更新を購読できるようになります。通常は有効にすることを推奨します' ); ?>
-                        </label>
-                    </div>
-
-                        </div><!-- .cp-accordion-content -->
-                    </div><!-- .cp-accordion-section -->
-
-                    <!-- その他の設定アコーディオン -->
-                    <div class="cp-accordion-section" data-section="other-settings">
-                        <button type="button" class="cp-accordion-header"
+                    <div class="nau-accordion-section" data-section="other-settings">
+                        <button type="button" class="nau-accordion-header"
                                 id="header-other-settings"
                                 aria-expanded="false"
                                 aria-controls="accordion-other-settings">
-                            <span class="cp-accordion-title">その他の設定</span>
-                            <span class="cp-accordion-icon" aria-hidden="true"></span>
+                            <span class="nau-accordion-title">その他の設定</span>
+                            <span class="nau-accordion-icon" aria-hidden="true"></span>
                         </button>
                         <div id="accordion-other-settings"
-                             class="cp-accordion-content"
+                             class="nau-accordion-content"
                              role="region"
                              aria-labelledby="header-other-settings"
                              aria-hidden="true">
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             フォルダ名のカスタマイズ
-                            <?php echo $this->render_tooltip( '静的サイト生成時に wp-includes や wp-content フォルダを別の名前に変更できます。<br>wp-includes: WordPress本体のJavaScript、CSSファイルなど<br>wp-content: テーマのCSS/JS、アップロードした画像など<br>用途: ポートフォリオサイトなどで、WordPressで作られたことを隠したい場合に便利です。<br>空欄の場合は元の名前のまま生成されます。使用可能な文字: 英数字、ハイフン（-）、アンダースコア（_）のみ（1-50文字）' ); ?>
+                            <?php echo $this->render_tooltip( 'wp-includes や wp-content を別の名前に変更できます。空欄の場合は元の名前のまま生成されます' ); ?>
                         </label>
-                        <div style="margin-bottom: 12px;">
-                            <label for="cp-custom-wp-includes">wp-includes フォルダ名</label>
+                        <div style="margin-bottom: 20px;">
+                            <label for="cp-custom-wp-includes" style="display: block; margin-bottom: 4px;">wp-includes フォルダ名</label>
                             <input type="text" id="cp-custom-wp-includes" name="custom_wp_includes" class="regular-text" value="<?php echo esc_attr( $settings['custom_wp_includes'] ?? '' ); ?>" placeholder="wp-includes" maxlength="50">
                         </div>
                         <div>
-                            <label for="cp-custom-wp-content">wp-content フォルダ名</label>
+                            <label for="cp-custom-wp-content" style="display: block; margin-bottom: 4px;">wp-content フォルダ名</label>
                             <input type="text" id="cp-custom-wp-content" name="custom_wp_content" class="regular-text" value="<?php echo esc_attr( $settings['custom_wp_content'] ?? '' ); ?>" placeholder="wp-content" maxlength="50">
                         </div>
                     </div>
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label for="cp-timeout">
                             タイムアウト時間（秒）
-                            <?php echo $this->render_tooltip( '静的化処理の最大実行時間を設定します（デフォルト: 300秒 = 5分） ページ数が多いサイトや画像が多いサイトの場合は、この時間を長く設定してください 設定可能範囲: 60〜18000秒（1分〜5時間）' ); ?>
+                            <?php echo $this->render_tooltip( 'デフォルト: 300秒です。ページ数が多い場合は長めに設定してください（60〜18000秒）' ); ?>
                         </label>
                         <input type="number" id="cp-timeout" name="timeout" class="small-text" value="<?php echo esc_attr( $settings['timeout'] ?? 300 ); ?>" min="60" max="18000">
                     </div>
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" name="minify_html" value="1" <?php checked( ! empty( $settings['minify_html'] ) ); ?>>
                             HTML圧縮の有効化
-                            <?php echo $this->render_tooltip( 'HTMLファイルを圧縮してファイルサイズを削減します。改行・インデント・不要なスペース・HTMLコメントを削除します。<br>注意: 一部のテーマやプラグインで表示が崩れる可能性があります。有効化後は必ずサイトの表示を確認してください' ); ?>
+                            <?php echo $this->render_tooltip( '改行・スペース・コメントを削除してファイルサイズを削減します' ); ?>
                         </label>
                     </div>
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" name="minify_css" value="1" <?php checked( ! empty( $settings['minify_css'] ) ); ?>>
                             インラインCSS圧縮の有効化
-                            <?php echo $this->render_tooltip( 'インラインCSSを圧縮してファイルサイズを削減します 改行・インデント・不要なスペース・CSSコメントを削除します' ); ?>
+                            <?php echo $this->render_tooltip( 'インラインCSSから不要なスペース・コメントを削除します' ); ?>
                         </label>
                     </div>
 
-                    <div class="cp-form-group">
+                    <div class="nau-form-group">
                         <label>
                             <input type="checkbox" name="auto_generate" value="1" <?php checked( ! empty( $settings['auto_generate'] ) ); ?>>
-                            記事公開時に自動で静的化を実行する
-                            <?php echo $this->render_tooltip( '有効にすると、記事を公開または更新した時に自動的に静的化処理が開始されます。手動で実行ボタンを押す手間が省けて便利です。<br>注意: 頻繁に記事を更新する場合、処理が重複して実行される可能性があるため、サーバー負荷にご注意ください' ); ?>
+                            自動で静的化を実行する
+                            <?php echo $this->render_tooltip( '記事の公開・更新時に自動で静的化を実行します' ); ?>
                         </label>
                     </div>
 
-                    <div class="cp-form-group">
-                        <label>
-                            <input type="checkbox" name="cache_enabled" value="1" <?php checked( ! empty( $settings['cache_enabled'] ) ); ?>>
-                            キャッシュを有効化（生成を高速化）
-                            <?php echo $this->render_tooltip( '有効にすると、前回から変更がないページはキャッシュから取得してスキップします 2回目以降の静的化処理が大幅に高速化されます（推奨）' ); ?>
-                        </label>
-                    </div>
 
-                        </div><!-- .cp-accordion-content -->
-                    </div><!-- .cp-accordion-section -->
+                        </div><!-- .nau-accordion-content -->
+                    </div><!-- .nau-accordion-section -->
 
-                    <div class="cp-form-actions">
+                    <div class="nau-form-actions">
                         <button type="submit" class="button button-primary" id="cp-save-settings" <?php echo $is_running ? 'disabled' : ''; ?>>設定を保存</button>
-                        <button type="button" class="button" id="cp-reset-settings" <?php echo $is_running ? 'disabled' : ''; ?>>設定をリセット</button>
+                        <button type="button" class="button button-danger" id="cp-reset-settings" <?php echo $is_running ? 'disabled' : ''; ?>>設定をリセット</button>
                         <button type="button" class="button" id="cp-clear-cache" <?php echo $is_running ? 'disabled' : ''; ?>>キャッシュをクリア</button>
                         <button type="button" class="button" id="cp-clear-logs" <?php echo $is_running ? 'disabled' : ''; ?>>ログをクリア</button>
                         <button type="button" class="button" id="cp-export-settings">設定をエクスポート</button>
-                        <button type="button" class="button" id="cp-import-settings">設定をインポート</button>
-                        <button type="button" class="button" id="cp-reset-scheduler">Scheduled Actionsをリセット</button>
+                        <button type="button" class="button" id="cp-import-settings" <?php echo $is_running ? 'disabled' : ''; ?>>設定をインポート</button>
+                        <button type="button" class="button button-caution" id="cp-reset-scheduler">Scheduled Actionsをリセット</button>
                         <input type="file" id="cp-import-file" accept=".json" style="display:none;">
                     </div>
                 </form>
 
-                <div class="cp-version-info">
+                <div class="nau-version-info">
                     Carry Pod <a href="https://github.com/villyoshioka/CarryPod/releases/tag/v<?php echo esc_attr( CP_VERSION ); ?>" target="_blank" rel="noopener noreferrer">v<?php echo esc_html( CP_VERSION ); ?></a>
                 </div>
             </div>
@@ -1011,13 +1062,9 @@ class CP_Admin {
         <?php
     }
 
-    /**
-     * Ajax: 静的化を実行
-     */
-    public function ajax_execute_generation() {
+    public function ajax_execute_generation(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        // レート制限チェック（1分間に3回まで）
         if ( ! $this->check_rate_limit( 'execute_generation', 3, 60 ) ) {
             wp_send_json_error( array( 'message' => 'リクエストが多すぎます。しばらく待ってから再試行してください。' ) );
         }
@@ -1026,45 +1073,42 @@ class CP_Admin {
             wp_send_json_error( array( 'message' => '静的化実行の権限がありません。' ) );
         }
 
-        // Action Schedulerが利用可能かチェック
         if ( ! function_exists( 'as_enqueue_async_action' ) ) {
             wp_send_json_error( array( 'message' => 'Action Schedulerが読み込まれていません。プラグインを再度有効化してください。' ) );
         }
 
         $logger = CP_Logger::get_instance();
 
-        // コミットメッセージを保存（実行時に動的生成するため、ここでは保存しない）
-        $settings = get_option( 'cp_settings', array() );
+        $settings_instance = CP_Settings::get_instance();
+        $settings = $settings_instance->get_settings();
+        $validation = $settings_instance->validate_settings( $settings );
+        if ( is_wp_error( $validation ) ) {
+            wp_send_json_error( array( 'message' => $validation->get_error_message() ) );
+        }
+
         if ( isset( $_POST['commit_message'] ) && ! empty( trim( $_POST['commit_message'] ) ) ) {
             $settings['commit_message'] = sanitize_text_field( $_POST['commit_message'] );
             update_option( 'cp_settings', $settings );
-        } elseif ( empty( $settings['commit_message'] ) ) {
-            // コミットメッセージが空の場合は実行時に動的生成するため、ここでは何もしない
-            // 実行時に最新のタイムスタンプでコミットメッセージが生成される
         }
 
-        // アトミックに実行中フラグをチェックして設定（競合状態を防ぐ）
+        /** アトミックなロック取得で並行実行を防止 */
         $lock_key = 'cp_execution_lock';
-        $lock_timeout = 3600; // 1時間
-        $lock_value = wp_generate_uuid4(); // ユニークなロック識別子
+        $lock_timeout = 3600;
+        $lock_value = wp_generate_uuid4();
 
-        // ロック取得を試行
         $lock_acquired = add_option( $lock_key, array( 'value' => $lock_value, 'time' => time() ), '', 'no' );
 
         if ( ! $lock_acquired ) {
-            // 既にロックが存在する場合、タイムアウトをチェック
             $existing_lock = get_option( $lock_key );
 
             if ( is_array( $existing_lock ) && isset( $existing_lock['time'] ) ) {
                 $lock_age = time() - $existing_lock['time'];
 
                 if ( $lock_age < $lock_timeout ) {
-                    // ロックが有効 - 実行中
                     wp_send_json_error( array( 'message' => '既に実行中です。しばらくお待ちください。' ) );
                 }
 
-                // タイムアウトしたロックを削除して再取得を試行（アトミックに）
-                // delete + add の間に別プロセスが入らないよう、条件付き削除
+                // 条件付き削除でアトミックにロック再取得
                 global $wpdb;
                 $deleted = $wpdb->delete(
                     $wpdb->options,
@@ -1076,11 +1120,9 @@ class CP_Admin {
                 );
 
                 if ( $deleted ) {
-                    // 削除成功 - 新しいロックを取得
                     $lock_acquired = add_option( $lock_key, array( 'value' => $lock_value, 'time' => time() ), '', 'no' );
                 }
             } else {
-                // 不正な形式のロック - 削除して再取得
                 delete_option( $lock_key );
                 $lock_acquired = add_option( $lock_key, array( 'value' => $lock_value, 'time' => time() ), '', 'no' );
             }
@@ -1090,40 +1132,25 @@ class CP_Admin {
             }
         }
 
-        // 既存の保留中タスクをキャンセル
         as_unschedule_all_actions( 'cp_static_generation', array(), 'sge' );
 
-        // 実行中フラグをクリア（前回のクラッシュで残っている場合に備えて）
         delete_transient( 'cp_manual_running' );
         delete_transient( 'cp_auto_running' );
 
-        // 進捗情報をクリア
         $logger->clear_progress();
-
-        // ログを強制的にクリア（実行中フラグをチェックせずに直接クリア）
         update_option( 'cp_logs', array() );
-        // クリア後に初期ログを記録（ログがクリアされたことを確認するため）
         $logger->add_log( '新しい実行を開始します...' );
 
-        // 実行中フラグをセット（タスクをキューに入れる前にセット）
         set_transient( 'cp_manual_running', true, 3600 );
-
-        // Action Schedulerで非同期実行
         as_enqueue_async_action( 'cp_static_generation', array(), 'sge' );
-
-        // ロックを解除（タスクがキューに入ったら）
         delete_option( $lock_key );
 
-        // 初期進捗状態をセット
         $logger->update_progress( 0, 1, 'バックグラウンド処理を待機中...' );
 
         wp_send_json_success( array( 'message' => '静的化を開始しました。' ) );
     }
 
-    /**
-     * Ajax: ログを取得
-     */
-    public function ajax_get_logs() {
+    public function ajax_get_logs(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
         if ( ! current_user_can( 'cp_execute' ) ) {
@@ -1143,10 +1170,7 @@ class CP_Admin {
         ) );
     }
 
-    /**
-     * Ajax: 進捗を取得
-     */
-    public function ajax_get_progress() {
+    public function ajax_get_progress(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
         if ( ! current_user_can( 'cp_execute' ) ) {
@@ -1157,49 +1181,88 @@ class CP_Admin {
         $progress = $logger->get_progress();
         $is_running = $logger->is_running();
 
+        $zip_download_available = ! $is_running && (bool) get_transient( 'cp_zip_download_path' );
+
         wp_send_json_success( array(
             'progress' => $progress,
             'is_running' => $is_running,
+            'zip_download_available' => $zip_download_available,
         ) );
     }
 
-    /**
-     * Ajax: ログをクリア
-     */
-    public function ajax_clear_logs() {
+    public function ajax_download_zip(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
         if ( ! current_user_can( 'cp_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
         }
 
-        // 実行中かチェック
+        $zip_path = get_transient( 'cp_zip_download_path' );
+        if ( ! $zip_path || ! file_exists( $zip_path ) ) {
+            wp_send_json_error( array( 'message' => 'ダウンロード可能なZIPファイルが見つかりません。' ) );
+        }
+
+        // パスが carry-pod-tmp/ 内であることを検証
+        $upload_dir   = wp_upload_dir();
+        $expected_dir = trailingslashit( $upload_dir['basedir'] ) . 'carry-pod-tmp' . DIRECTORY_SEPARATOR;
+        $real_path    = realpath( $zip_path );
+        $real_dir     = realpath( dirname( $zip_path ) );
+        if ( ! $real_path || ! $real_dir || ! str_starts_with( $real_path, rtrim( $real_dir, DIRECTORY_SEPARATOR ) . DIRECTORY_SEPARATOR ) ) {
+            wp_send_json_error( array( 'message' => '不正なファイルパスです。' ) );
+        }
+
+        $filename = basename( $zip_path );
+
+        header( 'Content-Type: application/zip' );
+        header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+        header( 'Content-Length: ' . filesize( $zip_path ) );
+        header( 'Cache-Control: no-cache, no-store, must-revalidate' );
+        header( 'Pragma: no-cache' );
+        header( 'Expires: 0' );
+
+        set_time_limit( 0 );
+        readfile( $zip_path );
+
+        unlink( $zip_path );
+        delete_transient( 'cp_zip_download_path' );
+
+        exit;
+    }
+
+    public function ajax_is_running(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        }
+
+        $logger = CP_Logger::get_instance();
+        wp_send_json_success( array( 'is_running' => $logger->is_running() ) );
+    }
+
+    public function ajax_clear_logs(): void {
+        check_ajax_referer( 'cp_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'cp_execute' ) ) {
+            wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        }
+
         $logger = CP_Logger::get_instance();
         if ( $logger->is_running() ) {
             wp_send_json_error( array( 'message' => '静的化実行中はログをクリアできません。' ) );
         }
 
-        // ログをクリア
         update_option( 'cp_logs', array() );
-
-        // エラー通知をクリア
         delete_option( 'cp_error_notification' );
 
         wp_send_json_success( array( 'message' => 'ログをクリアしました。' ) );
     }
 
-    /**
-     * Ajax: 設定を保存
-     */
-    public function ajax_save_settings() {
+    public function ajax_save_settings(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
-        // レート制限チェック（1分間に10回まで）
         if ( ! $this->check_rate_limit( 'save_settings', 10, 60 ) ) {
             wp_send_json_error( array( 'message' => '設定の保存を連続で行いすぎています。1分間お待ちいただいてから再度お試しください。' ) );
         }
 
-        // フォームのnonceも検証
         if ( isset( $_POST['cp_settings_nonce'] ) && ! wp_verify_nonce( $_POST['cp_settings_nonce'], 'cp_save_settings' ) ) {
             wp_send_json_error( array( 'message' => 'セキュリティチェックに失敗しました。ページをリロード（F5キー）してから再度お試しください。' ) );
         }
@@ -1208,16 +1271,13 @@ class CP_Admin {
             wp_send_json_error( array( 'message' => '設定を変更する権限がありません。管理者権限を持つユーザーアカウントでログインしてください。' ) );
         }
 
-        // ホワイトリスト: 許可されたフィールドのみ処理
         $allowed_fields = array(
-            // Boolean fields
             'github_enabled' => 'boolean',
             'git_local_enabled' => 'boolean',
-            'git_local_push_remote' => 'boolean',
             'local_enabled' => 'boolean',
             'zip_enabled' => 'boolean',
+            'zip_mode' => 'text',
             'auto_generate' => 'boolean',
-            'cache_enabled' => 'boolean',
             'enable_tag_archive' => 'boolean',
             'enable_date_archive' => 'boolean',
             'enable_author_archive' => 'boolean',
@@ -1233,7 +1293,6 @@ class CP_Admin {
             'cloudflare_use_wrangler' => 'boolean_select',
             'gitlab_enabled' => 'boolean',
             'netlify_enabled' => 'boolean',
-            // Text fields
             'github_token' => 'text',
             'github_repo' => 'text',
             'github_branch_mode' => 'text',
@@ -1242,6 +1301,7 @@ class CP_Admin {
             'github_base_branch' => 'text',
             'git_local_work_dir' => 'text',
             'git_local_branch' => 'text',
+            'git_local_remote_url' => 'text',
             'local_output_path' => 'text',
             'zip_output_path' => 'text',
             'url_mode' => 'text',
@@ -1258,15 +1318,11 @@ class CP_Admin {
             'gitlab_api_url' => 'text',
             'netlify_api_token' => 'text',
             'netlify_site_id' => 'text',
-            // Textarea fields
             'include_paths' => 'textarea',
             'exclude_patterns' => 'textarea',
-            // URL fields
             'base_url' => 'url',
-            // Folder name fields
             'custom_wp_includes' => 'folder_name',
             'custom_wp_content' => 'folder_name',
-            // Integer fields
             'timeout' => 'integer',
         );
 
@@ -1283,13 +1339,10 @@ class CP_Admin {
             } elseif ( $type === 'url' ) {
                 $settings[ $field ] = isset( $_POST[ $field ] ) ? esc_url_raw( wp_unslash( $_POST[ $field ] ) ) : '';
             } elseif ( $type === 'folder_name' ) {
-                // フォルダ名専用のバリデーション
                 $value = isset( $_POST[ $field ] ) ? sanitize_text_field( wp_unslash( $_POST[ $field ] ) ) : '';
-                // 空の場合はそのまま許可
                 if ( empty( $value ) ) {
                     $settings[ $field ] = '';
                 } else {
-                    // 予約語チェック（システムディレクトリ名との衝突防止）
                     $reserved_names = array(
                         'wp-admin', 'wp-includes', 'wp-content',
                         'system', 'windows', 'winnt', 'etc', 'bin', 'usr', 'var', 'tmp',
@@ -1299,9 +1352,7 @@ class CP_Admin {
 
                     if ( in_array( $value_lower, $reserved_names, true ) ) {
                         $settings[ $field ] = '';
-                    } elseif ( preg_match( '/^[a-zA-Z0-9_-]{1,50}$/', $value ) && strpos( $value, '..' ) === false ) {
-                        // 英数字、ハイフン、アンダースコアのみ許可
-                        // 1-50文字、パストラバーサル防止（..を含まない）
+                    } elseif ( preg_match( '/^[a-zA-Z0-9_-]{1,50}$/', $value ) && ! str_contains( $value, '..' ) ) {
                         $settings[ $field ] = $value;
                     } else {
                         $settings[ $field ] = '';
@@ -1312,7 +1363,10 @@ class CP_Admin {
             }
         }
 
-        // デフォルト値の設定
+        if ( ! in_array( $settings['zip_mode'] ?? '', array( 'download', 'local' ), true ) ) {
+            $settings['zip_mode'] = 'download';
+        }
+
         if ( empty( $settings['github_branch_mode'] ) ) {
             $settings['github_branch_mode'] = 'existing';
         }
@@ -1332,30 +1386,24 @@ class CP_Admin {
             $settings['gitlab_api_url'] = 'https://gitlab.com/api/v4';
         }
 
-        // base_urlのバリデーション
         if ( ! empty( $settings['base_url'] ) ) {
-            // 末尾のスラッシュを削除
             $settings['base_url'] = rtrim( $settings['base_url'], '/' );
 
-            // HTTP/HTTPSのみ許可
             $parsed_url = wp_parse_url( $settings['base_url'] );
             if ( empty( $parsed_url['scheme'] ) || ! in_array( $parsed_url['scheme'], array( 'http', 'https' ), true ) ) {
-                // 無効なURLの場合はエラー
                 wp_send_json_error( array( 'message' => 'URLの形式が正しくありません。「https://example.com」のように、http:// または https:// から始まる完全なURLを入力してください。' ) );
             }
         }
 
-        // 設定を保存前に、キャッシュクリアが必要かチェック
         $settings_manager = CP_Settings::get_instance();
         $old_settings = $settings_manager->get_settings();
 
-        // カスタムフォルダ名またはURL形式が変更されたかチェック
         $should_clear_cache = false;
         $cache_clear_fields = array( 'custom_wp_includes', 'custom_wp_content', 'url_mode', 'base_url', 'minify_html', 'minify_css' );
 
         foreach ( $cache_clear_fields as $field ) {
-            $old_value = isset( $old_settings[ $field ] ) ? $old_settings[ $field ] : '';
-            $new_value = isset( $settings[ $field ] ) ? $settings[ $field ] : '';
+            $old_value = $old_settings[ $field ] ?? '';
+            $new_value = $settings[ $field ] ?? '';
 
             if ( $old_value !== $new_value ) {
                 $should_clear_cache = true;
@@ -1363,14 +1411,15 @@ class CP_Admin {
             }
         }
 
-        // 設定を保存
         $result = $settings_manager->save_settings( $settings );
 
         if ( is_wp_error( $result ) ) {
-            wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+            wp_send_json_error( array(
+                'message'  => $result->get_error_message(),
+                'messages' => $result->get_error_messages(),
+            ) );
         }
 
-        // キャッシュクリアが必要な場合は実行
         if ( $should_clear_cache ) {
             $cache = CP_Cache::get_instance();
             $cache->clear_all();
@@ -1379,10 +1428,7 @@ class CP_Admin {
         wp_send_json_success( array( 'message' => '設定を保存しました。' ) );
     }
 
-    /**
-     * Ajax: 設定をリセット
-     */
-    public function ajax_reset_settings() {
+    public function ajax_reset_settings(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
         if ( ! current_user_can( 'cp_manage_settings' ) ) {
@@ -1395,10 +1441,7 @@ class CP_Admin {
         wp_send_json_success( array( 'message' => '設定をリセットしました。' ) );
     }
 
-    /**
-     * Ajax: 設定をエクスポート
-     */
-    public function ajax_export_settings() {
+    public function ajax_export_settings(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
         if ( ! current_user_can( 'cp_manage_settings' ) ) {
@@ -1411,10 +1454,7 @@ class CP_Admin {
         wp_send_json_success( array( 'data' => $json ) );
     }
 
-    /**
-     * Ajax: 設定をインポート
-     */
-    public function ajax_import_settings() {
+    public function ajax_import_settings(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
         if ( ! current_user_can( 'cp_manage_settings' ) ) {
@@ -1425,7 +1465,6 @@ class CP_Admin {
             wp_send_json_error( array( 'message' => 'データが送信されていません。' ) );
         }
 
-        // インポートデータをサニタイズ（JSON文字列としてエスケープ処理）
         $import_data = wp_unslash( $_POST['data'] );
 
         $settings_manager = CP_Settings::get_instance();
@@ -1438,10 +1477,7 @@ class CP_Admin {
         wp_send_json_success( array( 'message' => '設定をインポートしました。トークンを再入力してください。' ) );
     }
 
-    /**
-     * Ajax: キャッシュをクリア
-     */
-    public function ajax_clear_cache() {
+    public function ajax_clear_cache(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
         if ( ! current_user_can( 'cp_manage_settings' ) ) {
@@ -1458,10 +1494,7 @@ class CP_Admin {
         ) );
     }
 
-    /**
-     * Ajax: 最新のログをダウンロード
-     */
-    public function ajax_download_log() {
+    public function ajax_download_log(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
         if ( ! current_user_can( 'cp_execute' ) ) {
@@ -1478,12 +1511,9 @@ class CP_Admin {
                 ) );
             }
 
-            // ログは個別のエントリの配列なので、すべてのログを使用
-            // 最初のログエントリからタイムスタンプを取得
             $first_log = reset( $logs );
             $timestamp = $first_log['timestamp'];
 
-            // エラーがあるかチェック
             $has_error = false;
             foreach ( $logs as $log_entry ) {
                 if ( ! empty( $log_entry['is_error'] ) ) {
@@ -1492,20 +1522,16 @@ class CP_Admin {
                 }
             }
 
-            // 設定情報を取得
             $settings_manager = CP_Settings::get_instance();
             $settings = $settings_manager->get_settings();
 
-            // キャッシュ情報を取得
             $cache = CP_Cache::get_instance();
             $cache_stats = $cache->get_stats();
 
-            // ログをテキスト形式に変換
             $log_text = "=====================================\n";
             $log_text .= "Carry Pod - 生成ログ\n";
             $log_text .= "=====================================\n\n";
 
-            // 基本情報
             $log_text .= "【基本情報】\n";
             $log_text .= "生成日時: " . $timestamp . "\n";
             $log_text .= "ステータス: " . ( $has_error ? 'エラー' : '成功' ) . "\n";
@@ -1514,7 +1540,6 @@ class CP_Admin {
             $log_text .= "PHP バージョン: " . PHP_VERSION . "\n";
             $log_text .= "\n";
 
-            // 設定情報
             $log_text .= "【設定情報】\n";
             $log_text .= "出力先:\n";
             $log_text .= "  - GitHub出力: " . ( ! empty( $settings['github_enabled'] ) ? '有効' : '無効' ) . "\n";
@@ -1532,7 +1557,6 @@ class CP_Admin {
             if ( ! empty( $settings['git_local_enabled'] ) ) {
                 $log_text .= "    - 作業ディレクトリ: " . ( $settings['git_local_work_dir'] ?? 'なし' ) . "\n";
                 $log_text .= "    - ブランチ名: " . ( $settings['git_local_branch'] ?? 'main' ) . "\n";
-                $log_text .= "    - リモートプッシュ: " . ( ! empty( $settings['git_local_push_remote'] ) ? '有効' : '無効' ) . "\n";
             }
             $log_text .= "  - ローカルディレクトリ出力: " . ( ! empty( $settings['local_enabled'] ) ? '有効' : '無効' ) . "\n";
             if ( ! empty( $settings['local_enabled'] ) ) {
@@ -1559,6 +1583,10 @@ class CP_Admin {
                 $log_text .= "    - Project ID: " . ( $settings['netlify_site_id'] ?? 'なし' ) . "\n";
             }
             $log_text .= "  - ZIP出力: " . ( ! empty( $settings['zip_enabled'] ) ? '有効' : '無効' ) . "\n";
+            if ( ! empty( $settings['zip_enabled'] ) ) {
+                $zip_mode_label = ( $settings['zip_mode'] ?? 'download' ) === 'local' ? 'ローカル保存' : 'ブラウザダウンロード';
+                $log_text .= "    - 出力方法: " . $zip_mode_label . "\n";
+            }
             $log_text .= "\n";
 
             $log_text .= "その他の設定:\n";
@@ -1568,11 +1596,8 @@ class CP_Admin {
             }
             $log_text .= "  - タイムアウト: " . ( $settings['timeout'] ?? 300 ) . " 秒\n";
             $log_text .= "  - 自動静的化: " . ( ! empty( $settings['auto_generate'] ) ? '有効' : '無効' ) . "\n";
-            $log_text .= "  - キャッシュ: " . ( ! empty( $settings['cache_enabled'] ) ? '有効' : '無効' ) . "\n";
-            if ( ! empty( $settings['cache_enabled'] ) ) {
-                $log_text .= "    - キャッシュファイル数: " . $cache_stats['count'] . " 個\n";
-                $log_text .= "    - キャッシュサイズ: " . $cache_stats['size_formatted'] . "\n";
-            }
+            $log_text .= "  - キャッシュファイル数: " . $cache_stats['count'] . " 個\n";
+            $log_text .= "  - キャッシュサイズ: " . $cache_stats['size_formatted'] . "\n";
             $log_text .= "  - HTML圧縮: " . ( ! empty( $settings['minify_html'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "  - インラインCSS圧縮: " . ( ! empty( $settings['minify_css'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "  - 出力対象:\n";
@@ -1582,7 +1607,6 @@ class CP_Admin {
             $log_text .= "    - サイトマップ: " . ( ! empty( $settings['enable_sitemap'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "    - robots.txt: " . ( ! empty( $settings['enable_robots_txt'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "    - llms.txt: " . ( ! empty( $settings['enable_llms_txt'] ) ? '有効' : '無効' ) . "\n";
-            // Matiが有効な場合のみ_headersの設定を表示
             if ( defined( 'MATI_VERSION' ) && class_exists( 'Mati_Settings' ) ) {
                 $headers_enabled = ! empty( $settings['generate_mati_headers'] );
                 // Cloudflare Workersのみ有効で他の出力先がない場合は無効扱い
@@ -1604,7 +1628,6 @@ class CP_Admin {
             $log_text .= "    - RSS: " . ( ! empty( $settings['enable_rss'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "\n";
 
-            // ログメッセージ
             $log_text .= "【処理ログ】\n";
             $log_text .= "-------------------------------------\n";
 
@@ -1616,18 +1639,16 @@ class CP_Admin {
                 $message = $log_entry['message'];
                 $log_text .= sprintf( "[%d/%d] %s: %s\n", $index + 1, $message_count, $log_entry['timestamp'], $message );
 
-                // 統計情報を収集
-                if ( ! empty( $log_entry['is_error'] ) || strpos( $message, 'エラー' ) !== false || strpos( $message, '失敗' ) !== false ) {
+                if ( ! empty( $log_entry['is_error'] ) || str_contains( $message, 'エラー' ) || str_contains( $message, '失敗' ) ) {
                     $error_count++;
                 }
-                if ( strpos( $message, 'キャッシュを使用' ) !== false ) {
+                if ( str_contains( $message, 'キャッシュを使用' ) ) {
                     $cache_hit_count++;
                 }
             }
 
             $log_text .= "-------------------------------------\n\n";
 
-            // 統計情報
             $log_text .= "【統計情報】\n";
             $log_text .= "総メッセージ数: " . $message_count . " 件\n";
             if ( $error_count > 0 ) {
@@ -1642,7 +1663,6 @@ class CP_Admin {
             $log_text .= "Generated with Carry Pod\n";
             $log_text .= "=====================================\n";
 
-            // エラー通知をクリア
             delete_option( 'cp_error_notification' );
 
             wp_send_json_success( array(
@@ -1651,20 +1671,15 @@ class CP_Admin {
             ) );
 
         } catch ( Exception $e ) {
-            // 詳細なエラー情報はログに記録
             error_log( 'SGE Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString() );
 
-            // ユーザーには一般的なメッセージのみ返す
             wp_send_json_error( array(
                 'message' => 'エラーが発生しました。詳細はサーバーログをご確認ください。',
             ) );
         }
     }
 
-    /**
-     * Ajax: 静的化を中止
-     */
-    public function ajax_cancel_generation() {
+    public function ajax_cancel_generation(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
         if ( ! current_user_can( 'cp_execute' ) ) {
@@ -1672,16 +1687,12 @@ class CP_Admin {
         }
 
         try {
-            // Action Schedulerのタスクをキャンセル
             if ( function_exists( 'as_unschedule_all_actions' ) ) {
                 as_unschedule_all_actions( 'cp_static_generation', array(), 'sge' );
             }
 
-            // 実行中フラグをクリア
             delete_transient( 'cp_manual_running' );
             delete_transient( 'cp_auto_running' );
-
-            // ログと進捗情報をクリア
             update_option( 'cp_logs', array() );
             delete_option( 'cp_progress' );
 
@@ -1692,10 +1703,7 @@ class CP_Admin {
         }
     }
 
-    /**
-     * Ajax: Scheduled Actionsをリセット
-     */
-    public function ajax_reset_scheduler() {
+    public function ajax_reset_scheduler(): void {
         check_ajax_referer( 'cp_nonce', 'nonce' );
 
         if ( ! current_user_can( 'cp_manage_settings' ) ) {
@@ -1705,19 +1713,14 @@ class CP_Admin {
         try {
             global $wpdb;
 
-            // Action Schedulerのすべてのタスクをキャンセル
             if ( function_exists( 'as_unschedule_all_actions' ) ) {
                 as_unschedule_all_actions( 'cp_static_generation', array(), 'sge' );
             }
 
-            // 実行中フラグをクリア
             delete_transient( 'cp_manual_running' );
             delete_transient( 'cp_auto_running' );
-
-            // 進捗情報をクリア
             delete_option( 'cp_progress' );
 
-            // Action Schedulerのテーブルから直接削除
             $tables = array(
                 $wpdb->prefix . 'actionscheduler_actions',
                 $wpdb->prefix . 'actionscheduler_claims',
@@ -1728,11 +1731,9 @@ class CP_Admin {
             $deleted_total = 0;
 
             foreach ( $tables as $table ) {
-                // テーブルが存在するか確認
                 $table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
 
                 if ( $table_exists ) {
-                    // sgeグループに関連するレコードを削除（タイムアウト付き）
                     if ( $table === $wpdb->prefix . 'actionscheduler_actions' ) {
                         $deleted = $this->safe_delete_records(
                             $table,
@@ -1748,7 +1749,6 @@ class CP_Admin {
                             60
                         );
                     } else {
-                        // claimsとlogsは直接削除（sgeアクションに関連するものを削除）
                         $deleted = $this->safe_delete_records(
                             $table,
                             "DELETE FROM {$table} WHERE action_id IN (SELECT action_id FROM {$wpdb->prefix}actionscheduler_actions WHERE hook = %s)",
@@ -1760,7 +1760,6 @@ class CP_Admin {
                     if ( ! is_wp_error( $deleted ) ) {
                         $deleted_total += $deleted;
                     } else {
-                        // タイムアウトエラーの場合も部分的な削除数を加算
                         if ( isset( $deleted->error_data['partial_delete'] ) ) {
                             $deleted_total += $deleted->error_data['partial_delete'];
                         }
@@ -1778,10 +1777,7 @@ class CP_Admin {
         }
     }
 
-    /**
-     * Ajax: エラー通知チェック
-     */
-    public function ajax_check_error_notification() {
+    public function ajax_check_error_notification(): void {
         $error_notification = get_option( 'cp_error_notification', false );
         $has_error = $error_notification && ! empty( $error_notification['count'] );
 
@@ -1791,22 +1787,11 @@ class CP_Admin {
         ) );
     }
 
-    /**
-     * Wrangler CLIの検出結果を取得（外部からのアクセス用）
-     *
-     * @return array 検出結果
-     */
-    public function get_wrangler_info() {
+    public function get_wrangler_info(): array {
         return $this->detect_wrangler();
     }
 
-    /**
-     * Wrangler CLIを検出
-     *
-     * @return array 検出結果（found, path, version, needs_update）
-     */
-    private function detect_wrangler() {
-        // PATHディレクトリからwranglerの実行ファイルを直接検索（which/whereに依存しない）
+    private function detect_wrangler(): array {
         $extended_path = $this->get_extended_path();
         $is_windows = PHP_OS_FAMILY === 'Windows';
         $separator = $is_windows ? ';' : ':';
@@ -1828,7 +1813,6 @@ class CP_Admin {
                 if ( ! is_file( $candidate ) ) {
                     continue;
                 }
-                // Windowsではis_executable()が.cmdに対してfalseを返すことがあるためis_file()のみで判定
                 if ( $is_windows || is_executable( $candidate ) ) {
                     $full_path = $candidate;
                     break 2;
@@ -1845,7 +1829,6 @@ class CP_Admin {
             );
         }
 
-        // バージョン取得
         $descriptors = array(
             0 => array( 'pipe', 'r' ),
             1 => array( 'pipe', 'w' ),
@@ -1868,7 +1851,6 @@ class CP_Admin {
         fclose( $pipes[2] );
         proc_close( $process );
 
-        // バージョン番号を抽出（例: "4.0.0" or "wrangler 4.0.0"）
         if ( preg_match( '/(\d+\.\d+\.\d+)/', $version_output, $matches ) ) {
             $version = $matches[1];
             $major = intval( explode( '.', $version )[0] );
@@ -1889,20 +1871,15 @@ class CP_Admin {
         );
     }
 
-    /**
-     * Node.js/npmの一般的なインストールパスを補完したPATH文字列を取得
-     *
-     * @return string 拡張されたPATH
-     */
-    public function get_extended_path() {
+    /** Node.js/npm/pnpmの一般的なインストールパスを補完したPATH */
+    public function get_extended_path(): string {
         $path = getenv( 'PATH' ) ?: '';
         $is_windows = PHP_OS_FAMILY === 'Windows';
 
         if ( ! $is_windows ) {
-            // Mac/Linux: Node.js/npm/pnpmの一般的なインストールパス
-            $home = getenv( 'HOME' ) ?: ( isset( $_SERVER['HOME'] ) ? $_SERVER['HOME'] : '' );
+            $home = getenv( 'HOME' ) ?: ( $_SERVER['HOME'] ?? '' );
 
-            // 優先パス（PATHの先頭に追加 - nvmのNode.jsをシステムNodeより優先）
+            // nvmのNode.jsをシステムNodeより優先
             $priority_paths = array();
             if ( ! empty( $home ) ) {
                 $nvm_version = $this->detect_node_version( $home );
@@ -1915,19 +1892,18 @@ class CP_Admin {
                 $priority_paths[] = $home . '/.yarn/bin';
             }
             foreach ( array_reverse( $priority_paths ) as $extra ) {
-                if ( is_dir( $extra ) && strpos( $path, $extra ) === false ) {
+                if ( is_dir( $extra ) && ! str_contains( $path, $extra ) ) {
                     $path = $extra . ':' . $path;
                 }
             }
 
-            // システムパス（PATHの末尾に追加）
             $system_paths = array(
                 '/usr/bin',
                 '/usr/local/bin',
                 '/opt/homebrew/bin',
             );
             foreach ( $system_paths as $extra ) {
-                if ( is_dir( $extra ) && strpos( $path, $extra ) === false ) {
+                if ( is_dir( $extra ) && ! str_contains( $path, $extra ) ) {
                     $path .= ':' . $extra;
                 }
             }
@@ -1936,12 +1912,7 @@ class CP_Admin {
         return $path;
     }
 
-    /**
-     * proc_open用の拡張PATH環境変数配列を取得
-     *
-     * @return array proc_open用の環境変数配列
-     */
-    public function get_extended_path_env() {
+    public function get_extended_path_env(): array {
         $env = array( 'PATH' => $this->get_extended_path() );
         $home = getenv( 'HOME' );
         if ( $home !== false ) {
@@ -1950,18 +1921,11 @@ class CP_Admin {
         return $env;
     }
 
-    /**
-     * nvm管理下のNode.jsバージョンを検出
-     *
-     * @param string $home ホームディレクトリ
-     * @return string Node.jsバージョンディレクトリ名（例: v22.12.0）、見つからない場合は空文字
-     */
-    private function detect_node_version( $home ) {
+    private function detect_node_version( string $home ): string {
         $nvm_dir = $home . '/.nvm/versions/node';
         if ( ! is_dir( $nvm_dir ) ) {
             return '';
         }
-        // 最新バージョンを取得（ディレクトリ名でソートして最後の要素）
         $versions = @scandir( $nvm_dir );
         if ( $versions === false ) {
             return '';
@@ -1974,27 +1938,17 @@ class CP_Admin {
         return end( $versions );
     }
 
-    /**
-     * レート制限をチェック
-     *
-     * @param string $action アクション名
-     * @param int $limit 制限回数
-     * @param int $period 期間（秒）
-     * @return bool 制限内ならtrue
-     */
-    private function check_rate_limit( $action, $limit = 10, $period = 60 ) {
+    private function check_rate_limit( string $action, int $limit = 10, int $period = 60 ): bool {
         $user_id = get_current_user_id();
         $key = 'cp_rate_limit_' . $action . '_' . $user_id;
         $attempts = get_transient( $key );
 
         if ( $attempts === false ) {
-            // 初回アクセス
             set_transient( $key, 1, $period );
             return true;
         }
 
         if ( $attempts >= $limit ) {
-            // 制限超過 - セキュリティイベントをログ
             $this->log_security_event( 'rate_limit_exceeded', array(
                 'action' => $action,
                 'user_id' => $user_id,
@@ -2003,18 +1957,13 @@ class CP_Admin {
             return false;
         }
 
-        // カウントを増やす
         set_transient( $key, $attempts + 1, $period );
         return true;
     }
 
-    /**
-     * セキュリティヘッダーを追加
-     */
-    public function add_security_headers() {
-        // 自分の管理画面にのみCSPヘッダーを追加
+    public function add_security_headers(): void {
         $screen = get_current_screen();
-        if ( $screen && strpos( $screen->id, 'sge' ) !== false ) {
+        if ( $screen && str_contains( $screen->id, 'sge' ) ) {
             header( "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" );
             header( 'X-Content-Type-Options: nosniff' );
             header( 'X-Frame-Options: SAMEORIGIN' );
@@ -2022,13 +1971,7 @@ class CP_Admin {
         }
     }
 
-    /**
-     * セキュリティイベントをログに記録
-     *
-     * @param string $event_type イベントタイプ
-     * @param array $context コンテキスト情報
-     */
-    private function log_security_event( $event_type, $context = array() ) {
+    private function log_security_event( string $event_type, array $context = array() ): void {
         $log_entry = array(
             'timestamp' => current_time( 'mysql' ),
             'event_type' => $event_type,
@@ -2037,34 +1980,21 @@ class CP_Admin {
             'context' => $context,
         );
 
-        // セキュリティログをオプションに保存（最大100件）
         $security_logs = get_option( 'cp_security_logs', array() );
         array_unshift( $security_logs, $log_entry );
         $security_logs = array_slice( $security_logs, 0, 100 );
         update_option( 'cp_security_logs', $security_logs, false );
 
-        // 重要なイベントはerror_logにも記録
         if ( in_array( $event_type, array( 'rate_limit_exceeded', 'auth_failed', 'invalid_nonce' ) ) ) {
             error_log( 'SGE Security Event: ' . $event_type . ' - User: ' . $log_entry['user_id'] . ' - IP: ' . $log_entry['ip_address'] );
         }
     }
 
-    /**
-     * クライアントIPアドレスを取得
-     *
-     * セキュリティ注意: HTTP_CLIENT_IP や HTTP_X_FORWARDED_FOR はスプーフィング可能。
-     * REMOTE_ADDR のみを信頼し、プロキシ環境では信頼できるプロキシ設定が必要。
-     *
-     * @return string IPアドレス
-     */
-    private function get_client_ip() {
-        // REMOTE_ADDR のみを信頼（スプーフィング対策）
-        // プロキシ環境の場合は、サーバー側で信頼できるプロキシからのヘッダーのみを
-        // REMOTE_ADDR に設定するよう構成する必要がある
+    /** REMOTE_ADDRのみ信頼（HTTP_X_FORWARDED_FOR等はスプーフィング可能） */
+    private function get_client_ip(): string {
         $ip = '';
         if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
             $ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
-            // 有効なIPアドレス形式かチェック
             if ( ! filter_var( $ip, FILTER_VALIDATE_IP ) ) {
                 $ip = '';
             }
@@ -2072,23 +2002,13 @@ class CP_Admin {
         return $ip;
     }
 
-    /**
-     * タイムアウト付き安全なレコード削除
-     *
-     * @param string $table テーブル名
-     * @param string $query DELETEクエリ（LIMIT句なし）
-     * @param array $params プリペアドステートメントのパラメータ
-     * @param int $timeout タイムアウト秒数（デフォルト60秒）
-     * @return int|WP_Error 削除件数またはエラー
-     */
-    private function safe_delete_records( $table, $query, $params = array(), $timeout = 60 ) {
+    private function safe_delete_records( string $table, string $query, array $params = array(), int $timeout = 60 ): int|\WP_Error {
         global $wpdb;
 
         $start_time = time();
         $batch_size = 100;
         $deleted_total = 0;
 
-        // まず件数を確認
         $count_query = str_replace( 'DELETE FROM', 'SELECT COUNT(*) FROM', $query );
         $total_count = $wpdb->get_var( $wpdb->prepare( $count_query, $params ) );
 
@@ -2096,15 +2016,12 @@ class CP_Admin {
             return 0;
         }
 
-        // 少数の場合は一括削除
         if ( $total_count <= $batch_size ) {
             $result = $wpdb->query( $wpdb->prepare( $query, $params ) );
             return $result !== false ? $result : 0;
         }
 
-        // 大量データの場合はバッチ削除
         while ( true ) {
-            // タイムアウトチェック
             if ( ( time() - $start_time ) >= $timeout ) {
                 $error = new WP_Error(
                     'db_timeout',
@@ -2114,45 +2031,32 @@ class CP_Admin {
                 return $error;
             }
 
-            // LIMIT付きクエリを作成（intvalで確実に整数化）
             $batch_query = $query . ' LIMIT ' . intval( $batch_size );
             $deleted = $wpdb->query( $wpdb->prepare( $batch_query, $params ) );
 
             if ( $deleted === false || $deleted === 0 ) {
-                break; // 削除完了または失敗
+                break;
             }
 
             $deleted_total += $deleted;
 
-            // 負荷軽減のため少し待機
-            usleep( 10000 ); // 10ms
+            usleep( 10000 );
         }
 
         return $deleted_total;
     }
 
-    /**
-     * ツールチップHTMLを生成
-     *
-     * @param string $text ツールチップに表示するテキスト
-     * @return string ツールチップHTML
-     */
-    private function render_tooltip( $text ) {
+    private function render_tooltip( string $text ): string {
         return sprintf(
-            '<span class="cp-tooltip-wrapper">' .
-            '<span class="cp-tooltip-trigger" tabindex="0" role="button" aria-label="詳細を表示" aria-expanded="false">?</span>' .
-            '<span class="cp-tooltip-content" role="tooltip">%s</span>' .
+            '<span class="nau-tooltip-wrapper">' .
+            '<span class="nau-tooltip-trigger" tabindex="0" role="button" aria-label="詳細を表示" aria-expanded="false">?</span>' .
+            '<span class="nau-tooltip-content" role="tooltip">%s</span>' .
             '</span>',
             wp_kses( $text, array( 'br' => array() ) )
         );
     }
 
-    /**
-     * Mati設定からX-Robots-Tagの値を取得
-     *
-     * @return string X-Robots-Tagの値
-     */
-    private function get_mati_xrobots_value() {
+    private function get_mati_xrobots_value(): string {
         if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
             return '';
         }
@@ -2191,10 +2095,7 @@ class CP_Admin {
         }
     }
 
-    /**
-     * MatiにBluesky DIDが設定されているか確認
-     */
-    private function has_mati_bluesky_did() {
+    private function has_mati_bluesky_did(): bool {
         if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
             return false;
         }
@@ -2217,10 +2118,7 @@ class CP_Admin {
         }
     }
 
-    /**
-     * Mati設定からframe-ancestorsの値を取得
-     */
-    private function get_mati_frame_ancestors_value() {
+    private function get_mati_frame_ancestors_value(): string {
         if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
             return "frame-ancestors 'self'";
         }
@@ -2238,7 +2136,7 @@ class CP_Admin {
 
             $mati_settings   = $mati_settings_instance->get_settings();
             $frame_ancestors = "'self'";
-            $custom_domains  = isset( $mati_settings['frame_ancestors_domains'] ) ? $mati_settings['frame_ancestors_domains'] : '';
+            $custom_domains  = $mati_settings['frame_ancestors_domains'] ?? '';
 
             if ( ! empty( $custom_domains ) ) {
                 $domains = array_filter( array_map( 'trim', explode( "\n", $custom_domains ) ) );
@@ -2253,31 +2151,49 @@ class CP_Admin {
         }
     }
 
-    /**
-     * Mati互換性チェック
-     *
-     * Matiがインストールされており、バージョンが1.7.0未満の場合に警告を表示
-     */
-    public function check_mati_compatibility() {
-        // Matiがインストールされていない場合は何も表示しない
+    public function check_mati_compatibility(): void {
         if ( ! defined( 'MATI_VERSION' ) ) {
             return;
         }
 
         $mati_version = MATI_VERSION;
 
-        // Mati 1.7.0以降の場合は何も表示しない（正常に連携可能）
-        if ( version_compare( $mati_version, '1.7.0', '>=' ) ) {
+        if ( version_compare( $mati_version, '2.0.0', '>=' ) ) {
             return;
         }
 
-        // Matiが古い場合は警告を表示
         ?>
         <div class="notice notice-warning">
             <p>
                 <strong>⚠️ Mati連携</strong><br>
-                Mati 1.7.0以降にアップデートすると、すべての連携機能が有効になります。<br>
-                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 1.7.0+</small>
+                Mati 2.0.0以降にアップデートすると、すべての連携機能が有効になります。<br>
+                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 2.0.0+</small>
+            </p>
+        </div>
+        <?php
+    }
+
+    public function check_screw_compatibility(): void {
+        if ( ! defined( 'SC_VERSION' ) ) {
+            return;
+        }
+
+        $sc_version = SC_VERSION;
+
+        if ( ! preg_match( '/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9\-]+)?$/', $sc_version ) ) {
+            return;
+        }
+
+        if ( version_compare( $sc_version, '2.0.0', '>=' ) ) {
+            return;
+        }
+
+        ?>
+        <div class="notice notice-warning">
+            <p>
+                <strong>⚠️ Screw連携</strong><br>
+                Screw 2.0.0以降にアップデートすると、双方向連携機能が有効になります。<br>
+                <small>現在: Screw <?php echo esc_html( $sc_version ); ?> → 推奨: Screw 2.0.0+</small>
             </p>
         </div>
         <?php

@@ -1,9 +1,6 @@
 <?php
 /**
- * GitHub からの自動更新クラス
- *
- * GitHub Releases API を使用してプラグインの更新をチェックし、
- * WordPress の更新システムに統合します。
+ * GitHub Releases APIを使用した自動更新クラス
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -12,80 +9,39 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CP_Updater {
 
-    /**
-     * GitHub リポジトリのオーナー
-     */
-    private $github_owner = 'villyoshioka';
+    private string $github_owner = 'villyoshioka';
+    private string $github_repo = 'CarryPod';
+    private string $plugin_basename;
+    private string $plugin_slug;
+    private string $current_version;
+    private string $cache_key = 'cp_github_release_cache';
+    private int $cache_expiry = 43200; // 12時間
 
-    /**
-     * GitHub リポジトリ名
-     */
-    private $github_repo = 'CarryPod';
-
-    /**
-     * プラグインのベースネーム
-     */
-    private $plugin_basename;
-
-    /**
-     * プラグインのスラッグ
-     */
-    private $plugin_slug;
-
-    /**
-     * 現在のバージョン
-     */
-    private $current_version;
-
-    /**
-     * キャッシュキー
-     */
-    private $cache_key = 'cp_github_release_cache';
-
-    /**
-     * キャッシュ有効期間（秒）
-     */
-    private $cache_expiry = 43200; // 12時間
-
-    /**
-     * コンストラクタ
-     */
     public function __construct() {
         $this->plugin_basename = plugin_basename( CP_PLUGIN_DIR . 'carry-pod.php' );
         $this->plugin_slug = dirname( $this->plugin_basename );
         $this->current_version = CP_VERSION;
 
-        // フックを登録
         add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_for_update' ) );
         add_filter( 'plugins_api', array( $this, 'plugin_info' ), 10, 3 );
         add_filter( 'upgrader_source_selection', array( $this, 'fix_source_dir' ), 10, 4 );
         add_action( 'upgrader_process_complete', array( $this, 'on_upgrade_complete' ), 10, 2 );
     }
 
-    /**
-     * プラグイン更新完了時にキャッシュをクリア
-     *
-     * @param WP_Upgrader $upgrader アップグレーダーインスタンス
-     * @param array       $options  更新オプション
-     */
-    public function on_upgrade_complete( $upgrader, $options ) {
-        // プラグイン更新の場合のみ処理
+    public function on_upgrade_complete( $upgrader, $options ): void {
         if ( $options['action'] !== 'update' || $options['type'] !== 'plugin' ) {
             return;
         }
 
-        // このプラグインが更新対象に含まれているかチェック
-        $plugins = isset( $options['plugins'] ) ? $options['plugins'] : array();
+        $plugins = $options['plugins'] ?? array();
         if ( ! is_array( $plugins ) ) {
             $plugins = array( $plugins );
         }
 
         if ( in_array( $this->plugin_basename, $plugins, true ) ) {
-            // GitHubリリースキャッシュをクリア（通常キャッシュとベータ用キャッシュ両方）
             delete_transient( $this->cache_key );
             delete_transient( $this->cache_key . '_beta' );
 
-            // WordPressの更新トランジェントからこのプラグインを削除
             $update_plugins = get_site_transient( 'update_plugins' );
             if ( $update_plugins && isset( $update_plugins->response[ $this->plugin_basename ] ) ) {
                 unset( $update_plugins->response[ $this->plugin_basename ] );
@@ -94,21 +50,13 @@ class CP_Updater {
         }
     }
 
-    /**
-     * 更新をチェック
-     *
-     * @param object $transient 更新トランジェント
-     * @return object 更新されたトランジェント
-     */
-    public function check_for_update( $transient ) {
+    public function check_for_update( $transient ): object {
         if ( empty( $transient->checked ) ) {
             return $transient;
         }
 
-        // WordPressが認識している実際のインストール済みバージョンを使用
-        $current_version = isset( $transient->checked[ $this->plugin_basename ] )
-            ? $transient->checked[ $this->plugin_basename ]
-            : $this->current_version;
+        $current_version = $transient->checked[ $this->plugin_basename ]
+            ?? $this->current_version;
 
         $release = $this->get_latest_release();
 
@@ -118,15 +66,13 @@ class CP_Updater {
 
         $latest_version = ltrim( $release['tag_name'], 'v' );
 
-        // メジャーバージョンチェック（メジャーバージョンが異なる場合は自動更新を提供しない）
+        // メジャーバージョンが異なる場合は自動更新を提供しない
         $current_parts = explode( '.', $current_version );
         $latest_parts = explode( '.', $latest_version );
-        $current_major = isset( $current_parts[0] ) ? (int) $current_parts[0] : 0;
-        $latest_major = isset( $latest_parts[0] ) ? (int) $latest_parts[0] : 0;
+        $current_major = (int) ( $current_parts[0] ?? 0 );
+        $latest_major = (int) ( $latest_parts[0] ?? 0 );
 
         if ( $current_major !== $latest_major ) {
-            // メジャーバージョンが異なる場合は自動更新を提供しない
-            // （v2.0.0通知機能が別途表示される）
             return $transient;
         }
 
@@ -143,15 +89,13 @@ class CP_Updater {
                     'icons'       => array(),
                     'banners'     => array(),
                     'tested'      => '',
-                    'requires_php' => '7.4',
+                    'requires_php' => '8.3',
                 );
             }
         } else {
-            // 更新不要の場合、responseから削除してno_updateに移動
             if ( isset( $transient->response[ $this->plugin_basename ] ) ) {
                 unset( $transient->response[ $this->plugin_basename ] );
             }
-            // no_updateに登録（最新版であることを明示）
             if ( ! isset( $transient->no_update[ $this->plugin_basename ] ) ) {
                 $transient->no_update[ $this->plugin_basename ] = (object) array(
                     'slug'        => $this->plugin_slug,
@@ -166,15 +110,7 @@ class CP_Updater {
         return $transient;
     }
 
-    /**
-     * プラグイン情報を取得（詳細ポップアップ用）
-     *
-     * @param false|object|array $result 結果
-     * @param string $action アクション
-     * @param object $args 引数
-     * @return false|object 結果
-     */
-    public function plugin_info( $result, $action, $args ) {
+    public function plugin_info( $result, $action, $args ): false|object {
         if ( $action !== 'plugin_information' ) {
             return $result;
         }
@@ -205,32 +141,22 @@ class CP_Updater {
                 'changelog'    => $this->format_changelog( $release['body'] ),
             ),
             'download_link'     => $download_url,
-            'requires'          => '6.0',
+            'requires'          => '6.8',
             'tested'            => '',
-            'requires_php'      => '7.4',
+            'requires_php'      => '8.2',
             'last_updated'      => $release['published_at'],
         );
     }
 
-    /**
-     * GitHub から最新リリース情報を取得
-     *
-     * @return array|false リリース情報または失敗時false
-     */
-    private function get_latest_release() {
-        // ベータチャンネルが有効かどうかを確認
+    private function get_latest_release(): array|false {
         $include_prerelease = $this->is_beta_channel_enabled();
-
-        // キャッシュキーを分ける（ベータとノーマル）
         $cache_key = $include_prerelease ? $this->cache_key . '_beta' : $this->cache_key;
 
-        // キャッシュをチェック
         $cached = get_transient( $cache_key );
         if ( $cached !== false ) {
             return $cached;
         }
 
-        // ベータチャンネルの場合は全リリースを取得、通常は最新のみ
         if ( $include_prerelease ) {
             $url = sprintf(
                 'https://api.github.com/repos/%s/%s/releases',
@@ -264,17 +190,14 @@ class CP_Updater {
 
         $body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-        // JSONデコードエラーチェック
         if ( json_last_error() !== JSON_ERROR_NONE ) {
             return false;
         }
 
-        // ベータチャンネルの場合は配列から最新を選択
         if ( $include_prerelease ) {
             $body = $this->get_latest_from_releases( $body );
         }
 
-        // 必須フィールドの検証
         if ( empty( $body ) || ! is_array( $body ) ) {
             return false;
         }
@@ -286,39 +209,24 @@ class CP_Updater {
             }
         }
 
-        // tag_name の形式を検証（vX.X.X または X.X.X）
         if ( ! preg_match( '/^v?\d+\.\d+(\.\d+)?(-[a-zA-Z0-9.]+)?$/', $body['tag_name'] ) ) {
             return false;
         }
 
-        // キャッシュに保存
         set_transient( $cache_key, $body, $this->cache_expiry );
 
         return $body;
     }
 
-    /**
-     * ベータチャンネルが有効かどうかを確認
-     *
-     * @return bool 有効ならtrue
-     */
-    private function is_beta_channel_enabled() {
+    private function is_beta_channel_enabled(): bool {
         return (bool) get_transient( 'cp_beta_channel' );
     }
 
-    /**
-     * リリース一覧から最新のリリースを取得（プレリリース含む）
-     *
-     * @param array $releases リリース一覧
-     * @return array|false 最新のリリース情報
-     */
-    private function get_latest_from_releases( $releases ) {
+    private function get_latest_from_releases( array $releases ): array|false {
         if ( empty( $releases ) || ! is_array( $releases ) ) {
             return false;
         }
 
-        // リリースは公開日順（降順）で返されるので、最初の要素が最新
-        // プレリリースも含めて最初のものを返す
         foreach ( $releases as $release ) {
             if ( is_array( $release ) && isset( $release['tag_name'] ) ) {
                 return $release;
@@ -328,19 +236,11 @@ class CP_Updater {
         return false;
     }
 
-    /**
-     * ダウンロードURLを取得
-     *
-     * @param array $release リリース情報
-     * @return string|false ダウンロードURL
-     */
-    private function get_download_url( $release ) {
-        // carry-pod.zip という名前のアセットを探す
+    private function get_download_url( array $release ): string|false {
         if ( ! empty( $release['assets'] ) && is_array( $release['assets'] ) ) {
             foreach ( $release['assets'] as $asset ) {
                 if ( isset( $asset['name'] ) && $asset['name'] === 'carry-pod.zip' ) {
                     if ( isset( $asset['browser_download_url'] ) ) {
-                        // SSRF対策: URLがGitHubのドメインであることを検証
                         if ( $this->is_valid_github_url( $asset['browser_download_url'] ) ) {
                             return $asset['browser_download_url'];
                         }
@@ -349,29 +249,21 @@ class CP_Updater {
             }
         }
 
-        // carry-pod.zip が見つからない場合はfalse
         return false;
     }
 
-    /**
-     * URLが正当なGitHub URLかどうかを検証
-     *
-     * @param string $url 検証するURL
-     * @return bool 正当なGitHub URLならtrue
-     */
-    private function is_valid_github_url( $url ) {
+    /** SSRF対策: GitHubドメインのみ許可 */
+    private function is_valid_github_url( string $url ): bool {
         if ( empty( $url ) || ! is_string( $url ) ) {
             return false;
         }
 
         $parsed = wp_parse_url( $url );
 
-        // スキームがhttpsであることを確認
         if ( ! isset( $parsed['scheme'] ) || $parsed['scheme'] !== 'https' ) {
             return false;
         }
 
-        // ホストがGitHubのドメインであることを確認
         if ( ! isset( $parsed['host'] ) ) {
             return false;
         }
@@ -380,14 +272,13 @@ class CP_Updater {
             'api.github.com',
             'github.com',
             'codeload.github.com',
-            'objects.githubusercontent.com', // リリースアセットのダウンロード先
+            'objects.githubusercontent.com',
         );
 
         if ( ! in_array( $parsed['host'], $allowed_hosts, true ) ) {
             return false;
         }
 
-        // パスに期待するリポジトリ情報が含まれているか確認
         if ( ! isset( $parsed['path'] ) ) {
             return false;
         }
@@ -397,9 +288,8 @@ class CP_Updater {
             return true;
         }
 
-        // リポジトリのowner/repoがパスに含まれていることを確認
         $expected_path_part = '/' . $this->github_owner . '/' . $this->github_repo;
-        if ( strpos( $parsed['path'], $expected_path_part ) === false ) {
+        if ( ! str_contains( $parsed['path'], $expected_path_part ) ) {
             return false;
         }
 
@@ -418,10 +308,9 @@ class CP_Updater {
      * @param array $hook_extra 追加情報
      * @return string|WP_Error 修正されたソースパス
      */
-    public function fix_source_dir( $source, $remote_source, $upgrader, $hook_extra ) {
+    public function fix_source_dir( $source, $remote_source, $upgrader, $hook_extra ): string|\WP_Error {
         global $wp_filesystem;
 
-        // このプラグインの更新かどうかを確認
         if ( ! isset( $hook_extra['plugin'] ) || $hook_extra['plugin'] !== $this->plugin_basename ) {
             return $source;
         }
@@ -435,7 +324,6 @@ class CP_Updater {
         // GitHubのzipball形式（owner-repo-hash）かどうかを確認
         $github_pattern = '/^' . preg_quote( $this->github_owner, '/' ) . '-' . preg_quote( $this->github_repo, '/' ) . '-[a-f0-9]+$/i';
         if ( ! preg_match( $github_pattern, $source_dirname ) ) {
-            // 予期しない形式の場合はそのまま返す
             return $source;
         }
 
@@ -448,24 +336,21 @@ class CP_Updater {
         }
 
         // ソースがリモートソース内にあることを確認
-        if ( strpos( $real_source, $real_remote ) !== 0 ) {
+        if ( ! str_starts_with( $real_source, $real_remote ) ) {
             return new WP_Error( 'path_traversal', 'パストラバーサルが検出されました。' );
         }
 
-        // 正しいディレクトリ名
         $correct_dir = trailingslashit( $remote_source ) . $this->plugin_slug;
 
         // Null バイトチェック
-        if ( strpos( $correct_dir, "\0" ) !== false ) {
+        if ( str_contains( $correct_dir, "\0" ) ) {
             return new WP_Error( 'null_byte', '無効な文字が含まれています。' );
         }
 
-        // 既に正しい名前のディレクトリが存在する場合は削除
         if ( $wp_filesystem->exists( $correct_dir ) ) {
             $wp_filesystem->delete( $correct_dir, true );
         }
 
-        // ディレクトリ名を変更
         if ( $wp_filesystem->move( $source, $correct_dir ) ) {
             return trailingslashit( $correct_dir );
         }
@@ -478,7 +363,7 @@ class CP_Updater {
      *
      * @return string 説明文
      */
-    private function get_readme_description() {
+    private function get_readme_description(): string {
         return 'Carry Pod は WordPress サイトを静的 HTML ファイルに変換するプラグインです。' .
                'GitHub、GitLab、Cloudflare Workers、ローカルディレクトリなど複数の出力先に対応しています。';
     }
@@ -489,16 +374,14 @@ class CP_Updater {
      * @param string $body リリースノート
      * @return string フォーマットされた変更履歴
      */
-    private function format_changelog( $body ) {
+    private function format_changelog( ?string $body ): string {
         if ( empty( $body ) ) {
             return '<p>変更履歴はありません。</p>';
         }
 
-        // Markdown を簡易的に HTML に変換
         $html = esc_html( $body );
         $html = nl2br( $html );
 
-        // リスト項目を変換
         $html = preg_replace( '/^- (.+)$/m', '<li>$1</li>', $html );
         $html = preg_replace( '/(<li>.+<\/li>\s*)+/', '<ul>$0</ul>', $html );
 
@@ -510,7 +393,7 @@ class CP_Updater {
      *
      * @return bool 成功ならtrue、権限がなければfalse
      */
-    public function clear_cache() {
+    public function clear_cache(): bool {
         // 認可チェック: 管理者のみ実行可能
         if ( ! current_user_can( 'manage_options' ) ) {
             return false;

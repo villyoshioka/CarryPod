@@ -3,84 +3,73 @@
 **WordPress サイトを静的サイトに変換するプラグイン。**
 
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue.svg)](https://wordpress.org/)
-[![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue.svg)](https://www.php.net/)
-[![Version](https://img.shields.io/badge/Version-2.8.2-green.svg)](https://github.com/villyoshioka/CarryPod/releases)
+[![WordPress](https://img.shields.io/badge/WordPress-6.8%2B-blue.svg)](https://wordpress.org/)
+[![PHP](https://img.shields.io/badge/PHP-8.3%2B-blue.svg)](https://www.php.net/)
+[![Version](https://img.shields.io/badge/Version-3.0.0-green.svg)](https://github.com/villyoshioka/CarryPod/releases)
 
 > **注意**: **このプラグインについて、コードは公開していますが、サポートは行っていません。**
 
 ---
 
-## これは何？
+## Carry Pod って？
 
-WordPress で作ったサイトを、静的な HTML や CSS などのファイルに変換するプラグインです。
-
-### 主な機能
-
-- WordPress のページや記事を HTML ファイルに変換
-- GitHub / GitLab / Cloudflare Workers / Netlify など複数の出力先に対応
-- 自動静的化機能
-- wp-includes / wp-content を任意の名称に変更可能
-
-### 出力先
-
-以下から選べます：
-
-- **GitHub**: GitHub API で直接プッシュ
-- **GitLab**: GitLab API で直接プッシュ
-- **Cloudflare Workers**: Cloudflare Workers にデプロイ
-- **Netlify**: Netlify にデプロイ
-- **ローカル Git**: Git リポジトリとして出力
-- **ZIP ファイル**: ZIP ファイルとして出力
-- **ローカルディレクトリ**: 指定したフォルダに出力
+WordPress サイトを、まるごと静的ファイルに変換するプラグインです。  
+自分の PC で作ったサイトを、GitHub・Cloudflare Workers・Netlify などへ簡単に公開できます。メンテナンスの手間とセキュリティリスクを抑えつつ、表示も軽くなります。
 
 ---
 
-## インストール
+## Carry Pod ができること
 
-1. [Releases](https://github.com/villyoshioka/CarryPod/releases) から ZIP ファイルをダウンロード
-2. WordPress の管理画面で「プラグイン」→「新規追加」→「プラグインのアップロード」
-3. ダウンロードした ZIP ファイルを選択してインストール
-4. 「有効化」をクリック
+- **複数の出力先に対応** — GitHub / GitLab / Cloudflare Workers / Netlify / ローカル Git / ZIP / ローカルディレクトリから選べます。
+- **wp-includes / wp-content の変名** — WordPress 特有の狙われやすいフォルダ名を、自由に変更できます。
+- **自動静的化** — 投稿の公開や更新をトリガーに、自動で静的化を実行できます。
+- **管理画面の自動ロック** — 実行中は投稿編集やテーマ変更などの操作を自動で無効化し、状態のズレを防ぎます。
+- **設定のインポート / エクスポート** — 設定を JSON で書き出して、別環境にそのまま持ち込めます。
+- **実行前バリデーション** — 設定不備があれば、実行ボタンが押せないように警告を出します。
 
 ---
 
-## 使い方
+## 想定環境について
 
-プラグインを有効化すると、WordPress 管理画面に「Carry Pod」メニューが追加されます。
+Carry Pod は、[Local](https://localwp.com/) や [MAMP](https://www.mamp.info/) などのツールを使って、自分の PC（ローカル）で WordPress を動かすスタイルを想定しています。
 
-1. **設定画面**で出力先を選択します（GitHub / GitLab / Cloudflare Workers / Netlify / ローカル Git / ZIP / ディレクトリ）
-2. 必要に応じて、カスタムフォルダ名、追加・除外ファイル、URL形式などの設定を行います
-3. **実行画面**で「静的化を実行」ボタンをクリックします
-4. 進捗を確認しながら完了を待ちます（時間がかかる場合がありますので、その間に黄身時雨でもどうぞ）
+- **セキュリティに強い** — 管理画面はあなたの PC からしかアクセスできないので、外部から狙われにくいです。
+- **コストを抑えられる** — WordPress 専用サーバーは不要。静的ホスティングなら無料〜低コストで公開できます。
+- **壊しても怖くない** — 自分の手元なら、好きなだけ試行錯誤できます。
+
+必要なのは PC とドメイン代だけ。手軽にサイト運営を始められます。
+
+---
+
+## 使いかたの 3 ステップ
+
+1. **プラグインを入れる** — [Releases](https://github.com/villyoshioka/CarryPod/releases) から ZIP をダウンロードし、WordPress 管理画面の「プラグイン → 新規追加 → プラグインのアップロード」からインストールして有効化します。
+2. **設定する** — 管理メニューに追加された "CarryPod" を開き、出力先とオプションを選びます。
+3. **実行する** — 「静的化を実行」ボタンを押すだけ。あとは待つだけです。
 
 ### デバッグモード
 
-詳細なログを確認したい場合は、URL に `&debugmode=on` を追加してデバッグモードを有効化できます。無効にするには `&debugmode=off` を追加してください。
+トラブル時や動作確認時は、URL の末尾に `&debugmode=on` を付けると詳細な状況が確認できます（解除は `&debugmode=off`）。
 
 ---
 
 ## ライセンスと使用モジュール
 
-このプラグインは GPLv3 ライセンスで公開されています。[WP2Static](https://github.com/elementor/wp2static)（Unlicense）からインスパイアされ開発されました。
+Carry Pod は [GPLv3 ライセンス](https://www.gnu.org/licenses/gpl-3.0) で公開されています。  
+バックグラウンド処理には [Action Scheduler](https://actionscheduler.org/) を利用しています。
 
-バックグラウンド処理には [Action Scheduler](https://actionscheduler.org/)（GPLv3）を使用しています。
+このプラグインの制作にあたり、先人である [WP2Static](https://github.com/elementor/wp2static) 作者の Leon Stafford 氏に深く敬意を表します。
 
 ---
 
 ## プライバシーについて
 
-このプラグインは WordPress サイトを静的ファイルに変換する機能のみを提供します。
-
-- ユーザーデータの収集・解析なし
-- トラッキング機能なし
+Carry Pod はあなたの手元だけで動きます。あなたのデータを勝手に集めたり、こっそり追跡したりすることは一切ありません。
 
 ---
 
 ## 開発について
 
-このプラグインは、Claude（Anthropic 社の AI）を用いて実装されました。設計・仕様策定・品質管理は開発者が行っています。
-
-詳細は [AI 利用ポリシー](AI_POLICY.md) をご覧ください。
+このプラグインは、開発者が設計と品質を見ながら、AI（Anthropic 社の Claude）の手も借りて開発しています。詳細は [AI 利用ポリシー](AI_POLICY.md) にまとめています。
 
 **開発**: Vill Yoshioka ([@villyoshioka](https://github.com/villyoshioka))
