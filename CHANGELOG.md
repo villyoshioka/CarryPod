@@ -4,7 +4,7 @@
 
 ### 機能追加
 
-- **WordPress Studio（Playground）対応**: WordPress Studio 環境では利用できないローカルGitとWrangler CLIの設定コントロールを自動的に非表示にします。Cloudflare Workers は常にDirect Upload API方式で動作します。
+- **WordPress Studio（Playground）対応**: WordPress Studio（Playground） 環境に対応しました。Playgroundの特性上使用できない機能については非表示になっています。
 - **新バージョン公開通知**: 新しいバージョンが公開された際、メジャーバージョンの違いに関わらず、管理画面にGitHubリリースページへのリンク付き通知を表示するようになりました。
 
 ---
