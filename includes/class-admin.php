@@ -328,6 +328,9 @@ class CP_Admin {
         $logger = CP_Logger::get_instance();
         $is_running = $logger->is_running();
 
+        // Playground（WordPress Studio）ではCLI依存機能（ローカルGit・Wrangler）のUIを出さない
+        $is_playground = CP_Settings::is_playground();
+
         if ( isset( $_GET['debugmode'] ) ) {
             $debug_param = sanitize_text_field( wp_unslash( $_GET['debugmode'] ) );
             if ( $debug_param === 'on' ) {
@@ -453,6 +456,7 @@ class CP_Admin {
                     </div>
 
                     <div id="cp-cloudflare-settings" class="nau-subsection" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                        <?php if ( ! $is_playground ) : ?>
                         <div class="nau-form-group">
                             <label for="cp-cloudflare-use-wrangler">
                                 Wrangler
@@ -464,6 +468,7 @@ class CP_Admin {
                             </select>
                             <div id="cp-wrangler-guide"></div>
                         </div>
+                        <?php endif; ?>
 
                         <div class="nau-form-group">
                             <label for="cp-cloudflare-api-token">Cloudflare API Token <span class="required">*</span></label>
@@ -656,14 +661,16 @@ class CP_Admin {
                         </div>
                     </div>
 
+                    <?php if ( ! $is_playground ) : ?>
                     <div class="nau-form-group">
                         <label>
                             <input type="checkbox" id="cp-git-local-enabled" name="git_local_enabled" value="1" <?php checked( ! empty( $settings['git_local_enabled'] ) ); ?>>
                             ローカルGitに出力
                         </label>
                     </div>
+                    <?php endif; ?>
 
-                    <div id="cp-git-local-settings" class="nau-subsection" <?php echo empty( $settings['git_local_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                    <div id="cp-git-local-settings" class="nau-subsection" <?php echo ( $is_playground || empty( $settings['git_local_enabled'] ) ) ? 'style="display:none;"' : ''; ?>>
                         <div class="nau-form-group">
                             <label for="cp-git-local-work-dir">
                                 Git作業ディレクトリ <span class="required">*</span>
@@ -1792,6 +1799,16 @@ class CP_Admin {
     }
 
     private function detect_wrangler(): array {
+        // Playground（WordPress Studio）ではproc_openがエラーなしで失敗するため検出しない
+        if ( CP_Settings::is_playground() ) {
+            return array(
+                'found'        => false,
+                'path'         => '',
+                'version'      => '',
+                'needs_update' => false,
+            );
+        }
+
         $extended_path = $this->get_extended_path();
         $is_windows = PHP_OS_FAMILY === 'Windows';
         $separator = $is_windows ? ';' : ':';

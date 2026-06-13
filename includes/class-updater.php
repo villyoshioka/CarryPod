@@ -26,6 +26,45 @@ class CP_Updater {
         add_filter( 'plugins_api', array( $this, 'plugin_info' ), 10, 3 );
         add_filter( 'upgrader_source_selection', array( $this, 'fix_source_dir' ), 10, 4 );
         add_action( 'upgrader_process_complete', array( $this, 'on_upgrade_complete' ), 10, 2 );
+        add_action( 'admin_notices', array( $this, 'show_update_notice' ) );
+    }
+
+    /**
+     * 新バージョン公開のお知らせをプラグイン管理画面に表示
+     *
+     * メジャーバージョンが異なり自動更新が提供されないケースを含め、
+     * 新しいリリースを検出したらGitHubリリースページへのリンクを案内する。
+     */
+    public function show_update_notice(): void {
+        if ( ! current_user_can( 'update_plugins' ) ) {
+            return;
+        }
+
+        $page = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+        if ( ! in_array( $page, array( 'carry-pod', 'carry-pod-settings' ), true ) ) {
+            return;
+        }
+
+        $release = $this->get_latest_release();
+        if ( ! $release ) {
+            return;
+        }
+
+        $latest_version = ltrim( $release['tag_name'], 'v' );
+        if ( version_compare( $this->current_version, $latest_version, '>=' ) ) {
+            return;
+        }
+
+        if ( ! $this->is_valid_github_url( $release['html_url'] ) ) {
+            return;
+        }
+
+        printf(
+            '<div class="notice notice-warning"><p>Carry Pod の新しいバージョン v%s が公開されています（現在 v%s）。<a href="%s" target="_blank" rel="noopener noreferrer">GitHub でリリースを見る →</a></p></div>',
+            esc_html( $latest_version ),
+            esc_html( $this->current_version ),
+            esc_url( $release['html_url'] )
+        );
     }
 
     public function on_upgrade_complete( $upgrader, $options ): void {

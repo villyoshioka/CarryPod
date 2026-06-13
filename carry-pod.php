@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Carry Pod
- * Version: 3.0.0
+ * Version: 3.1.0
  * Description: WordPressサイトを静的化してデプロイするプラグイン
  * Requires at least: 6.8
  * Tested up to: 7.0
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'CP_VERSION', '3.0.0' );
+define( 'CP_VERSION', '3.1.0' );
 define( 'CP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'CP_PLUGIN_FILE', __FILE__ );
@@ -97,9 +97,12 @@ class Carry_Pod {
         }
 
         require_once CP_PLUGIN_DIR . 'includes/class-generator.php';
-        $git_path = CP_Generator::find_git_command();
-        if ( $git_path === false ) {
-            set_transient( 'cp_git_warning', true, 30 );
+        // Playground（WordPress Studio）ではローカルGit機能自体を無効化するため警告不要
+        if ( ! CP_Settings::is_playground() ) {
+            $git_path = CP_Generator::find_git_command();
+            if ( $git_path === false ) {
+                set_transient( 'cp_git_warning', true, 30 );
+            }
         }
 
         $this->register_capabilities();

@@ -36,6 +36,19 @@ class CP_Settings {
     }
 
     /**
+     * WordPress Playground（php-wasm）環境かどうかを判定
+     *
+     * WordPress Studio は内部で Playground を使用しており、この環境では
+     * exec / proc_open がエラーを出さずに失敗するため、CLI 依存機能
+     * （ローカルGit・Wrangler CLI）を無効化する必要がある。
+     * SERVER_SOFTWARE には 'PHP.wasm' が設定される。
+     */
+    public static function is_playground(): bool {
+        $server_software = $_SERVER['SERVER_SOFTWARE'] ?? '';
+        return false !== stripos( $server_software, 'php.wasm' );
+    }
+
+    /**
      * ベータモードを有効化（パスワード検証付き）
      * タイミングセーフ比較 + レート制限（5回失敗で10分ロック）
      */
@@ -179,6 +192,12 @@ class CP_Settings {
 
     public function save_settings( array $settings ): bool|\WP_Error {
         $current_raw = get_option( 'cp_settings', array() );
+
+        // Playground（WordPress Studio）ではCLI実行不可のため、CLI依存機能を強制無効化
+        if ( self::is_playground() ) {
+            $settings['git_local_enabled'] = false;
+            $settings['cloudflare_use_wrangler'] = false;
+        }
 
         // 空のトークンは既存値を保持
         if ( empty( $settings['github_token'] ) && ! empty( $current_raw['github_token'] ) ) {
@@ -842,6 +861,12 @@ class CP_Settings {
 
         $merged = array_merge( $current, $sanitized );
         $merged['version'] = CP_VERSION;
+
+        // Playground（WordPress Studio）ではCLI実行不可のため、CLI依存機能を強制無効化
+        if ( self::is_playground() ) {
+            $merged['git_local_enabled'] = false;
+            $merged['cloudflare_use_wrangler'] = false;
+        }
 
         // Workers Direct Upload API単独の場合、_headersは機能しないため無効化
         if ( ! empty( $merged['cloudflare_enabled'] ) && empty( $merged['cloudflare_use_wrangler'] ) ) {

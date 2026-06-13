@@ -76,6 +76,12 @@ class CP_Generator {
             $generated_count = 0;
             $use_parallel = ! empty( $this->settings['use_parallel_crawling'] );
 
+            // curl拡張がない環境（php-wasm等）では逐次クローリングにフォールバック
+            if ( $use_parallel && ! function_exists( 'curl_multi_init' ) ) {
+                $use_parallel = false;
+                $this->logger->add_log( 'curl拡張が利用できないため、逐次クローリングに切り替えました' );
+            }
+
             if ( $use_parallel && class_exists( 'CP_Parallel_Crawler' ) ) {
                 $this->logger->add_log( '並列クローリングモードで処理を開始' );
 
@@ -269,11 +275,16 @@ class CP_Generator {
             }
 
             if ( ! empty( $this->settings['git_local_enabled'] ) ) {
-                $output_step++;
-                $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
-                $this->logger->add_log( 'ローカルGitに出力中...' );
-                $this->logger->update_progress( $progress, $total_steps, 'ローカルGitに出力中...' );
-                $this->output_to_git_local();
+                if ( CP_Settings::is_playground() ) {
+                    // Playground（WordPress Studio）ではgitコマンドが実行できない（エラーなしで失敗する）
+                    $this->logger->add_log( 'WordPress Studio（Playground）環境ではローカルGit出力は利用できないため、スキップしました', true );
+                } else {
+                    $output_step++;
+                    $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
+                    $this->logger->add_log( 'ローカルGitに出力中...' );
+                    $this->logger->update_progress( $progress, $total_steps, 'ローカルGitに出力中...' );
+                    $this->output_to_git_local();
+                }
             }
 
             if ( ! empty( $this->settings['zip_enabled'] ) ) {
@@ -1630,7 +1641,8 @@ class CP_Generator {
      * Cloudflare Workers出力
      */
     private function output_to_cloudflare_workers(): void {
-        if ( ! empty( $this->settings['cloudflare_use_wrangler'] ) ) {
+        // Playground（WordPress Studio）ではWrangler CLIが実行できないため常にDirect Upload API方式
+        if ( ! empty( $this->settings['cloudflare_use_wrangler'] ) && ! CP_Settings::is_playground() ) {
             $this->output_to_cloudflare_wrangler();
             return;
         }
