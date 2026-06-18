@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Carry Pod
- * Version: 3.1.0
+ * Version: 3.1.1
  * Description: WordPressサイトを静的化してデプロイするプラグイン
  * Requires at least: 6.8
  * Tested up to: 7.0
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'CP_VERSION', '3.1.0' );
+define( 'CP_VERSION', '3.1.1' );
 define( 'CP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'CP_PLUGIN_FILE', __FILE__ );
