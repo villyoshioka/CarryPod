@@ -354,36 +354,16 @@ class CP_Generator {
 
     private function get_urls_to_generate(): array {
         $urls = array();
-        $posts_per_page = (int) get_option( 'posts_per_page' );
+        $archive_bases = array();
         $home_url = home_url( '/' );
 
         $this->logger->update_progress( 0, 100, 'URLを収集中: 投稿を取得中...' );
 
+        // ホーム（アーカイブベースとして収集）
         $urls[] = $home_url;
-        $post_count = wp_count_posts( 'post' )->publish;
-        $max_pages = ceil( $post_count / $posts_per_page );
+        $archive_bases[] = $home_url;
 
-        for ( $page = 1; $page <= $max_pages; $page++ ) {
-            $page_url = ( $page === 1 ) ? $home_url : $home_url . 'page/' . $page . '/';
-            if ( $page > 1 ) {
-                $urls[] = $page_url;
-            }
-
-            $page_posts = get_posts( array(
-                'post_type'      => 'post',
-                'post_status'    => 'publish',
-                'posts_per_page' => $posts_per_page,
-                'paged'          => $page,
-                'fields'         => 'ids',
-                'no_found_rows'  => true,
-                'suppress_filters' => true,
-            ) );
-
-            if ( ! empty( $page_posts ) ) {
-                $this->url_to_dependent_posts_map[ $page_url ] = $page_posts;
-            }
-        }
-
+        // 投稿単体ページ
         $public_post_types = get_post_types( array( 'public' => true ) );
         $all_posts = get_posts( array(
             'post_type'      => array_values( $public_post_types ),
@@ -424,14 +404,18 @@ class CP_Generator {
             wp_reset_postdata();
         }
 
+        // カスタム投稿タイプアーカイブ
         $custom_post_types = get_post_types( array( 'public' => true, '_builtin' => false ) );
         foreach ( $custom_post_types as $post_type ) {
             $post_type_obj = get_post_type_object( $post_type );
             if ( $post_type_obj->has_archive ) {
-                $urls[] = get_post_type_archive_link( $post_type );
+                $archive_link = trailingslashit( get_post_type_archive_link( $post_type ) );
+                $urls[] = $archive_link;
+                $archive_bases[] = $archive_link;
             }
         }
 
+        // カテゴリ（1ページ目のみ収集、ページネーションは発見方式）
         $this->logger->update_progress( 0, 100, 'URLを収集中: カテゴリを取得中...' );
 
         $categories = get_categories( array( 'hide_empty' => true ) );
@@ -440,33 +424,13 @@ class CP_Generator {
             _prime_term_caches( $category_ids, false );
 
             foreach ( $categories as $category ) {
-                $category_link = get_category_link( $category->term_id );
+                $category_link = trailingslashit( get_category_link( $category->term_id ) );
                 $urls[] = $category_link;
-
-                $max_pages = ceil( $category->count / $posts_per_page );
-                for ( $page = 1; $page <= $max_pages; $page++ ) {
-                    $page_url = ( $page === 1 ) ? $category_link : $category_link . 'page/' . $page . '/';
-                    if ( $page > 1 ) {
-                        $urls[] = $page_url;
-                    }
-
-                    $category_posts = get_posts( array(
-                        'category'       => $category->term_id,
-                        'post_status'    => 'publish',
-                        'posts_per_page' => $posts_per_page,
-                        'paged'          => $page,
-                        'fields'         => 'ids',
-                        'no_found_rows'  => true,
-                        'suppress_filters' => true,
-                    ) );
-
-                    if ( ! empty( $category_posts ) ) {
-                        $this->url_to_dependent_posts_map[ $page_url ] = $category_posts;
-                    }
-                }
+                $archive_bases[] = $category_link;
             }
         }
 
+        // タグ（1ページ目のみ収集）
         $this->logger->update_progress( 0, 100, 'URLを収集中: タグを取得中...' );
 
         if ( ! empty( $this->settings['enable_tag_archive'] ) ) {
@@ -476,28 +440,28 @@ class CP_Generator {
                 _prime_term_caches( $tag_ids, false );
 
                 foreach ( $tags as $tag ) {
-                    $tag_link = get_tag_link( $tag->term_id );
+                    $tag_link = trailingslashit( get_tag_link( $tag->term_id ) );
                     $urls[] = $tag_link;
-
-                    $max_pages = ceil( $tag->count / $posts_per_page );
-                    for ( $i = 2; $i <= $max_pages; $i++ ) {
-                        $urls[] = $tag_link . 'page/' . $i . '/';
-                    }
+                    $archive_bases[] = $tag_link;
                 }
             }
         }
 
+        // 日付アーカイブ（1ページ目のみ収集）
         $this->logger->update_progress( 0, 100, 'URLを収集中: アーカイブを取得中...' );
 
         if ( ! empty( $this->settings['enable_date_archive'] ) ) {
             $archive_dates = $this->get_all_archive_dates();
             foreach ( $archive_dates as $date ) {
-                $urls[] = get_year_link( $date['year'] );
-                $urls[] = get_month_link( $date['year'], $date['month'] );
-                $urls[] = get_day_link( $date['year'], $date['month'], $date['day'] );
+                $year_link  = trailingslashit( get_year_link( $date['year'] ) );
+                $month_link = trailingslashit( get_month_link( $date['year'], $date['month'] ) );
+                $day_link   = trailingslashit( get_day_link( $date['year'], $date['month'], $date['day'] ) );
+                $urls = array_merge( $urls, array( $year_link, $month_link, $day_link ) );
+                $archive_bases = array_merge( $archive_bases, array( $year_link, $month_link, $day_link ) );
             }
         }
 
+        // カスタムタクソノミ（1ページ目のみ収集）
         $taxonomies = get_taxonomies( array( 'public' => true, '_builtin' => false ) );
         foreach ( $taxonomies as $taxonomy ) {
             $terms = get_terms( array( 'taxonomy' => $taxonomy, 'hide_empty' => true ) );
@@ -505,12 +469,15 @@ class CP_Generator {
                 foreach ( $terms as $term ) {
                     $term_link = get_term_link( $term );
                     if ( ! is_wp_error( $term_link ) ) {
+                        $term_link = trailingslashit( $term_link );
                         $urls[] = $term_link;
+                        $archive_bases[] = $term_link;
                     }
                 }
             }
         }
 
+        // ポストフォーマット（1ページ目のみ収集）
         if ( ! empty( $this->settings['enable_post_format_archive'] ) ) {
             $post_formats = get_terms( array(
                 'taxonomy'   => 'post_format',
@@ -520,31 +487,25 @@ class CP_Generator {
                 foreach ( $post_formats as $format ) {
                     $format_link = get_term_link( $format );
                     if ( ! is_wp_error( $format_link ) ) {
+                        $format_link = trailingslashit( $format_link );
                         $urls[] = $format_link;
-
-                        $max_pages = ceil( $format->count / $posts_per_page );
-                        for ( $i = 2; $i <= $max_pages; $i++ ) {
-                            $urls[] = $format_link . 'page/' . $i . '/';
-                        }
+                        $archive_bases[] = $format_link;
                     }
                 }
             }
         }
 
+        // 著者アーカイブ（1ページ目のみ収集）
         if ( ! empty( $this->settings['enable_author_archive'] ) ) {
             $users = get_users( array( 'has_published_posts' => true ) );
             foreach ( $users as $user ) {
-                $author_link = get_author_posts_url( $user->ID );
+                $author_link = trailingslashit( get_author_posts_url( $user->ID ) );
                 $urls[] = $author_link;
-
-                $user_post_count = count_user_posts( $user->ID );
-                $max_pages = ceil( $user_post_count / $posts_per_page );
-                for ( $i = 2; $i <= $max_pages; $i++ ) {
-                    $urls[] = $author_link . 'page/' . $i . '/';
-                }
+                $archive_bases[] = $author_link;
             }
         }
 
+        // フィード
         $this->logger->update_progress( 0, 100, 'URLを収集中: フィード・サイトマップを取得中...' );
 
         if ( ! empty( $this->settings['enable_rss'] ) ) {
@@ -555,7 +516,165 @@ class CP_Generator {
             $urls[] = home_url( '/comments/feed/' );
         }
 
+        // アーカイブのページネーションをクロール発見方式で取得
+        $this->logger->update_progress( 0, 100, 'URLを収集中: アーカイブのページネーションを検出中...' );
+        $discovered_urls = $this->discover_archive_pages( $archive_bases );
+        $this->logger->add_log( 'アーカイブページネーション検出: ' . count( $discovered_urls ) . '件' );
+
+        $urls = array_merge( $urls, $discovered_urls );
+
         return array_unique( $urls );
+    }
+
+    /**
+     * アーカイブの1ページ目をクロールし、「次ページ」リンクから
+     * 実際のページネーションURLを検出する。
+     *
+     * テーマが posts_per_page を上書きしている場合でも、
+     * 実際に表示されているページ数を正確に取得できる。
+     *
+     * @param array $archive_bases アーカイブの1ページ目URLの配列
+     * @return array 検出された page/N/ URLの配列
+     */
+    private function discover_archive_pages( array $archive_bases ): array {
+        $discovered = array();
+        $max_depth = 200;
+
+        foreach ( $archive_bases as $base_url ) {
+            $current_url = $base_url;
+            $current_page = 1;
+            $visited = array();
+
+            for ( $depth = 0; $depth < $max_depth; $depth++ ) {
+                if ( isset( $visited[ $current_url ] ) ) {
+                    break;
+                }
+                $visited[ $current_url ] = true;
+
+                $html = $this->fetch_url_for_discovery( $current_url );
+                if ( $html === null ) {
+                    break;
+                }
+
+                $next_page = $this->find_next_page_number( $html, $base_url, $current_page );
+                if ( $next_page === null ) {
+                    break;
+                }
+
+                $next_url = $base_url . 'page/' . $next_page . '/';
+                $discovered[] = $next_url;
+                $current_url = $next_url;
+                $current_page = $next_page;
+            }
+        }
+
+        return $discovered;
+    }
+
+    /**
+     * ページネーション検出用のHTTPリクエスト（認証対応）
+     *
+     * @param string $url 取得するURL
+     * @return string|null HTML本文（失敗時は null）
+     */
+    private function fetch_url_for_discovery( string $url ): ?string {
+        $parsed_url = parse_url( $url );
+        $is_localhost = in_array( $parsed_url['host'] ?? '', array( 'localhost', '127.0.0.1', '::1' ), true );
+
+        $args = array(
+            'timeout' => $this->settings['timeout'] ?? 300,
+            'sslverify' => ! $is_localhost,
+            'headers' => array(
+                'User-Agent' => 'Carry Pod/1.0',
+            ),
+        );
+
+        $auth_user = get_option( 'cp_basic_auth_user' );
+        if ( $auth_user ) {
+            $encrypted_pass = get_option( 'cp_basic_auth_pass' );
+            $settings_manager = CP_Settings::get_instance();
+            $auth_pass = $settings_manager->decrypt_basic_auth( $encrypted_pass );
+            if ( ! is_wp_error( $auth_pass ) ) {
+                $args['headers']['Authorization'] = 'Basic ' . base64_encode( $auth_user . ':' . $auth_pass );
+            }
+        }
+
+        $response = wp_remote_get( $url, $args );
+
+        if ( is_wp_error( $response ) ) {
+            return null;
+        }
+
+        $status_code = wp_remote_retrieve_response_code( $response );
+        if ( $status_code !== 200 ) {
+            return null;
+        }
+
+        $html = wp_remote_retrieve_body( $response );
+        if ( empty( $html ) ) {
+            return null;
+        }
+
+        return $html;
+    }
+
+    /**
+     * HTML内から次ページの番号を検出する
+     *
+     * 1. rel="next" を持つリンクから次ページを特定
+     * 2. アーカイブベースURLに関連する page/N/ リンクから最大ページを特定
+     *
+     * @param string $html 取得したHTML
+     * @param string $base_url アーカイブのベースURL（1ページ目）
+     * @param int $current_page 現在のページ番号
+     * @return int|null 次ページ番号（ない場合は null）
+     */
+    private function find_next_page_number( string $html, string $base_url, int $current_page ): ?int {
+        $base_path = wp_parse_url( $base_url, PHP_URL_PATH ) ?? '/';
+        $base_path = trailingslashit( $base_path );
+
+        // パターン1: rel="next" を持つ a タグの href からページ番号を抽出
+        $next_patterns = array(
+            '#<a[^>]*rel=["\']next["\'][^>]*href=["\']([^"\']+)["\'][^>]*>#i',
+            '#<a[^>]*href=["\']([^"\']+)["\'][^>]*rel=["\']next["\'][^>]*>#i',
+        );
+        foreach ( $next_patterns as $pattern ) {
+            if ( preg_match( $pattern, $html, $next_match ) ) {
+                $href_path = wp_parse_url( $next_match[1], PHP_URL_PATH );
+                if ( $href_path && preg_match( '#/page/(\d+)/?$#', $href_path, $page_match ) ) {
+                    $page_num = (int) $page_match[1];
+                    if ( $page_num > $current_page ) {
+                        return $page_num;
+                    }
+                }
+                return $current_page + 1;
+            }
+        }
+
+        // パターン2: base_url に関連する page/N/ リンクを全て探し、最大ページを取得
+        $max_page = 0;
+        if ( preg_match_all( '#href=["\']([^"\']+)["\']#i', $html, $matches ) ) {
+            $page_link_pattern = '#^' . preg_quote( $base_path, '#' ) . 'page/(\d+)/?$#';
+            foreach ( $matches[1] as $href ) {
+                $href_path = wp_parse_url( $href, PHP_URL_PATH );
+                if ( $href_path === null ) {
+                    continue;
+                }
+                $href_path = trailingslashit( $href_path );
+                if ( preg_match( $page_link_pattern, $href_path, $page_match ) ) {
+                    $page_num = (int) $page_match[1];
+                    if ( $page_num > $max_page ) {
+                        $max_page = $page_num;
+                    }
+                }
+            }
+        }
+
+        if ( $max_page > $current_page ) {
+            return $current_page + 1;
+        }
+
+        return null;
     }
 
     /**
