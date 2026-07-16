@@ -15,6 +15,7 @@ class CP_Parallel_Crawler {
     private CP_Logger $logger;
     private CP_Cache $cache;
     private array $url_to_dependent_posts_map = array();
+    private array $url_to_post_id_map = array();
 
     public function __construct() {
         $this->logger = CP_Logger::get_instance();
@@ -105,17 +106,7 @@ class CP_Parallel_Crawler {
         $urls_to_crawl = array();
 
         foreach ( $urls as $url ) {
-            $post_id = url_to_postid( $url );
-
-            if ( $post_id > 0 ) {
-                $this->cache->add_dependent_post( $post_id );
-            }
-
-            if ( isset( $this->url_to_dependent_posts_map[ $url ] ) ) {
-                foreach ( $this->url_to_dependent_posts_map[ $url ] as $dependent_id ) {
-                    $this->cache->add_dependent_post( $dependent_id );
-                }
-            }
+            $post_id = $this->resolve_post_id( $url );
 
             if ( $this->cache->is_valid( $url, $post_id ) ) {
                 $cached_content = $this->cache->get( $url );
@@ -141,7 +132,10 @@ class CP_Parallel_Crawler {
 
             foreach ( $crawl_results as $url => $result ) {
                 if ( $result['status_code'] == 200 && ! empty( $result['content'] ) ) {
-                    $post_id = url_to_postid( $url );
+                    // 前のURLの依存投稿が混入しないよう、URLごとにリセットする
+                    $this->cache->clear_dependent_posts();
+
+                    $post_id = $this->resolve_post_id( $url );
 
                     if ( $post_id > 0 ) {
                         $this->cache->add_dependent_post( $post_id );
@@ -173,5 +167,26 @@ class CP_Parallel_Crawler {
 
     public function set_url_to_dependent_posts_map( array $map ): void {
         $this->url_to_dependent_posts_map = $map;
+    }
+
+    public function set_url_to_post_id_map( array $map ): void {
+        $this->url_to_post_id_map = $map;
+    }
+
+    /**
+     * URLから投稿IDを解決する
+     *
+     * ジェネレーター側で構築したパーマリンクベースの対応表を優先し、
+     * 対応表にないURLのみ url_to_postid() にフォールバックする
+     * （url_to_postid() はフロントページや一部の固定ページで0を返すため）
+     */
+    private function resolve_post_id( string $url ): int {
+        $post_id = $this->url_to_post_id_map[ $url ] ?? 0;
+
+        if ( $post_id > 0 ) {
+            return $post_id;
+        }
+
+        return url_to_postid( $url );
     }
 }

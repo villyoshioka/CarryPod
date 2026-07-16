@@ -177,7 +177,12 @@ class CP_Cache {
             return false;
         }
 
-        $dependent_posts = array_slice( array_unique( $this->current_dependent_posts ), 0, 100 );
+        // 自ページのIDは上限による切り捨てで欠落しないよう、必ず先頭に置く
+        $dependent_posts = array_unique( $this->current_dependent_posts );
+        if ( $post_id ) {
+            $dependent_posts = array_unique( array_merge( array( $post_id ), $dependent_posts ) );
+        }
+        $dependent_posts = array_slice( $dependent_posts, 0, 100 );
 
         $dependent_posts_urls = array();
         foreach ( $dependent_posts as $dep_post_id ) {

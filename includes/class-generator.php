@@ -89,6 +89,7 @@ class CP_Generator {
                 $parallel_crawler->set_concurrency( 5 );
                 $parallel_crawler->set_timeout( 30 );
                 $parallel_crawler->set_url_to_dependent_posts_map( $this->url_to_dependent_posts_map );
+                $parallel_crawler->set_url_to_post_id_map( $this->url_to_post_id_map );
 
                 $batch_size = 10;
                 $url_batches = array_chunk( $urls, $batch_size );
@@ -167,6 +168,9 @@ class CP_Generator {
                         $current_step = (int) ( ( $index + 1 ) * $page_step_ratio );
                         $this->logger->update_progress( $current_step, $total_steps, 'ページを生成中: ' . ( $index + 1 ) . ' / ' . $total_urls );
                     }
+
+                    // 前のURLの依存投稿が混入しないよう、URLごとにリセットする
+                    $this->cache->clear_dependent_posts();
 
                     $post_id = $this->url_to_post_id_map[ $url ] ?? 0;
 

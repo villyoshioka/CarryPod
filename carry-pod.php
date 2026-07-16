@@ -1,9 +1,9 @@
 <?php
 /**
  * Plugin Name: Carry Pod
- * Version: 3.1.2
+ * Version: 3.2.0
  * Description: WordPressサイトを静的化してデプロイするプラグイン
- * Requires at least: 6.8
+ * Requires at least: 7.0
  * Tested up to: 7.0
  * Requires PHP: 8.3
  * Author: Vill Yoshioka
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'CP_VERSION', '3.1.2' );
+define( 'CP_VERSION', '3.2.0' );
 define( 'CP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'CP_PLUGIN_FILE', __FILE__ );
@@ -82,9 +82,9 @@ class Carry_Pod {
 
     public function activate(): void {
         global $wp_version;
-        if ( version_compare( $wp_version, '6.8', '<' ) ) {
+        if ( version_compare( $wp_version, '7.0', '<' ) ) {
             deactivate_plugins( plugin_basename( CP_PLUGIN_FILE ) );
-            wp_die( 'このプラグインにはWordPress 6.8以上が必要です。' );
+            wp_die( 'このプラグインにはWordPress 7.0以上が必要です。' );
         }
 
         if ( version_compare( PHP_VERSION, '8.3', '<' ) ) {
@@ -215,11 +215,6 @@ class Carry_Pod {
             update_option( 'cp_last_post_change', microtime( true ) );
         }
 
-        $settings = get_option( 'cp_settings', array() );
-        if ( empty( $settings['auto_generate'] ) ) {
-            return;
-        }
-
         $trigger_statuses = array( 'publish' );
 
         if ( in_array( $new_status, $trigger_statuses ) || in_array( $old_status, $trigger_statuses ) ) {
@@ -227,14 +222,21 @@ class Carry_Pod {
                 return;
             }
 
+            // キャッシュクリアは自動生成のON/OFFに関わらず実行する
+            // （OFF時は次回の手動生成で該当ページが再生成される）
+            $cache = CP_Cache::get_instance();
+            $cache->clear_by_post( $post->ID );
+            $cache->clear_adjacent_posts_cache( $post->ID, $old_status, $new_status );
+
+            $settings = get_option( 'cp_settings', array() );
+            if ( empty( $settings['auto_generate'] ) ) {
+                return;
+            }
+
             as_unschedule_all_actions( 'cp_static_generation', array(), 'cp' );
 
             update_option( 'cp_logs', array() );
             delete_option( 'cp_progress' );
-
-            $cache = CP_Cache::get_instance();
-            $cache->clear_by_post( $post->ID );
-            $cache->clear_adjacent_posts_cache( $post->ID, $old_status, $new_status );
 
             set_transient( 'cp_auto_running', true, 3600 );
 
@@ -268,6 +270,12 @@ class Carry_Pod {
         $current_version = get_option( 'cp_version', '0.0.0' );
 
         if ( version_compare( $current_version, CP_VERSION, '<' ) ) {
+            // 3.2.0未満で生成されたキャッシュは依存投稿の記録が不正確な
+            // 可能性があるため、3.2.0へのアップデート時のみ破棄して作り直す
+            if ( version_compare( $current_version, '3.2.0', '<' ) ) {
+                CP_Cache::get_instance()->clear_all();
+            }
+
             update_option( 'cp_version', CP_VERSION );
         }
     }

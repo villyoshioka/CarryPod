@@ -2175,7 +2175,7 @@ class CP_Admin {
 
         $mati_version = MATI_VERSION;
 
-        if ( version_compare( $mati_version, '2.0.0', '>=' ) ) {
+        if ( version_compare( $mati_version, '2.2.0', '>=' ) ) {
             return;
         }
 
@@ -2183,8 +2183,8 @@ class CP_Admin {
         <div class="notice notice-warning">
             <p>
                 <strong>⚠️ Mati連携</strong><br>
-                Mati 2.0.0以降にアップデートすると、すべての連携機能が有効になります。<br>
-                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 2.0.0+</small>
+                Mati 2.2.0以降にアップデートすると、すべての連携機能が有効になります。<br>
+                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 2.2.0+</small>
             </p>
         </div>
         <?php
@@ -2201,7 +2201,7 @@ class CP_Admin {
             return;
         }
 
-        if ( version_compare( $sc_version, '2.0.0', '>=' ) ) {
+        if ( version_compare( $sc_version, '2.2.0', '>=' ) ) {
             return;
         }
 
@@ -2209,8 +2209,8 @@ class CP_Admin {
         <div class="notice notice-warning">
             <p>
                 <strong>⚠️ Screw連携</strong><br>
-                Screw 2.0.0以降にアップデートすると、双方向連携機能が有効になります。<br>
-                <small>現在: Screw <?php echo esc_html( $sc_version ); ?> → 推奨: Screw 2.0.0+</small>
+                Screw 2.2.0以降にアップデートすると、双方向連携機能が有効になります。<br>
+                <small>現在: Screw <?php echo esc_html( $sc_version ); ?> → 推奨: Screw 2.2.0+</small>
             </p>
         </div>
         <?php

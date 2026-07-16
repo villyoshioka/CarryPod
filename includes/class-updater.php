@@ -180,9 +180,9 @@ class CP_Updater {
                 'changelog'    => $this->format_changelog( $release['body'] ),
             ),
             'download_link'     => $download_url,
-            'requires'          => '6.8',
+            'requires'          => '7.0',
             'tested'            => '',
-            'requires_php'      => '8.2',
+            'requires_php'      => '8.3',
             'last_updated'      => $release['published_at'],
         );
     }
