@@ -2834,13 +2834,10 @@ JS;
         $robots_content .= "User-agent: *\n";
         $robots_content .= "Disallow: /\n";
 
+        // Sitemap ディレクティブは絶対URL必須のため、URL形式の設定に関係なく絶対URLで出力
         if ( ! empty( $this->settings['enable_sitemap'] ) ) {
-            if ( $this->settings['url_mode'] === 'absolute' ) {
-                $base_url = ! empty( $this->settings['base_url'] ) ? untrailingslashit( $this->settings['base_url'] ) : untrailingslashit( get_site_url() );
-                $robots_content .= "\nSitemap: {$base_url}/sitemap.xml\n";
-            } else {
-                $robots_content .= "\nSitemap: /sitemap.xml\n";
-            }
+            $base_url = ! empty( $this->settings['base_url'] ) ? untrailingslashit( $this->settings['base_url'] ) : untrailingslashit( get_site_url() );
+            $robots_content .= "\nSitemap: {$base_url}/sitemap.xml\n";
         }
 
         if ( file_put_contents( $robots_txt_path, $robots_content ) === false ) {
@@ -2849,15 +2846,19 @@ JS;
     }
 
     /**
-     * llms.txtを生成
+     * llms.txtを生成（llmstxt.org 形式）
+     *
+     * アクセスポリシーはコードブロック内に保持し、ページ一覧を H2 のリンクリストとして出力する。
      */
     private function generate_llms_txt(): void {
         $llms_txt_path = $this->temp_dir . '/llms.txt';
 
-        $site_name = get_bloginfo( 'name' );
+        $site_name = $this->llms_inline_text( get_bloginfo( 'name' ) );
         $site_name_escaped = str_replace( array( '\\', '"' ), array( '\\\\', '\\"' ), $site_name );
 
+        // 改行を除去してコードブロックからの脱出を防ぐ
         $base_url = ! empty( $this->settings['base_url'] ) ? untrailingslashit( $this->settings['base_url'] ) : untrailingslashit( get_site_url() );
+        $base_url = preg_replace( '/[\r\n]+/', '', $base_url );
 
         $llms_content = "user-agent: *\n\n";
         $llms_content .= "# License\n";
@@ -2886,9 +2887,80 @@ JS;
         $llms_content .= "# Disallow\n";
         $llms_content .= "disallow: /\n";
 
-        if ( file_put_contents( $llms_txt_path, $llms_content ) === false ) {
+        $title = $site_name !== '' ? $site_name : ( wp_parse_url( $base_url, PHP_URL_HOST ) ?: $base_url );
+        $description = $this->llms_inline_text( get_bloginfo( 'description' ) );
+
+        // charset なしの text/plain で配信されてもブラウザが UTF-8 と判定できるよう BOM を付与（仕様上許可）
+        $markdown = "\xEF\xBB\xBF# " . $this->llms_escape_markdown( $title ) . "\n\n";
+        if ( $description !== '' ) {
+            $markdown .= '> ' . $this->llms_escape_markdown( $description ) . "\n\n";
+        }
+        $markdown .= "This file describes the AI access policy for this site.\n\n";
+        $markdown .= "```text\n" . $llms_content . "```\n";
+
+        $links = $this->build_llms_page_links( $base_url, $title );
+        if ( ! empty( $links ) ) {
+            $markdown .= "\n## Pages\n\n" . implode( "\n", $links ) . "\n";
+        }
+
+        if ( file_put_contents( $llms_txt_path, $markdown ) === false ) {
             $this->logger->add_log( 'llms.txtの生成に失敗', true );
         }
+    }
+
+    /**
+     * llms.txt用のページリンク一覧を生成（サイトマップと同じページ集合）
+     *
+     * @param string $base_url  絶対URLのベース
+     * @param string $home_name トップページのリンク名
+     * @return string[] Markdownリスト行
+     */
+    private function build_llms_page_links( string $base_url, string $home_name ): array {
+        $path_to_post_id = array();
+        foreach ( $this->url_to_post_id_map as $permalink => $post_id ) {
+            $path_to_post_id[ untrailingslashit( wp_parse_url( $permalink, PHP_URL_PATH ) ?? '' ) ] = $post_id;
+        }
+
+        $links = array();
+        foreach ( $this->generated_html_pages as $page ) {
+            if ( stripos( $page['url'], '/wp-admin' ) !== false || str_ends_with( $page['path'], '.xml' ) ) {
+                continue;
+            }
+
+            $key = untrailingslashit( $page['url'] );
+            if ( $key === '' ) {
+                $name = $home_name;
+            } elseif ( isset( $path_to_post_id[ $key ] ) ) {
+                $name = $this->llms_inline_text( get_the_title( $path_to_post_id[ $key ] ) );
+            } else {
+                $name = '';
+            }
+            if ( $name === '' ) {
+                $name = rawurldecode( $page['url'] );
+            }
+
+            // リンクの括弧を閉じさせないよう、括弧と空白をエンコード
+            $url = str_replace( array( '(', ')', ' ' ), array( '%28', '%29', '%20' ), esc_url_raw( $base_url . $page['url'] ) );
+
+            $links[ $url ] = '- [' . $this->llms_escape_markdown( $name ) . '](' . $url . ')';
+        }
+
+        return array_values( $links );
+    }
+
+    /**
+     * HTMLタグ・エンティティ・改行を除去して1行のプレーンテキストにする
+     */
+    private function llms_inline_text( string $text ): string {
+        $text = html_entity_decode( wp_strip_all_tags( $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+        return trim( preg_replace( '/\s+/u', ' ', $text ) );
+    }
+
+    /**
+     * リンクテキスト・見出し用に Markdown のリンク記号をエスケープ
+     */
+    private function llms_escape_markdown( string $text ): string {
+        return addcslashes( $text, '\\[]' );
     }
 
     /**
