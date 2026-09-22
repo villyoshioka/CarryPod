@@ -2,10 +2,15 @@
 
 ## 3.3.1 - 2026-09-22
 
+### 重要な変更
+
+- 連携プラグイン（Mati）の推奨バージョンを 2.3.1 に更新しました。
+
 ### 改善
 
 - **robots.txtのAIクローラー対応**: robots.txtでAI学習用のクローラー（GPTBot、ClaudeBot、Google-Extended、CCBot、meta-externalagent、Bytespider、Applebot-Extended）を名指しでブロックするようにしました。  
   あわせて、AIを介した検索やユーザーの依頼によるページ参照（ChatGPT-User、Claude-User、OAI-SearchBot、Claude-SearchBot）は許可するようにしました。これまではこれらもブロック対象に含まれていたため、アップデート後はAI検索などからサイトが参照されるようになります。
+- **Mati 2.3.1 連携**: Mati 2.3.1 で追加された TDMRep と X-Robots-Tag の適用範囲の設定を、静的化時に生成する _headers ファイルと、Cloudflare のレスポンス ヘッダー変換ルールの案内に反映するようにしました。
 
 ---
 

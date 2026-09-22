@@ -49,6 +49,77 @@ class CP_Settings {
     }
 
     /**
+     * Mati連携: ページ用・メディア用のヘッダー（X-Robots-Tag / TDMRep）
+     *
+     * Mati 2.3.1 以降は Mati 側の組み立て結果を使う。
+     * それより前の Mati では X-Robots-Tag をサイト全体に付ける従来動作にする。
+     *
+     * @return array{page: array<string, string>, media: array<string, string>}
+     */
+    public function get_mati_header_sets(): array {
+        $sets = array( 'page' => array(), 'media' => array() );
+
+        if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) || ! method_exists( 'Mati_Settings', 'get_instance' ) ) {
+            return $sets;
+        }
+
+        try {
+            $mati = Mati_Settings::get_instance();
+
+            if ( method_exists( $mati, 'get_header_sets' ) ) {
+                $sets = $mati->get_header_sets();
+            } elseif ( method_exists( $mati, 'get_settings' ) ) {
+                $mati_settings = $mati->get_settings();
+                $robots_tags   = array();
+
+                if ( ! empty( $mati_settings['add_noindex_meta'] ) ) {
+                    $robots_tags[] = 'noindex';
+                }
+                if ( ! empty( $mati_settings['add_noarchive_meta'] ) ) {
+                    $robots_tags[] = 'noarchive';
+                }
+                if ( ! empty( $mati_settings['add_noimageindex_meta'] ) ) {
+                    $robots_tags[] = 'noimageindex';
+                }
+                if ( ! empty( $mati_settings['add_noai_meta'] ) ) {
+                    $robots_tags[] = 'noai';
+                    $robots_tags[] = 'noimageai';
+                }
+
+                if ( ! empty( $robots_tags ) ) {
+                    $sets['page']['X-Robots-Tag']  = implode( ', ', $robots_tags );
+                    $sets['media']['X-Robots-Tag'] = $sets['page']['X-Robots-Tag'];
+                }
+            }
+        } catch ( Throwable ) {
+            return array( 'page' => array(), 'media' => array() );
+        }
+
+        // _headers や案内表示にそのまま出すため、1行に収まる安全な値のみ残す
+        foreach ( array( 'page', 'media' ) as $key ) {
+            $sets[ $key ] = array_filter(
+                (array) ( $sets[ $key ] ?? array() ),
+                fn( $value, $name ) => is_string( $name ) && is_string( $value )
+                    && 1 === preg_match( '/^[A-Za-z0-9-]+$/', $name )
+                    && 1 === preg_match( '/^[\x20-\x7E]+$/', $value ),
+                ARRAY_FILTER_USE_BOTH
+            );
+        }
+
+        return $sets;
+    }
+
+    /**
+     * 静的サイト上のアップロードフォルダのパス（例: /wp-content/uploads/）
+     */
+    public function get_static_uploads_path(): string {
+        $settings        = $this->get_settings();
+        $content_dirname = ! empty( $settings['custom_wp_content'] ) ? $settings['custom_wp_content'] : 'wp-content';
+
+        return '/' . trim( $content_dirname, '/' ) . '/uploads/';
+    }
+
+    /**
      * ベータモードを有効化（パスワード検証付き）
      * タイミングセーフ比較 + レート制限（5回失敗で10分ロック）
      */

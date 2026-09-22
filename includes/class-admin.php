@@ -904,7 +904,15 @@ class CP_Admin {
                              aria-labelledby="header-transform-guide"
                              aria-hidden="true">
                             <div class="cp-guide-content">
-                                <p>Cloudflareの管理画面で以下の<?php echo $this->has_mati_bluesky_did() ? '5' : '4'; ?>つのレスポンス ヘッダー変換ルールを設定してください。</p>
+                                <?php
+                                $cp_settings_manager = CP_Settings::get_instance();
+                                $mati_header_sets    = $cp_settings_manager->get_mati_header_sets();
+                                $mati_media_headers  = array_diff_key( $mati_header_sets['media'], $mati_header_sets['page'] );
+                                $has_bluesky_rule    = $this->has_mati_bluesky_did();
+                                $media_rule_number   = $has_bluesky_rule ? 6 : 5;
+                                $rule_count          = 4 + ( $has_bluesky_rule ? 1 : 0 ) + ( empty( $mati_media_headers ) ? 0 : 1 );
+                                ?>
+                                <p>Cloudflareの管理画面で以下の<?php echo esc_html( (string) $rule_count ); ?>つのレスポンス ヘッダー変換ルールを設定してください。</p>
 
                                 <h4>ルール1: セキュリティヘッダー</h4>
                                 <ul>
@@ -915,7 +923,9 @@ class CP_Admin {
                                     <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
                                     <tbody>
                                         <tr><td><code>Content-Security-Policy</code></td><td><code><?php echo esc_html( $this->get_mati_frame_ancestors_value() ); ?></code></td></tr>
-                                        <tr><td><code>X-Robots-Tag</code></td><td><code><?php echo esc_html( $this->get_mati_xrobots_value() ); ?></code></td></tr>
+                                        <?php foreach ( $mati_header_sets['page'] as $header_name => $header_value ) : ?>
+                                        <tr><td><code><?php echo esc_html( $header_name ); ?></code></td><td><code><?php echo esc_html( $header_value ); ?></code></td></tr>
+                                        <?php endforeach; ?>
                                     </tbody>
                                 </table>
 
@@ -977,7 +987,24 @@ class CP_Admin {
                                 </table>
                                 <?php endif; ?>
 
-                                <p class="description">※ Matiの設定を変更した場合は、ルール1のX-Robots-Tagの値も更新してください。</p>
+                                <?php if ( ! empty( $mati_media_headers ) ) : ?>
+                                <h4>ルール<?php echo esc_html( (string) $media_rule_number ); ?>: メディアファイル</h4>
+                                <ul>
+                                    <li>条件: <strong>カスタムフィルタ式</strong></li>
+                                    <li>式: <code>starts_with(http.request.uri.path, "<?php echo esc_html( $cp_settings_manager->get_static_uploads_path() ); ?>")</code></li>
+                                    <li>操作: <strong>静的を追加</strong></li>
+                                </ul>
+                                <table class="cp-guide-headers-table">
+                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                                    <tbody>
+                                        <?php foreach ( $mati_media_headers as $header_name => $header_value ) : ?>
+                                        <tr><td><code><?php echo esc_html( $header_name ); ?></code></td><td><code><?php echo esc_html( $header_value ); ?></code></td></tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                                <?php endif; ?>
+
+                                <p class="description">※ Matiの設定を変更した場合は、ルール1<?php echo empty( $mati_media_headers ) ? '' : '・ルール' . esc_html( (string) $media_rule_number ); ?>のヘッダーの値も更新してください。</p>
                                 <p class="description"><a href="https://developers.cloudflare.com/rules/transform/response-header-modification/" target="_blank" rel="noopener noreferrer">Cloudflare Transform Rules ドキュメント →</a></p>
                             </div><!-- .cp-guide-content -->
                         </div><!-- .nau-accordion-content -->
@@ -2073,45 +2100,6 @@ class CP_Admin {
         );
     }
 
-    private function get_mati_xrobots_value(): string {
-        if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
-            return '';
-        }
-
-        try {
-            if ( ! method_exists( 'Mati_Settings', 'get_instance' ) ) {
-                return '';
-            }
-
-            $mati_settings_instance = Mati_Settings::get_instance();
-
-            if ( ! method_exists( $mati_settings_instance, 'get_settings' ) ) {
-                return '';
-            }
-
-            $mati_settings = $mati_settings_instance->get_settings();
-            $robots_tags   = array();
-
-            if ( ! empty( $mati_settings['add_noindex_meta'] ) ) {
-                $robots_tags[] = 'noindex';
-            }
-            if ( ! empty( $mati_settings['add_noarchive_meta'] ) ) {
-                $robots_tags[] = 'noarchive';
-            }
-            if ( ! empty( $mati_settings['add_noimageindex_meta'] ) ) {
-                $robots_tags[] = 'noimageindex';
-            }
-            if ( ! empty( $mati_settings['add_noai_meta'] ) ) {
-                $robots_tags[] = 'noai';
-                $robots_tags[] = 'noimageai';
-            }
-
-            return ! empty( $robots_tags ) ? implode( ', ', $robots_tags ) : '（Matiで設定されていません）';
-        } catch ( Exception $e ) {
-            return '';
-        }
-    }
-
     private function has_mati_bluesky_did(): bool {
         if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
             return false;
@@ -2175,7 +2163,7 @@ class CP_Admin {
 
         $mati_version = MATI_VERSION;
 
-        if ( version_compare( $mati_version, '2.2.0', '>=' ) ) {
+        if ( version_compare( $mati_version, '2.3.1', '>=' ) ) {
             return;
         }
 
@@ -2183,8 +2171,8 @@ class CP_Admin {
         <div class="notice notice-warning">
             <p>
                 <strong>⚠️ Mati連携</strong><br>
-                Mati 2.2.0以降にアップデートすると、すべての連携機能が有効になります。<br>
-                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 2.2.0+</small>
+                Mati 2.3.1以降にアップデートすると、すべての連携機能が有効になります。<br>
+                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 2.3.1+</small>
             </p>
         </div>
         <?php

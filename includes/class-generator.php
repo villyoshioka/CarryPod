@@ -3031,24 +3031,20 @@ JS;
             $headers_content .= "  Content-Security-Policy: frame-ancestors $frame_ancestors\n";
             $headers_content .= "  X-Content-Type-Options: nosniff\n";
 
-            $robots_tags = array();
+            $cp_settings = CP_Settings::get_instance();
+            $header_sets = $cp_settings->get_mati_header_sets();
 
-            if ( ! empty( $mati_settings['add_noindex_meta'] ) ) {
-                $robots_tags[] = 'noindex';
-            }
-            if ( ! empty( $mati_settings['add_noarchive_meta'] ) ) {
-                $robots_tags[] = 'noarchive';
-            }
-            if ( ! empty( $mati_settings['add_noimageindex_meta'] ) ) {
-                $robots_tags[] = 'noimageindex';
-            }
-            if ( ! empty( $mati_settings['add_noai_meta'] ) ) {
-                $robots_tags[] = 'noai';
-                $robots_tags[] = 'noimageai';
+            foreach ( $header_sets['page'] as $name => $value ) {
+                $headers_content .= "  {$name}: {$value}\n";
             }
 
-            if ( ! empty( $robots_tags ) ) {
-                $headers_content .= '  X-Robots-Tag: ' . implode( ', ', $robots_tags ) . "\n";
+            // /* はメディアにも適用されるため、メディア用ルールにはページ用に含まれないものだけを書く
+            $media_headers = array_diff_key( $header_sets['media'], $header_sets['page'] );
+            if ( ! empty( $media_headers ) ) {
+                $headers_content .= $cp_settings->get_static_uploads_path() . "*\n";
+                foreach ( $media_headers as $name => $value ) {
+                    $headers_content .= "  {$name}: {$value}\n";
+                }
             }
 
             $bluesky_did = $mati_settings['bluesky_did'] ?? '';
