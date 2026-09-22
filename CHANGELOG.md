@@ -1,5 +1,14 @@
 # リリースノート
 
+## 3.3.1 - 2026-09-22
+
+### 改善
+
+- **robots.txtのAIクローラー対応**: robots.txtでAI学習用のクローラー（GPTBot、ClaudeBot、Google-Extended、CCBot、meta-externalagent、Bytespider、Applebot-Extended）を名指しでブロックするようにしました。  
+  あわせて、AIを介した検索やユーザーの依頼によるページ参照（ChatGPT-User、Claude-User、OAI-SearchBot、Claude-SearchBot）は許可するようにしました。これまではこれらもブロック対象に含まれていたため、アップデート後はAI検索などからサイトが参照されるようになります。
+
+---
+
 ## 3.3.0 - 2026-09-22
 
 ### 改善

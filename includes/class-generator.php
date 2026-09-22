@@ -2831,6 +2831,20 @@ JS;
         $robots_content .= "User-agent: Bingbot\n";
         $robots_content .= "User-agent: DuckDuckBot\n";
         $robots_content .= "Allow: /\n\n";
+
+        // AI検索・ユーザー起点の参照は許可（User-agent: * のブロックに含まれるため明示）
+        $robots_content .= "User-agent: ChatGPT-User\n";
+        $robots_content .= "User-agent: Claude-User\n";
+        $robots_content .= "User-agent: OAI-SearchBot\n";
+        $robots_content .= "User-agent: Claude-SearchBot\n";
+        $robots_content .= "Allow: /\n\n";
+
+        // AI学習用クローラーは名指しでブロック
+        $ai_training_bots = array( 'GPTBot', 'ClaudeBot', 'Google-Extended', 'CCBot', 'meta-externalagent', 'Bytespider', 'Applebot-Extended' );
+        foreach ( $ai_training_bots as $bot ) {
+            $robots_content .= "User-agent: {$bot}\nDisallow: /\n\n";
+        }
+
         $robots_content .= "User-agent: *\n";
         $robots_content .= "Disallow: /\n";
 
