@@ -889,8 +889,17 @@ class CP_Admin {
                         </div><!-- .nau-accordion-content -->
                     </div><!-- .nau-accordion-section -->
 
-                    <?php if ( $mati_available ) : ?>
-                    <div id="cp-cf-transform-guide" class="nau-accordion-section nau-accordion-section--warning" data-section="transform-guide" <?php echo empty( $settings['cloudflare_enabled'] ) ? 'style="display:none;"' : ''; ?>>
+                    <?php
+                    if ( $mati_available ) :
+                        $transform_guide        = $this->get_transform_guide_content();
+                        $transform_guide_hidden = get_option( 'cp_transform_guide_hidden' );
+                        $is_guide_dismissed     = md5( $transform_guide ) === $transform_guide_hidden;
+                        // 内容が変わって再表示したら非表示の記録を消す（内容が元に戻っても、再度非表示にするまで表示し続ける）
+                        if ( false !== $transform_guide_hidden && ! $is_guide_dismissed ) {
+                            delete_option( 'cp_transform_guide_hidden' );
+                        }
+                    ?>
+                    <div id="cp-cf-transform-guide" class="nau-accordion-section nau-accordion-section--warning" data-section="transform-guide"<?php echo $is_guide_dismissed ? ' data-dismissed="1"' : ''; ?> <?php echo ( empty( $settings['cloudflare_enabled'] ) || $is_guide_dismissed ) ? 'style="display:none;"' : ''; ?>>
                         <button type="button" class="nau-accordion-header"
                                 id="header-transform-guide"
                                 aria-expanded="false"
@@ -904,108 +913,14 @@ class CP_Admin {
                              aria-labelledby="header-transform-guide"
                              aria-hidden="true">
                             <div class="cp-guide-content">
-                                <?php
-                                $cp_settings_manager = CP_Settings::get_instance();
-                                $mati_header_sets    = $cp_settings_manager->get_mati_header_sets();
-                                $mati_media_headers  = array_diff_key( $mati_header_sets['media'], $mati_header_sets['page'] );
-                                $has_bluesky_rule    = $this->has_mati_bluesky_did();
-                                $media_rule_number   = $has_bluesky_rule ? 6 : 5;
-                                $rule_count          = 4 + ( $has_bluesky_rule ? 1 : 0 ) + ( empty( $mati_media_headers ) ? 0 : 1 );
-                                ?>
-                                <p>Cloudflareの管理画面で以下の<?php echo esc_html( (string) $rule_count ); ?>つのレスポンス ヘッダー変換ルールを設定してください。</p>
-
-                                <h4>ルール1: セキュリティヘッダー</h4>
-                                <ul>
-                                    <li>条件: <strong>すべての受信リクエスト</strong></li>
-                                    <li>操作: <strong>静的を追加</strong></li>
-                                </ul>
-                                <table class="cp-guide-headers-table">
-                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
-                                    <tbody>
-                                        <tr><td><code>Content-Security-Policy</code></td><td><code><?php echo esc_html( $this->get_mati_frame_ancestors_value() ); ?></code></td></tr>
-                                        <?php foreach ( $mati_header_sets['page'] as $header_name => $header_value ) : ?>
-                                        <tr><td><code><?php echo esc_html( $header_name ); ?></code></td><td><code><?php echo esc_html( $header_value ); ?></code></td></tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-
-                                <h4>ルール2: HTMLコンテンツタイプ</h4>
-                                <ul>
-                                    <li>条件: <strong>カスタムフィルタ式</strong></li>
-                                    <li>式: <code>not http.request.uri.path contains "."</code></li>
-                                    <li>操作: <strong>静的を追加</strong></li>
-                                </ul>
-                                <table class="cp-guide-headers-table">
-                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
-                                    <tbody>
-                                        <tr><td><code>Content-Type</code></td><td><code>text/html; charset=utf-8</code></td></tr>
-                                    </tbody>
-                                </table>
-
-                                <h4>ルール3: CSSコンテンツタイプ</h4>
-                                <ul>
-                                    <li>条件: <strong>カスタムフィルタ式</strong></li>
-                                    <li>式: <code>http.request.uri.path.extension eq "css"</code></li>
-                                    <li>操作: <strong>静的を追加</strong></li>
-                                </ul>
-                                <table class="cp-guide-headers-table">
-                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
-                                    <tbody>
-                                        <tr><td><code>Content-Type</code></td><td><code>text/css; charset=utf-8</code></td></tr>
-                                    </tbody>
-                                </table>
-
-                                <h4>ルール4: JSコンテンツタイプ</h4>
-                                <ul>
-                                    <li>条件: <strong>カスタムフィルタ式</strong></li>
-                                    <li>式: <code>http.request.uri.path.extension eq "js"</code></li>
-                                    <li>操作: <strong>静的を追加</strong></li>
-                                </ul>
-                                <table class="cp-guide-headers-table">
-                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
-                                    <tbody>
-                                        <tr><td><code>Content-Type</code></td><td><code>application/javascript; charset=utf-8</code></td></tr>
-                                    </tbody>
-                                </table>
-
-                                <?php if ( $this->has_mati_bluesky_did() ) : ?>
-                                <h4>ルール5: Blueskyドメイン認証</h4>
-                                <ul>
-                                    <li>条件: <strong>カスタムフィルタ式</strong></li>
-                                    <li>式: <code>http.request.uri.path eq "/.well-known/atproto-did"</code></li>
-                                    <li>操作: <strong>静的を追加</strong></li>
-                                </ul>
-                                <table class="cp-guide-headers-table">
-                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
-                                    <tbody>
-                                        <tr><td><code>Content-Type</code></td><td><code>text/plain; charset=utf-8</code></td></tr>
-                                        <tr><td><code>Cache-Control</code></td><td><code>no-cache, no-store, must-revalidate</code></td></tr>
-                                        <tr><td><code>Pragma</code></td><td><code>no-cache</code></td></tr>
-                                        <tr><td><code>Expires</code></td><td><code>0</code></td></tr>
-                                        <tr><td><code>Content-Disposition</code></td><td><code>inline</code></td></tr>
-                                    </tbody>
-                                </table>
-                                <?php endif; ?>
-
-                                <?php if ( ! empty( $mati_media_headers ) ) : ?>
-                                <h4>ルール<?php echo esc_html( (string) $media_rule_number ); ?>: メディアファイル</h4>
-                                <ul>
-                                    <li>条件: <strong>カスタムフィルタ式</strong></li>
-                                    <li>式: <code>starts_with(http.request.uri.path, "<?php echo esc_html( $cp_settings_manager->get_static_uploads_path() ); ?>")</code></li>
-                                    <li>操作: <strong>静的を追加</strong></li>
-                                </ul>
-                                <table class="cp-guide-headers-table">
-                                    <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
-                                    <tbody>
-                                        <?php foreach ( $mati_media_headers as $header_name => $header_value ) : ?>
-                                        <tr><td><code><?php echo esc_html( $header_name ); ?></code></td><td><code><?php echo esc_html( $header_value ); ?></code></td></tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                                <?php endif; ?>
-
-                                <p class="description">※ Matiの設定を変更した場合は、ルール1<?php echo empty( $mati_media_headers ) ? '' : '・ルール' . esc_html( (string) $media_rule_number ); ?>のヘッダーの値も更新してください。</p>
-                                <p class="description"><a href="https://developers.cloudflare.com/rules/transform/response-header-modification/" target="_blank" rel="noopener noreferrer">Cloudflare Transform Rules ドキュメント →</a></p>
+                                <?php echo $transform_guide; // 内部で出力値はエスケープ済み ?>
+                                <p>
+                                    <label>
+                                        <input type="checkbox" name="hide_transform_guide" value="1">
+                                        非表示にする
+                                    </label>
+                                    <input type="hidden" id="cp-reshow-transform-guide" name="reshow_transform_guide" value="">
+                                </p>
                             </div><!-- .cp-guide-content -->
                         </div><!-- .nau-accordion-content -->
                     </div><!-- .nau-accordion-section (transform-guide) -->
@@ -1445,6 +1360,12 @@ class CP_Admin {
             }
         }
 
+        // 保存前の設定で表示されていた案内を非表示にする（内容が変わると再表示される）
+        $hidden_guide_hash = null;
+        if ( ! empty( $_POST['hide_transform_guide'] ) && defined( 'MATI_VERSION' ) && class_exists( 'Mati_Settings' ) ) {
+            $hidden_guide_hash = md5( $this->get_transform_guide_content() );
+        }
+
         $result = $settings_manager->save_settings( $settings );
 
         if ( is_wp_error( $result ) ) {
@@ -1452,6 +1373,15 @@ class CP_Admin {
                 'message'  => $result->get_error_message(),
                 'messages' => $result->get_error_messages(),
             ) );
+        }
+
+        // 画面上で Wrangler 不使用に切り替えて再表示した案内は、再度非表示にするまで表示し続ける
+        $reshow_guide = ! empty( $_POST['reshow_transform_guide'] )
+            || ( ! empty( $old_settings['cloudflare_use_wrangler'] ) && empty( $settings['cloudflare_use_wrangler'] ) );
+        if ( null !== $hidden_guide_hash ) {
+            update_option( 'cp_transform_guide_hidden', $hidden_guide_hash, false );
+        } elseif ( $reshow_guide ) {
+            delete_option( 'cp_transform_guide_hidden' );
         }
 
         if ( $should_clear_cache ) {
@@ -2088,6 +2018,125 @@ class CP_Admin {
         }
 
         return $deleted_total;
+    }
+
+    /**
+     * Cloudflare レスポンス ヘッダー変換ルールの案内（本文）
+     *
+     * 本文の md5 を非表示にした時点のものと比較し、内容が変わったら再表示する。
+     */
+    private function get_transform_guide_content(): string {
+        ob_start();
+        try {
+            ?>
+            <?php
+            $cp_settings_manager = CP_Settings::get_instance();
+            $mati_header_sets    = $cp_settings_manager->get_mati_header_sets();
+            $mati_media_headers  = array_diff_key( $mati_header_sets['media'], $mati_header_sets['page'] );
+            $has_bluesky_rule    = $this->has_mati_bluesky_did();
+            $media_rule_number   = $has_bluesky_rule ? 6 : 5;
+            $rule_count          = 4 + ( $has_bluesky_rule ? 1 : 0 ) + ( empty( $mati_media_headers ) ? 0 : 1 );
+            ?>
+            <p>Cloudflareの管理画面で以下の<?php echo esc_html( (string) $rule_count ); ?>つのレスポンス ヘッダー変換ルールを設定してください。</p>
+
+            <h4>ルール1: セキュリティヘッダー</h4>
+            <ul>
+                <li>条件: <strong>すべての受信リクエスト</strong></li>
+                <li>操作: <strong>静的を追加</strong></li>
+            </ul>
+            <table class="cp-guide-headers-table">
+                <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                <tbody>
+                    <tr><td><code>Content-Security-Policy</code></td><td><code><?php echo esc_html( $this->get_mati_frame_ancestors_value() ); ?></code></td></tr>
+                    <?php foreach ( $mati_header_sets['page'] as $header_name => $header_value ) : ?>
+                    <tr><td><code><?php echo esc_html( $header_name ); ?></code></td><td><code><?php echo esc_html( $header_value ); ?></code></td></tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+
+            <h4>ルール2: HTMLコンテンツタイプ</h4>
+            <ul>
+                <li>条件: <strong>カスタムフィルタ式</strong></li>
+                <li>式: <code>not http.request.uri.path contains "."</code></li>
+                <li>操作: <strong>静的を追加</strong></li>
+            </ul>
+            <table class="cp-guide-headers-table">
+                <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                <tbody>
+                    <tr><td><code>Content-Type</code></td><td><code>text/html; charset=utf-8</code></td></tr>
+                </tbody>
+            </table>
+
+            <h4>ルール3: CSSコンテンツタイプ</h4>
+            <ul>
+                <li>条件: <strong>カスタムフィルタ式</strong></li>
+                <li>式: <code>http.request.uri.path.extension eq "css"</code></li>
+                <li>操作: <strong>静的を追加</strong></li>
+            </ul>
+            <table class="cp-guide-headers-table">
+                <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                <tbody>
+                    <tr><td><code>Content-Type</code></td><td><code>text/css; charset=utf-8</code></td></tr>
+                </tbody>
+            </table>
+
+            <h4>ルール4: JSコンテンツタイプ</h4>
+            <ul>
+                <li>条件: <strong>カスタムフィルタ式</strong></li>
+                <li>式: <code>http.request.uri.path.extension eq "js"</code></li>
+                <li>操作: <strong>静的を追加</strong></li>
+            </ul>
+            <table class="cp-guide-headers-table">
+                <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                <tbody>
+                    <tr><td><code>Content-Type</code></td><td><code>application/javascript; charset=utf-8</code></td></tr>
+                </tbody>
+            </table>
+
+            <?php if ( $this->has_mati_bluesky_did() ) : ?>
+            <h4>ルール5: Blueskyドメイン認証</h4>
+            <ul>
+                <li>条件: <strong>カスタムフィルタ式</strong></li>
+                <li>式: <code>http.request.uri.path eq "/.well-known/atproto-did"</code></li>
+                <li>操作: <strong>静的を追加</strong></li>
+            </ul>
+            <table class="cp-guide-headers-table">
+                <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                <tbody>
+                    <tr><td><code>Content-Type</code></td><td><code>text/plain; charset=utf-8</code></td></tr>
+                    <tr><td><code>Cache-Control</code></td><td><code>no-cache, no-store, must-revalidate</code></td></tr>
+                    <tr><td><code>Pragma</code></td><td><code>no-cache</code></td></tr>
+                    <tr><td><code>Expires</code></td><td><code>0</code></td></tr>
+                    <tr><td><code>Content-Disposition</code></td><td><code>inline</code></td></tr>
+                </tbody>
+            </table>
+            <?php endif; ?>
+
+            <?php if ( ! empty( $mati_media_headers ) ) : ?>
+            <h4>ルール<?php echo esc_html( (string) $media_rule_number ); ?>: メディアファイル</h4>
+            <ul>
+                <li>条件: <strong>カスタムフィルタ式</strong></li>
+                <li>式: <code>starts_with(http.request.uri.path, "<?php echo esc_html( $cp_settings_manager->get_static_uploads_path() ); ?>")</code></li>
+                <li>操作: <strong>静的を追加</strong></li>
+            </ul>
+            <table class="cp-guide-headers-table">
+                <thead><tr><th>ヘッダー名</th><th>値</th></tr></thead>
+                <tbody>
+                    <?php foreach ( $mati_media_headers as $header_name => $header_value ) : ?>
+                    <tr><td><code><?php echo esc_html( $header_name ); ?></code></td><td><code><?php echo esc_html( $header_value ); ?></code></td></tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
+
+            <p class="description">※ Matiの設定を変更した場合は、ルール1<?php echo empty( $mati_media_headers ) ? '' : '・ルール' . esc_html( (string) $media_rule_number ); ?>のヘッダーの値も更新してください。</p>
+            <p class="description"><a href="https://developers.cloudflare.com/rules/transform/response-header-modification/" target="_blank" rel="noopener noreferrer">Cloudflare Transform Rules ドキュメント →</a></p>
+            <?php
+        } finally {
+            $content = (string) ob_get_clean();
+        }
+
+        return $content;
     }
 
     private function render_tooltip( string $text ): string {

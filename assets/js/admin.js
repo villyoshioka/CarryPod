@@ -160,7 +160,7 @@ jQuery(document).ready(function($) {
 
         var $transformGuide = $('#cp-cf-transform-guide');
 
-        if (cfEnabled && !useWrangler) {
+        if (cfEnabled && !useWrangler && !$transformGuide.attr('data-dismissed')) {
             if (noTransition) { $transformGuide.show(); } else { $transformGuide.slideDown(motionDurationLong); }
         } else {
             if (noTransition) { $transformGuide.hide(); } else { $transformGuide.slideUp(motionDurationLong); }
@@ -240,6 +240,11 @@ jQuery(document).ready(function($) {
     $(window).on('resize', syncWranglerGuideWidth);
 
     $('#cp-cloudflare-use-wrangler').on('change', function() {
+        // Wrangler 不使用に切り替えたら、非表示にしていた案内も保存を待たずに再表示する
+        if ($(this).val() === '0') {
+            $('#cp-cf-transform-guide').removeAttr('data-dismissed');
+            $('#cp-reshow-transform-guide').val('1');
+        }
         updateCfGuide(false);
     });
 

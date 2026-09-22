@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Carry Pod
- * Version: 3.3.1
+ * Version: 3.3.2
  * Description: WordPressサイトを静的化してデプロイするプラグイン
  * Requires at least: 7.0
  * Tested up to: 7.0
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'CP_VERSION', '3.3.1' );
+define( 'CP_VERSION', '3.3.2' );
 define( 'CP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'CP_PLUGIN_FILE', __FILE__ );
@@ -187,6 +187,7 @@ class Carry_Pod {
     public static function uninstall(): void {
         delete_option( 'cp_settings' );
         delete_option( 'cp_logs' );
+        delete_option( 'cp_transform_guide_hidden' );
 
         $roles = array( 'administrator', 'editor' );
         $caps = array( 'cp_execute', 'cp_manage_settings' );
