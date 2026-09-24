@@ -235,6 +235,11 @@ class CP_Generator {
             $this->logger->update_progress( 87, $total_steps, '除外ファイルを削除中...' );
             $this->remove_excluded_files();
 
+            // 除外済みページを載せないよう、除外処理のあとに生成する
+            if ( ! empty( $this->settings['enable_llms_txt'] ) ) {
+                $this->generate_llms_txt();
+            }
+
             $this->logger->add_log( 'サイトマップを生成中...' );
             $this->logger->update_progress( 89, $total_steps, 'サイトマップを生成中...' );
             $this->generate_sitemap();
@@ -1246,10 +1251,6 @@ class CP_Generator {
 
         if ( ! empty( $this->settings['enable_robots_txt'] ) ) {
             $this->generate_robots_txt();
-        }
-
-        if ( ! empty( $this->settings['enable_llms_txt'] ) ) {
-            $this->generate_llms_txt();
         }
 
         // _headersファイルを生成（Mati連携）
@@ -2923,24 +2924,19 @@ JS;
     }
 
     /**
-     * llms.txt用のページリンク一覧を生成（サイトマップと同じページ集合）
+     * llms.txt用のページリンク一覧を生成
+     *
+     * サイトマップと異なり noindex ページも含める（noindex は検索エンジン向けの指示のため）。
      *
      * @param string $base_url  絶対URLのベース
      * @param string $home_name トップページのリンク名
      * @return string[] Markdownリスト行
      */
     private function build_llms_page_links( string $base_url, string $home_name ): array {
-        $path_to_post_id = array();
-        foreach ( $this->url_to_post_id_map as $permalink => $post_id ) {
-            $path_to_post_id[ untrailingslashit( wp_parse_url( $permalink, PHP_URL_PATH ) ?? '' ) ] = $post_id;
-        }
+        $path_to_post_id = $this->get_path_to_post_id_map();
 
         $links = array();
-        foreach ( $this->generated_html_pages as $page ) {
-            if ( stripos( $page['url'], '/wp-admin' ) !== false || str_ends_with( $page['path'], '.xml' ) ) {
-                continue;
-            }
-
+        foreach ( $this->get_listable_pages() as $page ) {
             $key = untrailingslashit( $page['url'] );
             if ( $key === '' ) {
                 $name = $home_name;
@@ -3910,23 +3906,41 @@ JS;
             ? untrailingslashit( $this->settings['base_url'] )
             : untrailingslashit( get_site_url() );
 
+        $path_to_post_id = $this->get_path_to_post_id_map();
+
         $sitemap_xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
         $sitemap_xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
 
-        foreach ( $this->generated_html_pages as $page ) {
-            $url = $base_url . $page['url'];
-
-            if ( stripos( $url, '/wp-admin' ) !== false ) {
+        $page_count = 0;
+        foreach ( $this->get_listable_pages() as $page ) {
+            if ( $this->has_noindex_meta( (string) file_get_contents( $this->temp_dir . '/' . $page['path'] ) ) ) {
                 continue;
             }
 
-            $priority = ( $page['url'] === '/' || $page['url'] === '' ) ? '1.0' : '0.8';
+            $key = untrailingslashit( $page['url'] );
+
+            // 投稿は自身の更新日時、トップは最新投稿の更新日時。アーカイブは正確な値が取れないため省略
+            $lastmod = '';
+            if ( isset( $path_to_post_id[ $key ] ) ) {
+                $lastmod = (string) get_post_modified_time( DATE_W3C, true, $path_to_post_id[ $key ] );
+            } elseif ( $key === '' ) {
+                $last_modified = get_lastpostmodified( 'GMT' );
+                if ( $last_modified ) {
+                    $lastmod = ( new DateTimeImmutable( $last_modified, new DateTimeZone( 'UTC' ) ) )->format( DATE_W3C );
+                }
+            }
+
+            $priority = $key === '' ? '1.0' : '0.8';
 
             $sitemap_xml .= '  <url>' . "\n";
-            $sitemap_xml .= '    <loc>' . esc_url( $url ) . '</loc>' . "\n";
+            $sitemap_xml .= '    <loc>' . esc_url( $base_url . $page['url'] ) . '</loc>' . "\n";
+            if ( $lastmod !== '' ) {
+                $sitemap_xml .= '    <lastmod>' . $lastmod . '</lastmod>' . "\n";
+            }
             $sitemap_xml .= '    <changefreq>weekly</changefreq>' . "\n";
             $sitemap_xml .= '    <priority>' . $priority . '</priority>' . "\n";
             $sitemap_xml .= '  </url>' . "\n";
+            $page_count++;
         }
 
         $sitemap_xml .= '</urlset>' . "\n";
@@ -3934,8 +3948,54 @@ JS;
         $sitemap_path = $this->temp_dir . '/sitemap.xml';
         file_put_contents( $sitemap_path, $sitemap_xml );
 
-        $page_count = count( $this->generated_html_pages );
         $this->logger->debug( "サイトマップ生成完了: {$page_count}ページ" );
+    }
+
+    /**
+     * サイトマップ・llms.txt に載せるページ（管理画面・フィード・除外パターンで削除済みを除く）
+     *
+     * @return array<int, array{url: string, path: string}>
+     */
+    private function get_listable_pages(): array {
+        return array_filter(
+            $this->generated_html_pages,
+            fn( array $page ): bool => stripos( $page['url'], '/wp-admin' ) === false
+                && ! str_ends_with( $page['path'], '.xml' )
+                && is_file( $this->temp_dir . '/' . $page['path'] )
+        );
+    }
+
+    /**
+     * URLパス（末尾スラッシュなし）→ 投稿ID の対応表
+     *
+     * @return array<string, int>
+     */
+    private function get_path_to_post_id_map(): array {
+        $path_to_post_id = array();
+        foreach ( $this->url_to_post_id_map as $permalink => $post_id ) {
+            $path_to_post_id[ untrailingslashit( wp_parse_url( $permalink, PHP_URL_PATH ) ?? '' ) ] = $post_id;
+        }
+        return $path_to_post_id;
+    }
+
+    /**
+     * meta robots に noindex（または none）が指定されているか
+     *
+     * 属性の順序・引用符の種類に依存しないよう、meta タグ単位で name と content を個別に判定する。
+     */
+    private function has_noindex_meta( string $html ): bool {
+        if ( ! preg_match_all( '/<meta\b[^>]*>/i', $html, $tags ) ) {
+            return false;
+        }
+
+        foreach ( $tags[0] as $tag ) {
+            if ( preg_match( '/\bname\s*=\s*["\']?robots["\'\s\/>]/i', $tag )
+                && preg_match( '/\bcontent\s*=\s*["\']?[^"\'>]*\b(?:noindex|none)\b/i', $tag ) ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
