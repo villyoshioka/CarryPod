@@ -1,11 +1,8 @@
-/* Carry Pod 管理画面スタイル（プラグイン固有） */
-/* 共通スタイルは admin-fw.css (Nautilus Admin UI) を参照 */
+/* Carry Pod admin styles (plugin-specific) */
+/* For shared styles, see admin-fw.css (Nautilus Admin UI) */
 
-/* ========================================
-   WordPress管理画面フッター位置調整
-   ======================================== */
+/* WordPress admin footer position adjustment */
 
-/* Carry Pod設定画面でのみ適用 */
 body.carry-pod_page_carry-pod-settings {
     display: flex !important;
     flex-direction: column !important;
@@ -35,26 +32,24 @@ body.carry-pod_page_carry-pod-settings #wpfooter {
     flex: 0 0 auto !important;
 }
 
-/* WordPress標準の.wrapクラスの中央揃えを上書き */
+/* Override the centering of the standard WordPress .wrap class */
 .wrap.nau-admin-wrap {
     text-align: left !important;
 }
 
-/* 実行ページ: フッターを下部に配置するための最小高さ */
+/* Execution page: minimum height to keep the footer at the bottom */
 body.toplevel_page_carry-pod .nau-admin-wrap {
     min-height: calc(100vh - 180px);
 }
 
-/* WordPressフッターの位置を修正 */
+/* Fix the WordPress footer position */
 #wpfooter {
     position: relative !important;
     clear: both !important;
     margin-top: -5px !important;
 }
 
-/* ========================================
-   アコーディオン直下のコントロール幅調整
-   ======================================== */
+/* Width adjustment for controls directly under accordions */
 
 .nau-accordion-content > .nau-form-group input[type="text"],
 .nau-accordion-content > .nau-form-group input[type="password"],
@@ -69,9 +64,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
 }
 
 
-/* ========================================
-   進捗表示エリア
-   ======================================== */
+/* Progress display area */
 
 .cp-progress-section {
     padding: 15px;
@@ -147,9 +140,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     display: none;
 }
 
-/* ========================================
-   Dynamic sections container
-   ======================================== */
+/* Dynamic sections container */
 
 .cp-dynamic-sections {
     display: flex;
@@ -162,9 +153,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     overflow: hidden;
 }
 
-/* ========================================
-   実行ボタンコンテナ
-   ======================================== */
+/* Execute button container */
 
 .cp-execute-section {
     order: 3;
@@ -186,9 +175,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     pointer-events: none;
 }
 
-/* ========================================
-   コミットメッセージセクション
-   ======================================== */
+/* Commit message section */
 
 .cp-commit-section {
     padding: 16px;
@@ -278,9 +265,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     flex-shrink: 0;
 }
 
-/* ========================================
-   ブランチ設定
-   ======================================== */
+/* Branch settings */
 
 .cp-branch-settings {
     padding: 15px;
@@ -347,7 +332,6 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     margin-bottom: 0;
 }
 
-/* ブランチ設定のコンテナ - 各行を独立させる（旧スタイル） */
 .nau-subsection .nau-form-group:not(.cp-branch-settings) > div {
     margin-bottom: 15px;
     display: flex !important;
@@ -446,9 +430,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     cursor: not-allowed;
 }
 
-/* ========================================
-   ラジオグループ
-   ======================================== */
+/* Radio group */
 
 .cp-radio-group {
     margin: 10px 0;
@@ -465,9 +447,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     border-color: #757575;
 }
 
-/* ========================================
-   インライン要素
-   ======================================== */
+/* Inline elements */
 
 .cp-inline-group {
     display: flex;
@@ -479,9 +459,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     flex: 1;
 }
 
-/* ========================================
-   エラー・成功メッセージ
-   ======================================== */
+/* Error/success messages */
 
 .cp-error-message {
     color: #d63638;
@@ -495,9 +473,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     font-size: 13px;
 }
 
-/* ========================================
-   カード風レイアウト
-   ======================================== */
+/* Card-style layout */
 
 .cp-card {
     background: #fff;
@@ -514,9 +490,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     color: #1d2327;
 }
 
-/* ========================================
-   タブスタイル
-   ======================================== */
+/* Tab styles */
 
 .cp-tabs {
     border-bottom: 1px solid #c3c4c7;
@@ -543,9 +517,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     background: #f6f7f7;
 }
 
-/* ========================================
-   テーブルスタイル
-   ======================================== */
+/* Table styles */
 
 .cp-table {
     width: 100%;
@@ -565,9 +537,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     font-weight: 600;
 }
 
-/* ========================================
-   カスタム通知のスタイル
-   ======================================== */
+/* Custom notice styles */
 
 .cp-notice {
     animation: slideDown 0.3s ease-out;
@@ -593,7 +563,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     }
 }
 
-/* エラー通知バッジ（WordPressデフォルトスタイル） */
+/* Error notification badge (WordPress default style) */
 #adminmenu #toplevel_page_carry-pod .awaiting-mod {
     display: inline-block;
     vertical-align: top;
@@ -615,9 +585,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     border-left-color: #d63638 !important;
 }
 
-/* ========================================
-   Cloudflare Transform Rules ガイド
-   ======================================== */
+/* Cloudflare Transform Rules guide */
 
 #cp-wrangler-guide {
     margin-bottom: 20px;
@@ -782,9 +750,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     text-decoration: underline;
 }
 
-/* ========================================
-   旧スタイル互換
-   ======================================== */
+/* Legacy style compatibility */
 
 .nau-subsection .nau-form-group div[style*="margin-top"] label + input[type="text"].regular-text {
     display: inline-block !important;
@@ -793,9 +759,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     vertical-align: middle !important;
 }
 
-/* ========================================
-   レスポンシブ対応（Carry Pod固有）
-   ======================================== */
+/* Responsive styles (Carry Pod-specific) */
 
 @media screen and (max-width: 782px) {
     .cp-execute-section {
@@ -1022,9 +986,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     }
 }
 
-/* ========================================
-   ボタン群のレスポンシブ対応（1267px未満）
-   ======================================== */
+/* Responsive button group (below 1267px) */
 
 @media screen and (max-width: 1266px) {
     .cp-commit-container {
@@ -1038,9 +1000,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     }
 }
 
-/* ========================================
-   タッチデバイス最適化（Carry Pod固有）
-   ======================================== */
+/* Touch device optimization (Carry Pod-specific) */
 
 @media (hover: none) and (pointer: coarse) {
     .cp-guide-details summary {
@@ -1050,9 +1010,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     }
 }
 
-/* ========================================
-   ツールチップ固有（コミットセクション）
-   ======================================== */
+/* Tooltip-specific (commit section) */
 
 .cp-commit-section h3 .nau-tooltip-content {
     left: 0;
@@ -1068,7 +1026,7 @@ body.toplevel_page_carry-pod .nau-admin-wrap {
     transform: none;
 }
 
-/* URL形式とURL入力の間を詰める */
+/* Tighten the gap between URL format and URL input */
 .cp-base-url-field {
     padding-top: 0 !important;
 }

@@ -1,6 +1,6 @@
 <?php
 /**
- * ログ管理クラス
+ * Log management class
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -29,10 +29,10 @@ class CP_Logger {
     }
 
     /**
-     * デバッグモードが有効かどうかをチェック
+     * Check whether debug mode is enabled
      *
-     * URLパラメータ &debugmode=on で有効化（管理者のみ）
-     * 有効化するとトランジェントに保存され、非同期処理でも維持される
+     * Enabled via the URL parameter &debugmode=on (administrators only)
+     * Once enabled, it is stored in a transient and persists across async processing
      */
     public function is_debug_mode(): bool {
         if ( $this->debug_mode_cache !== null ) {
@@ -74,7 +74,7 @@ class CP_Logger {
     }
 
     public function add_log( string $message, string|bool $level = self::LEVEL_INFO ): void {
-        // 後方互換性: 第2引数がboolの場合はerrorレベルとして扱う
+        // Backward compatibility: treat a bool second argument as the error level
         if ( is_bool( $level ) ) {
             $level = $level ? self::LEVEL_ERROR : self::LEVEL_INFO;
         }
@@ -114,7 +114,7 @@ class CP_Logger {
         $logs = get_option( 'cp_logs', array() );
         $logs = array_merge( $logs, $this->log_buffer );
 
-        // メモリ保護のため1000件まで
+        // Cap at 1000 entries to protect memory
         if ( count( $logs ) > 1000 ) {
             $logs = array_slice( $logs, -1000 );
         }

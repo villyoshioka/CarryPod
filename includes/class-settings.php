@@ -1,6 +1,6 @@
 <?php
 /**
- * 設定管理クラス
+ * Settings management class
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -15,9 +15,9 @@ if ( false ) {
 class CP_Settings {
 
     private static ?self $instance = null;
-    private string $encryption_key;
+    private ?string $encryption_key = null;
 
-    /** SHA-256ハッシュ値のみ保存（平文パスワードはソースコードに含めない） */
+    /** Store only the SHA-256 hash (the plaintext password is not included in the source code) */
     private string $beta_password_hash = 'a6301e803f92a28d1342b9248ecaf0fa01a6c59f8a1e8fb1fdcebb21a97de804';
 
     public static function get_instance(): static {
@@ -27,21 +27,19 @@ class CP_Settings {
         return self::$instance;
     }
 
-    private function __construct() {
-        $this->encryption_key = $this->get_or_create_encryption_key();
-    }
+    private function __construct() {}
 
     public function is_beta_mode_enabled(): bool {
         return (bool) get_transient( 'cp_beta_channel' );
     }
 
     /**
-     * WordPress Playground（php-wasm）環境かどうかを判定
+     * Determine whether this is a WordPress Playground (php-wasm) environment
      *
-     * WordPress Studio は内部で Playground を使用しており、この環境では
-     * exec / proc_open がエラーを出さずに失敗するため、CLI 依存機能
-     * （ローカルGit・Wrangler CLI）を無効化する必要がある。
-     * SERVER_SOFTWARE には 'PHP.wasm' が設定される。
+     * WordPress Studio uses Playground internally, and in this environment
+     * exec / proc_open fail without raising an error, so CLI-dependent features
+     * (local Git, Wrangler CLI) must be disabled.
+     * SERVER_SOFTWARE is set to 'PHP.wasm'.
      */
     public static function is_playground(): bool {
         $server_software = $_SERVER['SERVER_SOFTWARE'] ?? '';
@@ -49,10 +47,10 @@ class CP_Settings {
     }
 
     /**
-     * Mati連携: ページ用・メディア用のヘッダー（X-Robots-Tag / TDMRep）
+     * Mati integration: headers for pages and for media (X-Robots-Tag / TDMRep)
      *
-     * Mati 2.3.1 以降は Mati 側の組み立て結果を使う。
-     * それより前の Mati では X-Robots-Tag をサイト全体に付ける従来動作にする。
+     * On Mati 2.3.1 or later, use the result assembled by Mati.
+     * On earlier Mati versions, keep the legacy behavior of applying X-Robots-Tag site-wide.
      *
      * @return array{page: array<string, string>, media: array<string, string>}
      */
@@ -95,7 +93,7 @@ class CP_Settings {
             return array( 'page' => array(), 'media' => array() );
         }
 
-        // _headers や案内表示にそのまま出すため、1行に収まる安全な値のみ残す
+        // Keep only safe values that fit on one line, since they are output as-is to _headers and notices
         foreach ( array( 'page', 'media' ) as $key ) {
             $sets[ $key ] = array_filter(
                 (array) ( $sets[ $key ] ?? array() ),
@@ -110,7 +108,7 @@ class CP_Settings {
     }
 
     /**
-     * 静的サイト上のアップロードフォルダのパス（例: /wp-content/uploads/）
+     * Path of the uploads folder on the static site (e.g. /wp-content/uploads/)
      */
     public function get_static_uploads_path(): string {
         $settings        = $this->get_settings();
@@ -120,8 +118,8 @@ class CP_Settings {
     }
 
     /**
-     * ベータモードを有効化（パスワード検証付き）
-     * タイミングセーフ比較 + レート制限（5回失敗で10分ロック）
+     * Enable beta mode (with password verification)
+     * Timing-safe comparison + rate limiting (10-minute lock after 5 failures)
      */
     public function enable_beta_mode( string $password ): bool|\WP_Error {
         $user_id = get_current_user_id();
@@ -149,26 +147,83 @@ class CP_Settings {
         delete_transient( 'cp_github_release_cache_beta' );
     }
 
-    private function get_or_create_encryption_key(): string {
-        if ( defined( 'CP_ENCRYPTION_KEY' ) && ! empty( CP_ENCRYPTION_KEY ) ) {
-            return hash( 'sha256', CP_ENCRYPTION_KEY );
+    /**
+     * Encryption key for stored tokens
+     *
+     * Derived from CP_ENCRYPTION_KEY or the wp-config.php salts so that a database dump alone
+     * cannot decrypt the tokens. Resolved lazily because wp_salt() is pluggable and not
+     * available while plugins are still loading.
+     */
+    private function encryption_key(): string {
+        if ( $this->encryption_key !== null ) {
+            return $this->encryption_key;
         }
 
-        $stored_key = get_option( 'cp_encryption_key' );
-        if ( ! empty( $stored_key ) ) {
-            return $stored_key;
+        $new_key = defined( 'CP_ENCRYPTION_KEY' ) && ! empty( CP_ENCRYPTION_KEY )
+            ? hash( 'sha256', CP_ENCRYPTION_KEY )
+            : hash( 'sha256', wp_salt( 'secure_auth' ) . wp_salt( 'auth' ) );
+
+        $legacy_key = get_option( 'cp_encryption_key' );
+        if ( ! empty( $legacy_key ) ) {
+            $this->reencrypt_stored_tokens( $legacy_key, $new_key );
+            delete_option( 'cp_encryption_key' );
         }
 
-        try {
-            $random_bytes = random_bytes( 32 );
-            $new_key = hash( 'sha256', $random_bytes . wp_salt( 'secure_auth' ) . wp_salt( 'auth' ) );
-        } catch ( Exception $e ) {
-            $new_key = hash( 'sha256', wp_generate_password( 64, true, true ) . wp_salt( 'secure_auth' ) . wp_salt( 'auth' ) );
-        }
-
-        update_option( 'cp_encryption_key', $new_key, false );
-
+        $this->encryption_key = $new_key;
         return $new_key;
+    }
+
+    /**
+     * Re-encrypt stored secrets (tokens and the Basic auth password) that were encrypted
+     * with the key formerly kept in the database
+     */
+    private function reencrypt_stored_tokens( string $legacy_key, string $new_key ): void {
+        // Returns the value re-encrypted with the new key, or null when it needs no change or cannot be read
+        $reencrypt = function ( string $value ) use ( $legacy_key, $new_key ): ?string {
+            // Already readable with the new key (e.g. CP_ENCRYPTION_KEY was set later): nothing to do.
+            // Only trusted for v2 (GCM is authenticated); a legacy CBC value can "decrypt" to garbage
+            // under the wrong key, and CBC values were only ever written with the legacy key.
+            $this->encryption_key = $new_key;
+            if ( str_starts_with( $value, 'v2:' ) && ! is_wp_error( $this->decrypt_token( $value ) ) ) {
+                return null;
+            }
+
+            $this->encryption_key = $legacy_key;
+            $plain = $this->decrypt_token( $value );
+            $this->encryption_key = $new_key;
+            if ( is_wp_error( $plain ) ) {
+                return null;
+            }
+
+            $encrypted = $this->encrypt_token( $plain );
+            return $encrypted === false ? null : $encrypted;
+        };
+
+        $raw = get_option( 'cp_settings', array() );
+        if ( is_array( $raw ) ) {
+            $changed = false;
+            foreach ( array( 'github_token', 'cloudflare_api_token', 'gitlab_token', 'netlify_api_token' ) as $field ) {
+                if ( empty( $raw[ $field ] ) ) {
+                    continue;
+                }
+                $encrypted = $reencrypt( $raw[ $field ] );
+                if ( $encrypted !== null ) {
+                    $raw[ $field ] = $encrypted;
+                    $changed = true;
+                }
+            }
+            if ( $changed ) {
+                update_option( 'cp_settings', $raw );
+            }
+        }
+
+        $basic_auth_pass = get_option( 'cp_basic_auth_pass' );
+        if ( is_string( $basic_auth_pass ) && $basic_auth_pass !== '' ) {
+            $encrypted = $reencrypt( $basic_auth_pass );
+            if ( $encrypted !== null ) {
+                update_option( 'cp_basic_auth_pass', $encrypted, false );
+            }
+        }
     }
 
     public function is_encryption_key_in_config(): bool {
@@ -176,6 +231,7 @@ class CP_Settings {
     }
 
     public function get_settings(): array {
+        $this->encryption_key(); // migrate legacy-key tokens before reading them
         $settings = get_option( 'cp_settings', array() );
 
         $defaults = array(
@@ -262,15 +318,16 @@ class CP_Settings {
     }
 
     public function save_settings( array $settings ): bool|\WP_Error {
+        $this->encryption_key(); // migrate legacy-key tokens before reading them
         $current_raw = get_option( 'cp_settings', array() );
 
-        // Playground（WordPress Studio）ではCLI実行不可のため、CLI依存機能を強制無効化
+        // Force-disable CLI-dependent features on Playground (WordPress Studio) since the CLI cannot be run there
         if ( self::is_playground() ) {
             $settings['git_local_enabled'] = false;
             $settings['cloudflare_use_wrangler'] = false;
         }
 
-        // 空のトークンは既存値を保持
+        // Keep the existing value when the token is empty
         if ( empty( $settings['github_token'] ) && ! empty( $current_raw['github_token'] ) ) {
             $settings['github_token'] = $current_raw['github_token'];
             $decrypted = $this->decrypt_token( $current_raw['github_token'] );
@@ -305,7 +362,6 @@ class CP_Settings {
         unset( $settings['_has_existing_gl_token'] );
         unset( $settings['_has_existing_netlify_token'] );
 
-        // 未暗号化の新トークンのみ暗号化
         if ( ! empty( $settings['github_token'] ) && ! str_starts_with( $settings['github_token'], 'v2:' ) && ! str_contains( $settings['github_token'], '::' ) ) {
             $settings['github_token'] = $this->encrypt_token( $settings['github_token'] );
         }
@@ -376,6 +432,8 @@ class CP_Settings {
                 $errors[] = 'Git作業ディレクトリは絶対パスで指定してください。';
             } elseif ( str_contains( $settings['git_local_work_dir'], '..' ) ) {
                 $errors[] = 'Git作業ディレクトリのパスに".."を含めることはできません。';
+            } elseif ( $this->overlaps_wordpress_install( $settings['git_local_work_dir'] ) ) {
+                $errors[] = 'Git作業ディレクトリにWordPressのフォルダ（またはその中・上位のフォルダ）は指定できません。';
             } else {
                 $validated_path = $this->validate_safe_path( $settings['git_local_work_dir'] );
                 if ( is_wp_error( $validated_path ) ) {
@@ -412,6 +470,8 @@ class CP_Settings {
                 $errors[] = 'ローカル出力先パスに".."を含めることはできません。';
             } elseif ( $this->is_dangerous_path( $settings['local_output_path'] ) ) {
                 $errors[] = 'ローカル出力先に指定されたパスは使用できません。';
+            } elseif ( $this->overlaps_wordpress_install( $settings['local_output_path'] ) ) {
+                $errors[] = 'ローカル出力先にWordPressのフォルダ（またはその中・上位のフォルダ）は指定できません。';
             } else {
                 $validated_path = $this->validate_safe_path( $settings['local_output_path'] );
                 if ( is_wp_error( $validated_path ) ) {
@@ -569,7 +629,7 @@ class CP_Settings {
         return true;
     }
 
-    /** AES-256-GCM暗号化。フォーマット: v2:base64(iv + tag + encrypted) */
+    /** AES-256-GCM encryption. Format: v2:base64(iv + tag + encrypted) */
     private function encrypt_token( string $token ): string|false {
         $cipher = 'AES-256-GCM';
         $iv_length = openssl_cipher_iv_length( $cipher );
@@ -579,7 +639,7 @@ class CP_Settings {
         $encrypted = openssl_encrypt(
             $token,
             $cipher,
-            $this->encryption_key,
+            $this->encryption_key(),
             OPENSSL_RAW_DATA,
             $iv,
             $tag,
@@ -598,8 +658,21 @@ class CP_Settings {
         return $this->encrypt_token( $password );
     }
 
-    public function decrypt_basic_auth( string $encrypted_password ): string|\WP_Error {
-        return $this->decrypt_token( $encrypted_password );
+    /**
+     * Basic auth credentials used when crawling the site
+     *
+     * @return array{0: string, 1: string}|null [user, password], or null when unset or undecryptable
+     */
+    public function get_basic_auth_credentials(): ?array {
+        $user = get_option( 'cp_basic_auth_user' );
+        if ( ! $user ) {
+            return null;
+        }
+
+        $this->encryption_key(); // migrate legacy-key secrets before reading them
+        $pass = $this->decrypt_token( (string) get_option( 'cp_basic_auth_pass' ) );
+
+        return is_wp_error( $pass ) ? null : array( (string) $user, $pass );
     }
 
     private function decrypt_token( string $encrypted_token ): string|\WP_Error {
@@ -607,7 +680,7 @@ class CP_Settings {
             return $this->decrypt_token_v2( substr( $encrypted_token, 3 ) );
         }
 
-        // 旧形式（AES-256-CBC）- 後方互換性
+        // Legacy format (AES-256-CBC) - backward compatibility
         return $this->decrypt_token_legacy( $encrypted_token );
     }
 
@@ -634,7 +707,7 @@ class CP_Settings {
         $decrypted = openssl_decrypt(
             $encrypted_data,
             $cipher,
-            $this->encryption_key,
+            $this->encryption_key(),
             OPENSSL_RAW_DATA,
             $iv,
             $tag
@@ -657,7 +730,7 @@ class CP_Settings {
         }
 
         list( $encrypted_data, $iv ) = $parts;
-        $decrypted = openssl_decrypt( $encrypted_data, $cipher, $this->encryption_key, 0, $iv );
+        $decrypted = openssl_decrypt( $encrypted_data, $cipher, $this->encryption_key(), 0, $iv );
 
         if ( $decrypted === false ) {
             return new WP_Error( 'decrypt_failed', 'トークンの復号化に失敗しました。再設定が必要です。' );
@@ -697,6 +770,28 @@ class CP_Settings {
         }
 
         return false;
+    }
+
+    /**
+     * Whether the path is the WordPress install, inside it, or one of its parent folders
+     *
+     * Outputs that empty their target folder before writing must never point here.
+     */
+    private function overlaps_wordpress_install( string $path ): bool {
+        $normalize = function ( string $p ): string {
+            // Resolve the deepest existing ancestor so symlinks are followed even for folders not created yet
+            $missing = '';
+            while ( realpath( $p ) === false && dirname( $p ) !== $p ) {
+                $missing = '/' . basename( $p ) . $missing;
+                $p       = dirname( $p );
+            }
+            $p = untrailingslashit( wp_normalize_path( ( realpath( $p ) ?: $p ) . $missing ) );
+            return in_array( PHP_OS_FAMILY, array( 'Darwin', 'Windows' ), true ) ? strtolower( $p ) : $p;
+        };
+        $wp     = $normalize( ABSPATH );
+        $target = $normalize( $path );
+
+        return $target === $wp || str_starts_with( $target, $wp . '/' ) || str_starts_with( $wp, $target . '/' );
     }
 
     private function validate_safe_path( string $path ): string|\WP_Error {
@@ -799,15 +894,15 @@ class CP_Settings {
             'netlify_enabled', 'netlify_site_id',
             'github_enabled', 'github_repo',
             'github_branch_mode', 'github_existing_branch', 'github_new_branch', 'github_base_branch',
-            'github_method', 'git_work_dir',
+            'github_method',
             'gitlab_enabled', 'gitlab_project',
             'gitlab_branch_mode', 'gitlab_existing_branch', 'gitlab_new_branch', 'gitlab_base_branch',
             'gitlab_api_url',
-            'git_local_enabled', 'git_local_work_dir', 'git_local_branch', 'git_local_remote_url',
-            'local_enabled', 'local_output_path',
-            'zip_enabled', 'zip_mode', 'zip_output_path',
+            'git_local_enabled', 'git_local_branch', 'git_local_remote_url',
+            'local_enabled',
+            'zip_enabled', 'zip_mode',
             'url_mode', 'base_url', 'custom_wp_includes', 'custom_wp_content',
-            'include_paths', 'exclude_patterns',
+            'exclude_patterns',
             'enable_tag_archive', 'enable_date_archive', 'enable_author_archive', 'enable_post_format_archive',
             'enable_sitemap', 'enable_robots_txt', 'enable_llms_txt',
             'generate_mati_headers', 'enable_rss',
@@ -866,7 +961,7 @@ class CP_Settings {
             }
         }
 
-        // 旧フォーマットのインポート: zip_mode がない場合はデフォルト値を設定
+        // Legacy format import: set the default value when zip_mode is missing
         if ( ! isset( $imported['zip_mode'] ) ) {
             $imported['zip_mode'] = 'download';
         }
@@ -876,19 +971,18 @@ class CP_Settings {
         }
 
         $allowed_keys = array(
-            'local_enabled', 'local_output_path',
+            'local_enabled',
             'github_enabled', 'github_repo',
             'github_branch_mode', 'github_existing_branch', 'github_new_branch', 'github_base_branch',
             'github_method',
-            'git_local_enabled', 'git_local_work_dir', 'git_local_branch', 'git_local_remote_url',
-            'git_work_dir',
-            'zip_enabled', 'zip_mode', 'zip_output_path',
+            'git_local_enabled', 'git_local_branch', 'git_local_remote_url',
+            'zip_enabled', 'zip_mode',
             'cloudflare_enabled', 'cloudflare_use_wrangler', 'cloudflare_account_id', 'cloudflare_script_name',
             'gitlab_enabled', 'gitlab_project',
             'gitlab_branch_mode', 'gitlab_existing_branch', 'gitlab_new_branch', 'gitlab_base_branch',
             'gitlab_api_url',
             'netlify_enabled', 'netlify_site_id',
-            'url_mode', 'base_url', 'custom_wp_includes', 'custom_wp_content', 'include_paths', 'exclude_patterns',
+            'url_mode', 'base_url', 'custom_wp_includes', 'custom_wp_content', 'exclude_patterns',
             'timeout',
             'auto_generate',
             'commit_message',
@@ -919,7 +1013,7 @@ class CP_Settings {
             }
         }
 
-        $textarea_keys = array( 'include_paths', 'exclude_patterns' );
+        $textarea_keys = array( 'exclude_patterns' );
         foreach ( $textarea_keys as $key ) {
             if ( isset( $imported[ $key ] ) ) {
                 $sanitized[ $key ] = sanitize_textarea_field( $imported[ $key ] );
@@ -933,13 +1027,24 @@ class CP_Settings {
         $merged = array_merge( $current, $sanitized );
         $merged['version'] = CP_VERSION;
 
-        // Playground（WordPress Studio）ではCLI実行不可のため、CLI依存機能を強制無効化
+        // Filesystem locations are never imported, so turn off outputs that would have no location set
+        if ( empty( $merged['local_output_path'] ) ) {
+            $merged['local_enabled'] = false;
+        }
+        if ( empty( $merged['git_local_work_dir'] ) ) {
+            $merged['git_local_enabled'] = false;
+        }
+        if ( ( $merged['zip_mode'] ?? 'download' ) === 'local' && empty( $merged['zip_output_path'] ) ) {
+            $merged['zip_enabled'] = false;
+        }
+
+        // Force-disable CLI-dependent features on Playground (WordPress Studio) since the CLI cannot be run there
         if ( self::is_playground() ) {
             $merged['git_local_enabled'] = false;
             $merged['cloudflare_use_wrangler'] = false;
         }
 
-        // Workers Direct Upload API単独の場合、_headersは機能しないため無効化
+        // Disable when using the Workers Direct Upload API alone, since _headers does not work
         if ( ! empty( $merged['cloudflare_enabled'] ) && empty( $merged['cloudflare_use_wrangler'] ) ) {
             $other_destinations = array( 'github_enabled', 'gitlab_enabled', 'netlify_enabled', 'git_local_enabled', 'local_enabled', 'zip_enabled' );
             $has_other = false;

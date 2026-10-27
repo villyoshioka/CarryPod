@@ -1,6 +1,6 @@
 /**
- * Carry Pod - WP管理画面ロック
- * CP静的化実行中にWP管理画面の状態変更操作を無効化する
+ * Carry Pod - WP admin screen lock
+ * Disables state-changing operations in WP admin while CP static generation is running
  */
 
 (function($) {
@@ -39,7 +39,7 @@
     }
 
     /**
-     * 投稿編集画面のロック（Gutenberg）
+     * Lock the post edit screen (Gutenberg)
      */
     function lockGutenberg() {
         if (typeof wp === 'undefined' || !wp.data || !wp.data.dispatch) return false;
@@ -63,7 +63,7 @@
     }
 
     /**
-     * 投稿編集画面のロック（クラシックエディタ）
+     * Lock the post edit screen (Classic Editor)
      */
     function lockClassicEditor() {
         $('#publish, #save-post').prop('disabled', true);
@@ -76,7 +76,7 @@
     }
 
     /**
-     * テーマ一覧画面のロック
+     * Lock the themes screen
      */
     function lockThemes() {
         disableActivateButtons();
@@ -109,7 +109,7 @@
     }
 
     /**
-     * カスタマイザーのロック
+     * Lock the Customizer
      */
     function lockCustomizer() {
         $('#save').prop('disabled', true);
@@ -120,7 +120,7 @@
     }
 
     /**
-     * メニュー編集画面のロック
+     * Lock the menu edit screen
      */
     function lockMenus() {
         $('#save_menu_header, #save_menu_footer').prop('disabled', true);
@@ -131,7 +131,7 @@
     }
 
     /**
-     * ウィジェット画面のロック
+     * Lock the widgets screen
      */
     function lockWidgets() {
         $('.widget-control-save').prop('disabled', true);
@@ -144,7 +144,7 @@
     }
 
     /**
-     * 設定画面（パーマリンク・一般設定）のロック
+     * Lock the settings screens (Permalinks, General)
      */
     function lockOptions() {
         $('#submit').prop('disabled', true);
@@ -155,7 +155,7 @@
     }
 
     /**
-     * 画面タイプに応じたロック実行
+     * Apply the lock for the current screen type
      */
     function lockAll() {
         switch (hook) {
@@ -185,7 +185,7 @@
     }
 
     /**
-     * 画面タイプに応じたロック解除
+     * Release the lock for the current screen type
      */
     function unlockAll() {
         switch (hook) {

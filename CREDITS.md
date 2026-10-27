@@ -8,9 +8,9 @@ Carry Pod の開発にあたり、以下のオープンソースプロジェク�
 
 ### WP2Static
 
-- **URL**: <https://github.com/elementor/wp2static>
-- **作者**: Leon Stafford（現在は Strattic/Elementor が管理）
-- **ライセンス**: Unlicense（パブリックドメイン）
+- URL: <https://github.com/elementor/wp2static>
+- 作者: Leon Stafford（現在は Strattic/Elementor が管理）
+- ライセンス: Unlicense（パブリックドメイン）
 
 静的化エンジンの基本構造、URL 検出、アセット収集の仕組みにインスパイアされています。
 
@@ -20,9 +20,9 @@ Carry Pod の開発にあたり、以下のオープンソースプロジェク�
 
 ### Action Scheduler
 
-- **URL**: <https://actionscheduler.org/>
-- **作者**: Automattic
-- **ライセンス**: GPLv3
+- URL: <https://actionscheduler.org/>
+- 作者: Automattic
+- ライセンス: GPLv3
 
 バックグラウンドタスクの処理に使用しています。
 

@@ -1,8 +1,8 @@
 <?php
 /**
- * Cloudflare Workers Static Assets API連携クラス
+ * Cloudflare Workers Static Assets API integration class
  *
- * Workers Static Assets Direct Upload APIを使用して静的サイトをデプロイ
+ * Deploys the static site using the Workers Static Assets Direct Upload API
  *
  * @see https://developers.cloudflare.com/workers/static-assets/direct-upload/
  */
@@ -116,7 +116,7 @@ class CP_Cloudflare_Workers {
                 $relative_path = '/' . ltrim( substr( $full_path, strlen( $base_dir ) ), '/' );
                 $size = $file->getSize();
 
-                // Direct Upload APIでは_headersが機能しない
+                // _headers does not work with the Direct Upload API
                 if ( basename( $relative_path ) === '_headers' ) {
                     continue;
                 }
@@ -144,7 +144,7 @@ class CP_Cloudflare_Workers {
         return $files;
     }
 
-    /** SHA-256(account_id + content) の先頭32文字 */
+    /** First 32 characters of SHA-256(account_id + content) */
     private function compute_file_hash( string $content ): string {
         $hash_input = $this->account_id . $content;
         $full_hash = hash( 'sha256', $hash_input );
@@ -293,7 +293,6 @@ class CP_Cloudflare_Workers {
         $worker_script = <<<'WORKER'
 export default {
     async fetch(request, env) {
-        // ASSETSバインディングの存在確認
         if (!env.ASSETS) {
             return new Response(
                 'Service configuration error. Please contact the administrator.',
@@ -304,18 +303,14 @@ export default {
             );
         }
 
-        // リクエストされたアセットを取得
         const response = await env.ASSETS.fetch(request);
 
-        // 404エラーの場合、カスタム404.htmlがあればそれを返す
         if (response.status === 404) {
             try {
-                // 元のリクエストURLから404.htmlへのURLを構築
                 const url = new URL(request.url);
                 const notFoundUrl = url.origin + '/404.html';
                 const notFoundResponse = await env.ASSETS.fetch(notFoundUrl);
 
-                // 404.htmlが存在する場合のみ、それをステータス404で返す
                 if (notFoundResponse.status === 200) {
                     return new Response(notFoundResponse.body, {
                         status: 404,
@@ -324,8 +319,7 @@ export default {
                     });
                 }
             } catch (e) {
-                // 404.htmlの取得に失敗した場合は元のレスポンスを返す
-                // エラーをコンソールに出力（Cloudflare Workersログで確認可能）
+                // If fetching 404.html fails, return the original response
                 console.error('404.html fetch error:', e.message);
             }
         }

@@ -1,6 +1,6 @@
 <?php
 /**
- * キャッシュ管理クラス
+ * Cache management class
  */
 
 // Mati plugin stub for static analysis (never executed).
@@ -33,7 +33,7 @@ class CP_Cache {
     }
 
     private function ensure_cache_dir(): void {
-        // 旧キャッシュフォルダ（cp-cache）が残っていれば削除
+        // Remove the legacy cache folder (cp-cache) if it still exists
         $old_cache_dir = WP_CONTENT_DIR . '/cp-cache';
         if ( is_dir( $old_cache_dir ) ) {
             $this->remove_directory( $old_cache_dir );
@@ -72,11 +72,11 @@ class CP_Cache {
     }
 
     /**
-     * キャッシュが有効かチェック
+     * Check whether the cache is valid
      *
      * @param string $url URL
-     * @param int|null $post_id 投稿ID（オプション）
-     * @return bool 有効ならtrue
+     * @param int|null $post_id Post ID (optional)
+     * @return bool True if valid
      */
     public function is_valid( string $url, ?int $post_id = null ): bool {
         $cache_key = $this->get_cache_key( $url );
@@ -99,7 +99,7 @@ class CP_Cache {
             return false;
         }
 
-        // 依存投稿リストをチェック（後方互換性: 存在しない場合はスキップ）
+        // Check the dependent posts list (backward compatibility: skip if missing)
         if ( isset( $meta['dependent_posts'] ) && is_array( $meta['dependent_posts'] ) ) {
             foreach ( $meta['dependent_posts'] as $dependent_post_id ) {
                 $post = get_post( $dependent_post_id );
@@ -111,13 +111,12 @@ class CP_Cache {
                     return false;
                 }
 
-                // UTCで比較してタイムゾーン問題を回避
+                // Compare in UTC to avoid timezone issues
                 $post_modified = (float) strtotime( $post->post_modified_gmt . ' UTC' );
                 if ( $post_modified > $cache_time ) {
                     return false;
                 }
 
-                // スラッグ変更対応
                 if ( isset( $meta['dependent_posts_urls'] ) && is_array( $meta['dependent_posts_urls'] ) ) {
                     $cached_url = $meta['dependent_posts_urls'][ $dependent_post_id ] ?? '';
                     $current_url = get_permalink( $dependent_post_id );
@@ -144,10 +143,10 @@ class CP_Cache {
     }
 
     /**
-     * キャッシュを取得
+     * Get cache
      *
      * @param string $url URL
-     * @return string|false キャッシュされたHTML、存在しなければfalse
+     * @return string|false Cached HTML, or false if not found
      */
     public function get( string $url ): string|false {
         $cache_key = $this->get_cache_key( $url );
@@ -161,12 +160,12 @@ class CP_Cache {
     }
 
     /**
-     * キャッシュを保存
+     * Save cache
      *
      * @param string $url URL
      * @param string $html HTML
-     * @param int|null $post_id 投稿ID（オプション）
-     * @return bool 成功ならtrue
+     * @param int|null $post_id Post ID (optional)
+     * @return bool True on success
      */
     public function set( string $url, string $html, ?int $post_id = null ): bool {
         $cache_key = $this->get_cache_key( $url );
@@ -177,7 +176,7 @@ class CP_Cache {
             return false;
         }
 
-        // 自ページのIDは上限による切り捨てで欠落しないよう、必ず先頭に置く
+        // Always put this page's own ID first so it is not dropped when truncated to the limit
         $dependent_posts = array_unique( $this->current_dependent_posts );
         if ( $post_id ) {
             $dependent_posts = array_unique( array_merge( array( $post_id ), $dependent_posts ) );
@@ -207,10 +206,10 @@ class CP_Cache {
     }
 
     /**
-     * 特定のURLのキャッシュを削除
+     * Delete the cache for a specific URL
      *
      * @param string $url URL
-     * @return bool 成功ならtrue
+     * @return bool True on success
      */
     public function delete( string $url ): bool {
         $cache_key = $this->get_cache_key( $url );
@@ -231,10 +230,10 @@ class CP_Cache {
     }
 
     /**
-     * 投稿に関連するキャッシュを削除
+     * Delete caches related to a post
      *
-     * @param int $post_id 投稿ID
-     * @return int 削除したキャッシュの数
+     * @param int $post_id Post ID
+     * @return int Number of caches deleted
      */
     public function delete_by_post_id( int $post_id ): int {
         $deleted = 0;
@@ -258,9 +257,9 @@ class CP_Cache {
     }
 
     /**
-     * すべてのキャッシュをクリア
+     * Clear all caches
      *
-     * @return int 削除したファイル数
+     * @return int Number of files deleted
      */
     public function clear_all(): int {
         $deleted = 0;
@@ -273,7 +272,7 @@ class CP_Cache {
             }
         }
 
-        // Mati連携: seedを再生成（フィルターでスキップされない場合）
+        // Mati integration: regenerate the seed (unless skipped by the filter)
         $this->trigger_mati_seed_regeneration();
 
         return $deleted;
@@ -292,13 +291,13 @@ class CP_Cache {
     }
 
     /**
-     * Mati連携: obfuscation seedを再生成
+     * Mati integration: regenerate the obfuscation seed
      *
-     * キャッシュクリア時にMatiのobfuscation seedを再生成することで、
-     * 静的化ファイルの難読化パターンを変更する
+     * Regenerating Mati's obfuscation seed when the cache is cleared
+     * changes the obfuscation pattern of the generated static files
      */
     private function trigger_mati_seed_regeneration(): void {
-        // フィルターでスキップ指定されている場合は処理しない（無限ループ防止）
+        // Do nothing if skipped via the filter (prevents infinite loops)
         if ( apply_filters( 'cp_skip_mati_seed_regen', false ) ) {
             return;
         }
@@ -328,11 +327,11 @@ class CP_Cache {
 
             $current_settings = $mati_settings->get_settings();
 
-            // seedを再生成（skip_cp_clearオプションで無限ループ防止）
+            // Regenerate the seed (skip_cp_clear option prevents infinite loops)
             $mati_settings->save_settings( $current_settings, array( 'skip_cp_clear' => true ) );
 
         } catch ( Exception $e ) {
-            // エラーが発生してもキャッシュクリア処理は成功させる
+            // Let the cache clear succeed even if an error occurs
         }
     }
 
@@ -351,10 +350,10 @@ class CP_Cache {
     }
 
     /**
-     * 特定の投稿に関連するキャッシュをクリア
+     * Clear caches related to a specific post
      *
-     * @param int $post_id 投稿ID
-     * @return int 削除したキャッシュファイル数
+     * @param int $post_id Post ID
+     * @return int Number of cache files deleted
      */
     public function clear_by_post( int $post_id ): int {
         $deleted = 0;
@@ -383,12 +382,12 @@ class CP_Cache {
     }
 
     /**
-     * 投稿ステータス変更時に前後の投稿のキャッシュをクリア
+     * Clear caches of the previous/next posts when a post status changes
      *
-     * @param int $post_id 投稿ID
-     * @param string $old_status 変更前のステータス
-     * @param string $new_status 変更後のステータス
-     * @return int 削除したキャッシュファイル数
+     * @param int $post_id Post ID
+     * @param string $old_status Status before the change
+     * @param string $new_status Status after the change
+     * @return int Number of cache files deleted
      */
     public function clear_adjacent_posts_cache( int $post_id, string $old_status, string $new_status ): int {
         $deleted = 0;
@@ -398,7 +397,6 @@ class CP_Cache {
             return 0;
         }
 
-        // 非公開→依存キャッシュ + 前後投稿のキャッシュをクリア
         if ( $old_status === 'publish' && $new_status !== 'publish' ) {
             $meta_files = glob( $this->cache_dir . '/*.meta' );
             foreach ( $meta_files as $meta_file ) {
@@ -437,7 +435,6 @@ class CP_Cache {
             $post = $backup_post;
         }
 
-        // 公開になった場合: 前後の投稿のキャッシュをクリア
         if ( $old_status !== 'publish' && $new_status === 'publish' ) {
             global $post;
             $backup_post = $post;
@@ -459,9 +456,9 @@ class CP_Cache {
     }
 
     /**
-     * キャッシュ統計を取得
+     * Get cache statistics
      *
-     * @return array キャッシュ統計
+     * @return array Cache statistics
      */
     public function get_stats(): array {
         $cache_files = glob( $this->cache_dir . '/*.html' );

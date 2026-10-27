@@ -1,6 +1,6 @@
 <?php
 /**
- * GitHub Releases APIを使用した自動更新クラス
+ * Auto-update class using the GitHub Releases API
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -15,7 +15,7 @@ class CP_Updater {
     private string $plugin_slug;
     private string $current_version;
     private string $cache_key = 'cp_github_release_cache';
-    private int $cache_expiry = 43200; // 12時間
+    private int $cache_expiry = 43200; // 12 hours
 
     public function __construct() {
         $this->plugin_basename = plugin_basename( CP_PLUGIN_DIR . 'carry-pod.php' );
@@ -30,10 +30,10 @@ class CP_Updater {
     }
 
     /**
-     * 新バージョン公開のお知らせをプラグイン管理画面に表示
+     * Show a new version release notice on the Plugins admin screen
      *
-     * メジャーバージョンが異なり自動更新が提供されないケースを含め、
-     * 新しいリリースを検出したらGitHubリリースページへのリンクを案内する。
+     * When a new release is detected, show a link to the GitHub release page,
+     * including cases where the major version differs and no auto-update is offered.
      */
     public function show_update_notice(): void {
         if ( ! current_user_can( 'update_plugins' ) ) {
@@ -105,7 +105,7 @@ class CP_Updater {
 
         $latest_version = ltrim( $release['tag_name'], 'v' );
 
-        // メジャーバージョンが異なる場合は自動更新を提供しない
+        // Do not offer auto-updates when the major version differs
         $current_parts = explode( '.', $current_version );
         $latest_parts = explode( '.', $latest_version );
         $current_major = (int) ( $current_parts[0] ?? 0 );
@@ -128,7 +128,7 @@ class CP_Updater {
                     'icons'       => array(),
                     'banners'     => array(),
                     'tested'      => '',
-                    'requires_php' => '8.3',
+                    'requires_php' => '8.5.12',
                 );
             }
         } else {
@@ -182,7 +182,7 @@ class CP_Updater {
             'download_link'     => $download_url,
             'requires'          => '7.0',
             'tested'            => '',
-            'requires_php'      => '8.3',
+            'requires_php'      => '8.5.12',
             'last_updated'      => $release['published_at'],
         );
     }
@@ -291,7 +291,7 @@ class CP_Updater {
         return false;
     }
 
-    /** SSRF対策: GitHubドメインのみ許可 */
+    /** SSRF protection: allow GitHub domains only */
     private function is_valid_github_url( string $url ): bool {
         if ( empty( $url ) || ! is_string( $url ) ) {
             return false;
@@ -322,7 +322,7 @@ class CP_Updater {
             return false;
         }
 
-        // objects.githubusercontent.com はリダイレクト先なのでパス検証をスキップ
+        // Skip path validation for objects.githubusercontent.com since it is a redirect target
         if ( $parsed['host'] === 'objects.githubusercontent.com' ) {
             return true;
         }
@@ -336,16 +336,16 @@ class CP_Updater {
     }
 
     /**
-     * ソースディレクトリ名を修正
+     * Fix the source directory name
      *
-     * GitHub の zipball は「owner-repo-hash」形式のディレクトリ名になるため、
-     * 正しいプラグインディレクトリ名に修正する
+     * GitHub zipballs have a directory name in "owner-repo-hash" format,
+     * so rename it to the correct plugin directory name
      *
-     * @param string $source ソースパス
-     * @param string $remote_source リモートソース
-     * @param WP_Upgrader $upgrader アップグレーダー
-     * @param array $hook_extra 追加情報
-     * @return string|WP_Error 修正されたソースパス
+     * @param string $source Source path
+     * @param string $remote_source Remote source
+     * @param WP_Upgrader $upgrader Upgrader
+     * @param array $hook_extra Extra information
+     * @return string|WP_Error Fixed source path
      */
     public function fix_source_dir( $source, $remote_source, $upgrader, $hook_extra ): string|\WP_Error {
         global $wp_filesystem;
@@ -354,19 +354,19 @@ class CP_Updater {
             return $source;
         }
 
-        // 既に正しいディレクトリ名の場合はそのまま返す（リリースアセットからのインストール）
+        // Return as-is if the directory name is already correct (installation from a release asset)
         $source_dirname = basename( untrailingslashit( $source ) );
         if ( $source_dirname === $this->plugin_slug ) {
             return $source;
         }
 
-        // GitHubのzipball形式（owner-repo-hash）かどうかを確認
+        // Check whether it is in GitHub zipball format (owner-repo-hash)
         $github_pattern = '/^' . preg_quote( $this->github_owner, '/' ) . '-' . preg_quote( $this->github_repo, '/' ) . '-[a-f0-9]+$/i';
         if ( ! preg_match( $github_pattern, $source_dirname ) ) {
             return $source;
         }
 
-        // パストラバーサル対策: ソースパスの検証
+        // Path traversal protection: validate the source path
         $real_source = realpath( $source );
         $real_remote = realpath( $remote_source );
 
@@ -374,14 +374,13 @@ class CP_Updater {
             return new WP_Error( 'invalid_path', '無効なパスが検出されました。' );
         }
 
-        // ソースがリモートソース内にあることを確認
+        // Verify that the source is within the remote source
         if ( ! str_starts_with( $real_source, $real_remote ) ) {
             return new WP_Error( 'path_traversal', 'パストラバーサルが検出されました。' );
         }
 
         $correct_dir = trailingslashit( $remote_source ) . $this->plugin_slug;
 
-        // Null バイトチェック
         if ( str_contains( $correct_dir, "\0" ) ) {
             return new WP_Error( 'null_byte', '無効な文字が含まれています。' );
         }
@@ -398,9 +397,9 @@ class CP_Updater {
     }
 
     /**
-     * README から説明を取得
+     * Get the description from README
      *
-     * @return string 説明文
+     * @return string Description text
      */
     private function get_readme_description(): string {
         return 'Carry Pod は WordPress サイトを静的 HTML ファイルに変換するプラグインです。' .
@@ -408,10 +407,10 @@ class CP_Updater {
     }
 
     /**
-     * 変更履歴をフォーマット
+     * Format the changelog
      *
-     * @param string $body リリースノート
-     * @return string フォーマットされた変更履歴
+     * @param string $body Release notes
+     * @return string Formatted changelog
      */
     private function format_changelog( ?string $body ): string {
         if ( empty( $body ) ) {
@@ -428,12 +427,12 @@ class CP_Updater {
     }
 
     /**
-     * キャッシュをクリア
+     * Clear the cache
      *
-     * @return bool 成功ならtrue、権限がなければfalse
+     * @return bool true on success, false if not permitted
      */
     public function clear_cache(): bool {
-        // 認可チェック: 管理者のみ実行可能
+        // Authorization check: administrators only
         if ( ! current_user_can( 'manage_options' ) ) {
             return false;
         }

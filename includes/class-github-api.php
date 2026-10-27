@@ -1,6 +1,6 @@
 <?php
 /**
- * GitHub API連携クラス
+ * GitHub API integration class
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -130,7 +130,7 @@ class CP_GitHub_API {
         }
     }
 
-    /** 空リポジトリの初期化: Contents APIで1ファイル作成後、Git Data APIで全ファイル追加 */
+    /** Initialize an empty repository: create one file via the Contents API, then add all files via the Git Data API */
     private function create_initial_file( array $files, string $commit_message ): bool|\WP_Error {
         $this->logger->debug( '空のリポジトリに初回コミットを作成します (' . count( $files ) . 'ファイル)' );
 
@@ -575,7 +575,6 @@ class CP_GitHub_API {
                             $error_body = json_decode( $response->body, true );
                             $error_message = $error_body['message'] ?? 'Blob作成失敗';
 
-                            // セカンダリレート制限: フォールバック
                             if ( $response->status_code === 403 && str_contains( $error_message, 'secondary rate limit' ) ) {
                                 $this->logger->warning( "セカンダリレート制限検出: 60秒待機してリトライします..." );
                                 sleep( 60 );
@@ -738,7 +737,7 @@ class CP_GitHub_API {
 
         $changed_files = array();
         foreach ( $files as $path => $content ) {
-            // Git Blob SHA（git hash-object アルゴリズム）
+            // Git Blob SHA (git hash-object algorithm)
             $blob_content = 'blob ' . strlen( $content ) . "\0" . $content;
             $new_sha = sha1( $blob_content );
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * 静的化生成クラス
+ * Static site generation class
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -9,19 +9,44 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CP_Generator {
 
+    /** Extensions excluded from the static site (server-side code, executables, config, DB, dev files, etc.) */
+    private const array BLOCKED_EXTENSIONS = array(
+        // PHP-related
+        'php', 'php2', 'php3', 'php4', 'php5', 'php6', 'php7', 'php8', 'phtml', 'pht', 'phps', 'phar',
+        // Executables
+        'exe', 'bat', 'sh', 'command', 'com',
+        // Config files (.htaccess excluded - may be needed on a static site)
+        'htpasswd', 'ini', 'conf', 'config',
+        // Databases
+        'sql', 'sqlite', 'db',
+        // Dev files
+        'git', 'gitignore', 'gitmodules', 'svn',
+        // Other
+        'log', 'bak', 'backup', 'tmp', 'temp',
+    );
+
+    /** Search engine crawlers (allowed) */
+    private const array SEARCH_ENGINE_BOTS = array( 'Googlebot', 'Bingbot', 'DuckDuckBot' );
+
+    /** AI search / user-initiated retrieval crawlers (allowed) */
+    private const array AI_REFERENCE_BOTS = array( 'ChatGPT-User', 'Claude-User', 'OAI-SearchBot', 'Claude-SearchBot' );
+
+    /** AI training crawlers (blocked) */
+    private const array AI_TRAINING_BOTS = array( 'GPTBot', 'ClaudeBot', 'Google-Extended', 'CCBot', 'meta-externalagent', 'Bytespider', 'Applebot-Extended' );
+
     private CP_Logger $logger;
     private array $settings;
     private CP_Cache $cache;
     private string $temp_dir;
     private bool $debug_mode = false;
 
-    /** URL→投稿IDマップ（高速化用） */
+    /** URL → post ID map (for speed) */
     private array $url_to_post_id_map = array();
 
-    /** URL→依存投稿IDリストマップ（アーカイブページ用） */
+    /** URL → dependent post ID list map (for archive pages) */
     private array $url_to_dependent_posts_map = array();
 
-    /** サイトマップ生成用 */
+    /** For sitemap generation */
     private array $generated_html_pages = array();
     public function __construct() {
         $this->logger = CP_Logger::get_instance();
@@ -65,7 +90,7 @@ class CP_Generator {
             $total_urls = count( $urls );
             $this->logger->add_log( 'URL取得完了: ' . $total_urls . '件' );
 
-            // ページ生成(0-80%) + アセット等(80-90%) + 出力処理(90-100%)
+            // Page generation (0-80%) + assets etc. (80-90%) + output processing (90-100%)
             $total_steps = 100;
             $current_step = 0;
             $page_step_ratio = 80.0 / max( 1, $total_urls );
@@ -76,7 +101,7 @@ class CP_Generator {
             $generated_count = 0;
             $use_parallel = ! empty( $this->settings['use_parallel_crawling'] );
 
-            // curl拡張がない環境（php-wasm等）では逐次クローリングにフォールバック
+            // Fall back to sequential crawling in environments without the curl extension (php-wasm, etc.)
             if ( $use_parallel && ! function_exists( 'curl_multi_init' ) ) {
                 $use_parallel = false;
                 $this->logger->add_log( 'curl拡張が利用できないため、逐次クローリングに切り替えました' );
@@ -169,7 +194,7 @@ class CP_Generator {
                         $this->logger->update_progress( $current_step, $total_steps, 'ページを生成中: ' . ( $index + 1 ) . ' / ' . $total_urls );
                     }
 
-                    // 前のURLの依存投稿が混入しないよう、URLごとにリセットする
+                    // Reset per URL so dependent posts from the previous URL don't leak in
                     $this->cache->clear_dependent_posts();
 
                     $post_id = $this->url_to_post_id_map[ $url ] ?? 0;
@@ -222,7 +247,7 @@ class CP_Generator {
 
             $this->logger->add_log( 'ページ生成完了: ' . $total_urls . '件（キャッシュ: ' . $cache_used_count . '件、新規: ' . $generated_count . '件）' );
 
-            // アセット・追加ファイル・除外処理・サイトマップ (80-90%)
+            // Assets, additional files, exclusions, sitemap (80-90%)
             $this->logger->add_log( 'アセットファイルをコピー中...' );
             $this->logger->update_progress( 81, $total_steps, 'アセットファイルをコピー中...' );
             $this->copy_assets();
@@ -235,7 +260,7 @@ class CP_Generator {
             $this->logger->update_progress( 87, $total_steps, '除外ファイルを削除中...' );
             $this->remove_excluded_files();
 
-            // 除外済みページを載せないよう、除外処理のあとに生成する
+            // Generate after exclusion processing so excluded pages are not listed
             if ( ! empty( $this->settings['enable_llms_txt'] ) ) {
                 $this->generate_llms_txt();
             }
@@ -244,7 +269,10 @@ class CP_Generator {
             $this->logger->update_progress( 89, $total_steps, 'サイトマップを生成中...' );
             $this->generate_sitemap();
 
-            // 出力処理(90-100%)
+            // All outputs read temp_dir, so re-check everything here at once before sending
+            $this->remove_blocked_files();
+
+            // Output processing (90-100%)
             $output_count = 0;
             if ( ! empty( $this->settings['local_enabled'] ) ) {
                 $output_count++;
@@ -285,7 +313,7 @@ class CP_Generator {
 
             if ( ! empty( $this->settings['git_local_enabled'] ) ) {
                 if ( CP_Settings::is_playground() ) {
-                    // Playground（WordPress Studio）ではgitコマンドが実行できない（エラーなしで失敗する）
+                    // git commands cannot run on Playground (WordPress Studio) (they fail without an error)
                     $this->logger->add_log( 'WordPress Studio（Playground）環境ではローカルGit出力は利用できないため、スキップしました', true );
                 } else {
                     $output_step++;
@@ -368,11 +396,11 @@ class CP_Generator {
 
         $this->logger->update_progress( 0, 100, 'URLを収集中: 投稿を取得中...' );
 
-        // ホーム（アーカイブベースとして収集）
+        // Home (collected as an archive base)
         $urls[] = $home_url;
         $archive_bases[] = $home_url;
 
-        // 投稿単体ページ
+        // Single post pages
         $public_post_types = get_post_types( array( 'public' => true ) );
         $all_posts = get_posts( array(
             'post_type'      => array_values( $public_post_types ),
@@ -413,7 +441,7 @@ class CP_Generator {
             wp_reset_postdata();
         }
 
-        // カスタム投稿タイプアーカイブ
+        // Custom post type archives
         $custom_post_types = get_post_types( array( 'public' => true, '_builtin' => false ) );
         foreach ( $custom_post_types as $post_type ) {
             $post_type_obj = get_post_type_object( $post_type );
@@ -424,7 +452,7 @@ class CP_Generator {
             }
         }
 
-        // カテゴリ（1ページ目のみ収集、ページネーションは発見方式）
+        // Categories (collect page 1 only; pagination is discovered)
         $this->logger->update_progress( 0, 100, 'URLを収集中: カテゴリを取得中...' );
 
         $categories = get_categories( array( 'hide_empty' => true ) );
@@ -439,7 +467,7 @@ class CP_Generator {
             }
         }
 
-        // タグ（1ページ目のみ収集）
+        // Tags (collect page 1 only)
         $this->logger->update_progress( 0, 100, 'URLを収集中: タグを取得中...' );
 
         if ( ! empty( $this->settings['enable_tag_archive'] ) ) {
@@ -456,7 +484,7 @@ class CP_Generator {
             }
         }
 
-        // 日付アーカイブ（1ページ目のみ収集）
+        // Date archives (collect page 1 only)
         $this->logger->update_progress( 0, 100, 'URLを収集中: アーカイブを取得中...' );
 
         if ( ! empty( $this->settings['enable_date_archive'] ) ) {
@@ -470,7 +498,7 @@ class CP_Generator {
             }
         }
 
-        // カスタムタクソノミ（1ページ目のみ収集）
+        // Custom taxonomies (collect page 1 only)
         $taxonomies = get_taxonomies( array( 'public' => true, '_builtin' => false ) );
         foreach ( $taxonomies as $taxonomy ) {
             $terms = get_terms( array( 'taxonomy' => $taxonomy, 'hide_empty' => true ) );
@@ -486,7 +514,7 @@ class CP_Generator {
             }
         }
 
-        // ポストフォーマット（1ページ目のみ収集）
+        // Post formats (collect page 1 only)
         if ( ! empty( $this->settings['enable_post_format_archive'] ) ) {
             $post_formats = get_terms( array(
                 'taxonomy'   => 'post_format',
@@ -504,7 +532,7 @@ class CP_Generator {
             }
         }
 
-        // 著者アーカイブ（1ページ目のみ収集）
+        // Author archives (collect page 1 only)
         if ( ! empty( $this->settings['enable_author_archive'] ) ) {
             $users = get_users( array( 'has_published_posts' => true ) );
             foreach ( $users as $user ) {
@@ -514,7 +542,7 @@ class CP_Generator {
             }
         }
 
-        // フィード
+        // Feeds
         $this->logger->update_progress( 0, 100, 'URLを収集中: フィード・サイトマップを取得中...' );
 
         if ( ! empty( $this->settings['enable_rss'] ) ) {
@@ -525,7 +553,7 @@ class CP_Generator {
             $urls[] = home_url( '/comments/feed/' );
         }
 
-        // アーカイブのページネーションをクロール発見方式で取得
+        // Get archive pagination via crawl discovery
         $this->logger->update_progress( 0, 100, 'URLを収集中: アーカイブのページネーションを検出中...' );
         $discovered_urls = $this->discover_archive_pages( $archive_bases );
         $this->logger->add_log( 'アーカイブページネーション検出: ' . count( $discovered_urls ) . '件' );
@@ -536,14 +564,14 @@ class CP_Generator {
     }
 
     /**
-     * アーカイブの1ページ目をクロールし、「次ページ」リンクから
-     * 実際のページネーションURLを検出する。
+     * Crawl the first page of each archive and detect the actual
+     * pagination URLs from "next page" links.
      *
-     * テーマが posts_per_page を上書きしている場合でも、
-     * 実際に表示されているページ数を正確に取得できる。
+     * Even if the theme overrides posts_per_page, this accurately
+     * gets the number of pages actually displayed.
      *
-     * @param array $archive_bases アーカイブの1ページ目URLの配列
-     * @return array 検出された page/N/ URLの配列
+     * @param array $archive_bases Array of archive first-page URLs
+     * @return array Array of detected page/N/ URLs
      */
     private function discover_archive_pages( array $archive_bases ): array {
         $discovered = array();
@@ -581,10 +609,10 @@ class CP_Generator {
     }
 
     /**
-     * ページネーション検出用のHTTPリクエスト（認証対応）
+     * HTTP request for pagination detection (with authentication support)
      *
-     * @param string $url 取得するURL
-     * @return string|null HTML本文（失敗時は null）
+     * @param string $url URL to fetch
+     * @return string|null HTML body (null on failure)
      */
     private function fetch_url_for_discovery( string $url ): ?string {
         $parsed_url = parse_url( $url );
@@ -598,14 +626,9 @@ class CP_Generator {
             ),
         );
 
-        $auth_user = get_option( 'cp_basic_auth_user' );
-        if ( $auth_user ) {
-            $encrypted_pass = get_option( 'cp_basic_auth_pass' );
-            $settings_manager = CP_Settings::get_instance();
-            $auth_pass = $settings_manager->decrypt_basic_auth( $encrypted_pass );
-            if ( ! is_wp_error( $auth_pass ) ) {
-                $args['headers']['Authorization'] = 'Basic ' . base64_encode( $auth_user . ':' . $auth_pass );
-            }
+        $basic_auth = CP_Settings::get_instance()->get_basic_auth_credentials();
+        if ( $basic_auth ) {
+            $args['headers']['Authorization'] = 'Basic ' . base64_encode( $basic_auth[0] . ':' . $basic_auth[1] );
         }
 
         $response = wp_remote_get( $url, $args );
@@ -628,21 +651,21 @@ class CP_Generator {
     }
 
     /**
-     * HTML内から次ページの番号を検出する
+     * Detect the next page number in HTML
      *
-     * 1. rel="next" を持つリンクから次ページを特定
-     * 2. アーカイブベースURLに関連する page/N/ リンクから最大ページを特定
+     * 1. Identify the next page from a link with rel="next"
+     * 2. Identify the highest page from page/N/ links related to the archive base URL
      *
-     * @param string $html 取得したHTML
-     * @param string $base_url アーカイブのベースURL（1ページ目）
-     * @param int $current_page 現在のページ番号
-     * @return int|null 次ページ番号（ない場合は null）
+     * @param string $html Fetched HTML
+     * @param string $base_url Archive base URL (page 1)
+     * @param int $current_page Current page number
+     * @return int|null Next page number (null if none)
      */
     private function find_next_page_number( string $html, string $base_url, int $current_page ): ?int {
         $base_path = wp_parse_url( $base_url, PHP_URL_PATH ) ?? '/';
         $base_path = trailingslashit( $base_path );
 
-        // パターン1: rel="next" を持つ a タグの href からページ番号を抽出
+        // Pattern 1: extract the page number from the href of an a tag with rel="next"
         $next_patterns = array(
             '#<a[^>]*rel=["\']next["\'][^>]*href=["\']([^"\']+)["\'][^>]*>#i',
             '#<a[^>]*href=["\']([^"\']+)["\'][^>]*rel=["\']next["\'][^>]*>#i',
@@ -660,7 +683,7 @@ class CP_Generator {
             }
         }
 
-        // パターン2: base_url に関連する page/N/ リンクを全て探し、最大ページを取得
+        // Pattern 2: find all page/N/ links related to base_url and get the highest page
         $max_page = 0;
         if ( preg_match_all( '#href=["\']([^"\']+)["\']#i', $html, $matches ) ) {
             $page_link_pattern = '#^' . preg_quote( $base_path, '#' ) . 'page/(\d+)/?$#';
@@ -687,9 +710,9 @@ class CP_Generator {
     }
 
     /**
-     * 全日付アーカイブを1回のクエリで取得
+     * Get all date archives in a single query
      *
-     * @return array 日付の配列（year, month, day）
+     * @return array Array of dates (year, month, day)
      */
     private function get_all_archive_dates(): array {
         global $wpdb;
@@ -711,7 +734,7 @@ class CP_Generator {
     }
 
     private function generate_html( string $url ): array|\WP_Error {
-        // localhostの場合のみSSL検証を無効化（開発環境対応）
+        // Disable SSL verification only for localhost (for dev environments)
         $parsed_url = parse_url( $url );
         $is_localhost = in_array( $parsed_url['host'], array( 'localhost', '127.0.0.1', '::1' ) );
 
@@ -761,7 +784,6 @@ class CP_Generator {
             $html = $this->sanitize_static_html( $html );
             $html = $this->remove_archive_links( $html );
 
-            // 90%以上削減された場合は警告
             $processed_size = strlen( $html );
             if ( $processed_size < $original_size * 0.1 ) {
                 $this->logger->add_log(
@@ -904,7 +926,7 @@ class CP_Generator {
         $html = str_replace( $home_url_https_no_slash . '/', '/', $html );
         $html = str_replace( $home_url_http_no_slash . '/', '/', $html );
 
-        // 連続スラッシュを1つに（http://やhttps://等は除く）
+        // Collapse consecutive slashes into one (except http://, https://, etc.)
         $result = preg_replace( '#(?<!:)(?<!["\'])//+(?![/#\s])#', '/', $html );
         if ( $result !== null ) {
             $html = $result;
@@ -914,10 +936,10 @@ class CP_Generator {
     }
 
     /**
-     * HTML内の相対URLを絶対URLに変換
+     * Convert relative URLs in HTML to absolute URLs
      *
-     * @param string $html HTML内容
-     * @return string 変換後のHTML
+     * @param string $html HTML content
+     * @return string Converted HTML
      */
     private function convert_to_absolute_urls( string $html ): string {
         $base_url = ! empty( $this->settings['base_url'] ) ? $this->settings['base_url'] : untrailingslashit( get_site_url() );
@@ -954,10 +976,10 @@ class CP_Generator {
     }
 
     /**
-     * XML内のURLを絶対URLに変換
+     * Convert URLs in XML to absolute URLs
      *
-     * @param string $xml XML内容
-     * @return string 変換後のXML
+     * @param string $xml XML content
+     * @return string Converted XML
      */
     private function convert_xml_to_absolute_urls( string $xml ): string {
         $base_url = ! empty( $this->settings['base_url'] ) ? $this->settings['base_url'] : untrailingslashit( get_site_url() );
@@ -986,10 +1008,10 @@ class CP_Generator {
     }
 
     /**
-     * カスタムフォルダ名に置換
+     * Replace with custom folder names
      *
      * @param string $html HTML
-     * @return string 置換後のHTML
+     * @return string HTML after replacement
      */
     private function replace_custom_folder_names( string $html ): string {
         if ( ! empty( $this->settings['custom_wp_includes'] ) ) {
@@ -1014,10 +1036,10 @@ class CP_Generator {
     }
 
     /**
-     * HTML内の動的要素を静的化用に処理
+     * Process dynamic elements in HTML for static output
      *
-     * @param string $html HTML内容
-     * @return string 処理後のHTML
+     * @param string $html HTML content
+     * @return string Processed HTML
      */
     private function sanitize_static_html( string $html ): string {
         $html = preg_replace( '/<input[^>]*name=[\'"]_wpnonce[\'"][^>]*>/i', '', $html );
@@ -1032,10 +1054,10 @@ class CP_Generator {
     }
 
     /**
-     * アーカイブリンクを除去・変更
+     * Remove or modify archive links
      *
-     * @param string $html HTML内容
-     * @return string 変換後のHTML
+     * @param string $html HTML content
+     * @return string Converted HTML
      */
     private function remove_archive_links( string $html ): string {
         if ( empty( $this->settings['enable_tag_archive'] ) ) {
@@ -1094,11 +1116,11 @@ class CP_Generator {
     }
 
     /**
-     * CSS/JSファイル内のURLを変換
+     * Convert URLs in CSS/JS files
      *
-     * @param string $content ファイル内容
-     * @param string $type ファイルタイプ (css または js)
-     * @return string 変換後の内容
+     * @param string $content File content
+     * @param string $type File type (css or js)
+     * @return string Converted content
      */
     private function convert_asset_urls( string $content, string $type ): string {
         $site_url = trailingslashit( get_site_url() );
@@ -1155,7 +1177,7 @@ class CP_Generator {
     }
 
     /**
-     * アセットファイルをコピー
+     * Copy asset files
      */
     private function copy_assets(): bool {
         $success = true;
@@ -1253,12 +1275,10 @@ class CP_Generator {
             $this->generate_robots_txt();
         }
 
-        // _headersファイルを生成（Mati連携）
         if ( ! empty( $this->settings['generate_mati_headers'] ) ) {
             $this->generate_mati_headers();
         }
 
-        // .well-known/atproto-did を生成（Mati連携）
         $this->generate_atproto_did();
 
         if ( ! empty( $copied_dirs ) ) {
@@ -1272,11 +1292,11 @@ class CP_Generator {
     }
 
     /**
-     * wp-includes から参照されているファイルのみをコピー
+     * Copy only files referenced from wp-includes
      *
-     * @param string $source_dir ソースディレクトリ (ABSPATH/wp-includes)
-     * @param string $dest_dir   コピー先ディレクトリ
-     * @return bool 成功したかどうか
+     * @param string $source_dir Source directory (ABSPATH/wp-includes)
+     * @param string $dest_dir   Destination directory
+     * @return bool Whether it succeeded
      */
     private function copy_referenced_wp_includes( string $source_dir, string $dest_dir ): bool {
         $referenced_files = $this->collect_wp_includes_references();
@@ -1295,7 +1315,7 @@ class CP_Generator {
             $source_file = $source_dir . '/' . $relative_path;
             $dest_file = $dest_dir . '/' . $relative_path;
 
-            if ( ! file_exists( $source_file ) ) {
+            if ( ! file_exists( $source_file ) || $this->is_blocked_file( $source_file ) ) {
                 continue;
             }
 
@@ -1320,9 +1340,9 @@ class CP_Generator {
     }
 
     /**
-     * 生成済みHTMLとアセットからwp-includesへの参照を収集
+     * Collect references to wp-includes from generated HTML and assets
      *
-     * @return array wp-includes内の相対パスの配列
+     * @return array Array of relative paths within wp-includes
      */
     private function collect_wp_includes_references(): array {
         $references = array();
@@ -1373,10 +1393,10 @@ class CP_Generator {
     }
 
     /**
-     * HTMLコンテンツからwp-includesへの参照を抽出
+     * Extract references to wp-includes from HTML content
      *
-     * @param string $content HTMLコンテンツ
-     * @return array wp-includes内の相対パスの配列
+     * @param string $content HTML content
+     * @return array Array of relative paths within wp-includes
      */
     private function extract_wp_includes_refs_from_html( string $content ): array {
         $refs = array();
@@ -1421,10 +1441,10 @@ class CP_Generator {
     }
 
     /**
-     * 配列から再帰的にwp-includesパスを抽出
+     * Recursively extract wp-includes paths from an array
      *
-     * @param array $data 検索対象の配列
-     * @param array &$refs 参照の格納先（参照渡し）
+     * @param array $data Array to search
+     * @param array &$refs Where references are stored (passed by reference)
      */
     private function extract_wp_includes_from_array( array $data, array &$refs ): void {
         foreach ( $data as $value ) {
@@ -1440,10 +1460,10 @@ class CP_Generator {
     }
 
     /**
-     * URLからwp-includes内の相対パスを抽出
+     * Extract the relative path within wp-includes from a URL
      *
-     * @param string $url URL または相対パス
-     * @return string|false wp-includes内の相対パス、またはfalse
+     * @param string $url URL or relative path
+     * @return string|false Relative path within wp-includes, or false
      */
     private function parse_wp_includes_path( string $url ): string|false {
         $url = strtok( $url, '?' );
@@ -1457,7 +1477,7 @@ class CP_Generator {
 
         if ( preg_match( '#(?:' . $folder_pattern . '|wp-includes)/(.+)$#', $url, $matches ) ) {
             $path = $matches[1];
-            // セキュリティ: ディレクトリトラバーサルを防止
+            // Security: prevent directory traversal
             if ( str_contains( $path, '..' ) ) {
                 return false;
             }
@@ -1468,12 +1488,12 @@ class CP_Generator {
     }
 
     /**
-     * JS/CSSファイルから依存ファイルを抽出
+     * Extract dependency files from JS/CSS files
      *
-     * @param string $content ファイル内容
-     * @param string $current_path 現在のファイルの相対パス (wp-includes内)
-     * @param string $ext ファイル拡張子 (js/css)
-     * @return array wp-includes内の相対パスの配列
+     * @param string $content File content
+     * @param string $current_path Relative path of the current file (within wp-includes)
+     * @param string $ext File extension (js/css)
+     * @return array Array of relative paths within wp-includes
      */
     private function extract_deps_from_asset( string $content, string $current_path, string $ext ): array {
         $deps = array();
@@ -1498,20 +1518,18 @@ class CP_Generator {
                 }
             }
         } elseif ( $ext === 'js' ) {
-            // 動的インポートは複雑なため、よく使われるWordPressパターンのみ対応
-            // 例: wp.i18n, wp.components などの依存関係
-            // ただし、これらは通常HTMLで直接読み込まれるため、ここでは軽量な処理に留める
+            // JS dependencies are usually loaded directly from HTML, so they are not extracted here
         }
 
         return $deps;
     }
 
     /**
-     * 相対パスを解決してwp-includes内のパスに変換
+     * Resolve a relative path into a path within wp-includes
      *
-     * @param string $url 相対URL
-     * @param string $current_dir 現在のディレクトリ (wp-includes内)
-     * @return string|false 解決されたパス、またはfalse
+     * @param string $url Relative URL
+     * @param string $current_dir Current directory (within wp-includes)
+     * @return string|false Resolved path, or false
      */
     private function resolve_relative_path( string $url, string $current_dir ): string|false {
         $url = strtok( $url, '?' );
@@ -1551,7 +1569,7 @@ class CP_Generator {
 
         $result = implode( '/', $normalized );
 
-        // セキュリティ: wp-includes外への参照を防止
+        // Security: prevent references outside wp-includes
         if ( str_contains( $result, '..' ) ) {
             return false;
         }
@@ -1560,11 +1578,11 @@ class CP_Generator {
     }
 
     /**
-     * 指定ディレクトリ内のファイルを再帰的に検索
+     * Recursively search for files in the given directory
      *
-     * @param string $dir ディレクトリパス
-     * @param array  $extensions 拡張子の配列
-     * @return array ファイルパスの配列
+     * @param string $dir Directory path
+     * @param array  $extensions Array of extensions
+     * @return array Array of file paths
      */
     private function find_files_recursive( string $dir, array $extensions ): array {
         $files = array();
@@ -1591,7 +1609,7 @@ class CP_Generator {
     }
 
     /**
-     * 追加ファイルをコピー
+     * Copy additional files
      */
     private function copy_included_files(): void {
         if ( empty( $this->settings['include_paths'] ) ) {
@@ -1610,7 +1628,7 @@ class CP_Generator {
 
             $path = trim( $path, '\'"' );
 
-            // セキュリティ: realpath でシンボリックリンク攻撃を防止
+            // Security: prevent symlink attacks with realpath
             $real_path = realpath( $path );
             if ( $real_path === false ) {
                 $this->logger->add_log( "パスが存在しません: {$path}", true );
@@ -1618,7 +1636,7 @@ class CP_Generator {
                 continue;
             }
 
-            // セキュリティ: 危険なディレクトリへのアクセスを禁止
+            // Security: forbid access to dangerous directories
             $dangerous_dirs = array(
                 realpath( ABSPATH . 'wp-admin' ),
                 realpath( ABSPATH . 'wp-includes' ),
@@ -1657,7 +1675,7 @@ class CP_Generator {
     }
 
     /**
-     * 除外ファイルを削除
+     * Delete excluded files
      */
     private function remove_excluded_files(): void {
         $force_patterns = $this->get_force_exclude_patterns();
@@ -1716,34 +1734,103 @@ class CP_Generator {
     }
 
     /**
-     * 強制除外パターンを取得
+     * Whether the file has an extension excluded from the static site
      *
-     * @return array 除外パターンの配列
+     * @param string $path File path
+     * @return bool True if excluded
+     */
+    private function is_blocked_file( string $path ): bool {
+        return in_array( strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ), self::BLOCKED_EXTENSIONS, true );
+    }
+
+    /**
+     * Whether a directory name is hidden (.git, .svn, ...) and must not be published
+     */
+    private function is_hidden_dir( string $name ): bool {
+        return str_starts_with( $name, '.' ) && $name !== '.well-known';
+    }
+
+    /**
+     * Whether a path relative to the output root is hidden: a dotfile other than .htaccess,
+     * or anything inside a hidden directory
+     */
+    private function is_hidden_path( string $relative ): bool {
+        $segments = explode( '/', str_replace( '\\', '/', $relative ) );
+        $filename = array_pop( $segments );
+        if ( str_starts_with( $filename, '.' ) && $filename !== '.htaccess' ) {
+            return true;
+        }
+        foreach ( $segments as $segment ) {
+            if ( $this->is_hidden_dir( $segment ) ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Delete files with excluded extensions and hidden files from the temp directory
+     */
+    private function remove_blocked_files(): void {
+        if ( ! is_dir( $this->temp_dir ) ) {
+            return;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator( $this->temp_dir, RecursiveDirectoryIterator::SKIP_DOTS ),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        $removed = array();
+        foreach ( $iterator as $file ) {
+            $relative = str_replace( trailingslashit( $this->temp_dir ), '', $file->getPathname() );
+            if ( $file->isDir() ) {
+                // CHILD_FIRST: the contents were already removed below, so the directory is empty.
+                // The trailing slash makes every segment of the directory's own path count as a parent.
+                if ( $this->is_hidden_path( $relative . '/' ) ) {
+                    rmdir( $file->getPathname() );
+                }
+            } elseif ( $this->is_blocked_file( $file->getFilename() ) || $this->is_hidden_path( $relative ) ) {
+                unlink( $file->getPathname() );
+                $removed[] = $relative;
+            }
+        }
+
+        if ( ! empty( $removed ) ) {
+            $this->logger->add_log( '出力対象外のファイルを削除: ' . count( $removed ) . '件' );
+            $this->logger->debug( '出力対象外として削除: ' . implode( ', ', $removed ) );
+        }
+    }
+
+    /**
+     * Get forced exclusion patterns
+     *
+     * @return array Array of exclusion patterns
      */
     private function get_force_exclude_patterns(): array {
         return array(
-            // プラグイン内部キャッシュ
+            // Plugin internal cache
             'wp-content/.cp-cache',
             'wp-content/.cp-cache/*',
-            // wp2staticの出力ファイル
+            // wp2static output files
             'wp-content/uploads/wp2static-*',
-            // このプラグイン自身
+            // This plugin itself
             'wp-content/plugins/carry-pod',
             'wp-content/plugins/carry-pod/*',
-            // wp2static本体
+            // wp2static core
             'wp-content/plugins/wp2static',
             'wp-content/plugins/wp2static/*',
-            // wp2staticアドオン
+            // wp2static add-ons
             'wp-content/plugins/wp2static-addon-*',
             'wp-content/plugins/wp2static-addon-*/*',
-            // 翻訳ソースファイル
+            // Translation source files
             'wp-content/languages',
             'wp-content/languages/*',
         );
     }
 
     /**
-     * ローカルディレクトリに出力
+     * Output to a local directory
      */
     private function output_to_local(): void {
         $output_path = $this->settings['local_output_path'];
@@ -1762,10 +1849,10 @@ class CP_Generator {
     }
 
     /**
-     * Cloudflare Workers出力
+     * Cloudflare Workers output
      */
     private function output_to_cloudflare_workers(): void {
-        // Playground（WordPress Studio）ではWrangler CLIが実行できないため常にDirect Upload API方式
+        // Wrangler CLI cannot run on Playground (WordPress Studio), so always use the Direct Upload API method
         if ( ! empty( $this->settings['cloudflare_use_wrangler'] ) && ! CP_Settings::is_playground() ) {
             $this->output_to_cloudflare_wrangler();
             return;
@@ -1798,7 +1885,7 @@ class CP_Generator {
     }
 
     /**
-     * Cloudflare Workers出力（Wrangler CLI方式）
+     * Cloudflare Workers output (Wrangler CLI method)
      */
     private function output_to_cloudflare_wrangler(): void {
         $start_time = microtime( true );
@@ -1906,7 +1993,7 @@ JS;
 
             $stdout = '';
             $stderr = '';
-            $timeout = 300; // 5分
+            $timeout = 300; // 5 minutes
             $start = time();
 
             while ( true ) {
@@ -1929,7 +2016,7 @@ JS;
 
                 $stdout .= fread( $pipes[1], 8192 );
                 $stderr .= fread( $pipes[2], 8192 );
-                usleep( 100000 ); // 0.1秒
+                usleep( 100000 ); // 0.1 seconds
             }
 
             fclose( $pipes[1] );
@@ -1967,9 +2054,9 @@ JS;
     }
 
     /**
-     * proc_open用の環境変数を取得
+     * Get environment variables for proc_open
      *
-     * @return array 環境変数の配列
+     * @return array Array of environment variables
      */
     private function get_env_for_proc(): array {
         $env = CP_Admin::get_instance()->get_extended_path_env();
@@ -1985,7 +2072,7 @@ JS;
     }
 
     /**
-     * Netlify出力
+     * Netlify output
      */
     private function output_to_netlify(): void {
         if ( ! is_dir( $this->temp_dir ) ) {
@@ -2097,7 +2184,7 @@ JS;
             );
 
             if ( is_wp_error( $upload_response ) ) {
-                // デバッグモード時のみ詳細エラーをPHPエラーログに記録
+                // Log detailed errors to the PHP error log only in debug mode
                 if ( $this->debug_mode ) {
                     error_log( 'Netlify file upload error (' . $relative_path . '): ' . $upload_response->get_error_message() );
                 }
@@ -2122,7 +2209,7 @@ JS;
     }
 
     /**
-     * GitLab API経由で出力
+     * Output via the GitLab API
      */
     private function output_to_gitlab_api(): void {
         $branch = $this->settings['gitlab_branch_mode'] === 'existing'
@@ -2175,7 +2262,7 @@ JS;
     }
 
     /**
-     * ZIP出力
+     * ZIP output
      */
     private function output_to_zip(): void {
         $zip_mode = $this->settings['zip_mode'] ?? 'download';
@@ -2209,10 +2296,10 @@ JS;
     }
 
     /**
-     * ZIPアーカイブを作成
+     * Create a ZIP archive
      *
-     * @param string $output_path ZIP出力先パス
-     * @return string|null 作成したZIPファイルのフルパス（失敗時はnull）
+     * @param string $output_path ZIP output path
+     * @return string|null Full path of the created ZIP file (null on failure)
      */
     private function create_zip_archive( string $output_path ): ?string {
         $site_name = sanitize_title( get_bloginfo( 'name' ) );
@@ -2247,11 +2334,11 @@ JS;
     }
 
     /**
-     * ディレクトリをZIPに追加（再帰的）
+     * Add a directory to the ZIP (recursive)
      *
-     * @param ZipArchive $zip ZipArchiveオブジェクト
-     * @param string $dir 追加するディレクトリ
-     * @param string $base_dir ベースディレクトリ（相対パス計算用）
+     * @param ZipArchive $zip ZipArchive object
+     * @param string $dir Directory to add
+     * @param string $base_dir Base directory (for computing relative paths)
      */
     private function add_directory_to_zip( \ZipArchive $zip, string $dir, string $base_dir ): void {
         $files = new RecursiveIteratorIterator(
@@ -2284,7 +2371,7 @@ JS;
     }
 
     /**
-     * GitHub API経由で出力
+     * Output via the GitHub API
      */
     private function output_to_github_api(): void {
         $branch = $this->settings['github_branch_mode'] === 'existing'
@@ -2336,7 +2423,7 @@ JS;
     }
 
     /**
-     * ローカルGitに出力
+     * Output to local Git
      */
     private function output_to_git_local(): void {
         $work_dir = $this->settings['git_local_work_dir'];
@@ -2471,10 +2558,10 @@ JS;
     }
 
     /**
-     * ディレクトリが空かどうかをチェック（再帰的）
+     * Check whether a directory is empty (recursive)
      *
-     * @param string $dir チェックするディレクトリ
-     * @return bool 空の場合true、ファイルがある場合false
+     * @param string $dir Directory to check
+     * @return bool True if empty, false if it contains files
      */
     private function is_directory_empty_recursive( string $dir ): bool {
         if ( ! is_dir( $dir ) || ! is_readable( $dir ) ) {
@@ -2494,23 +2581,13 @@ JS;
             $path = $dir . '/' . $file;
 
             if ( is_dir( $path ) ) {
-                if ( ! $this->is_directory_empty_recursive( $path ) ) {
+                if ( ! $this->is_hidden_dir( $file ) && ! $this->is_directory_empty_recursive( $path ) ) {
                     return false;
                 }
             } else {
-                $extension = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
-                $excluded_extensions = array(
-                    'php', 'php3', 'php4', 'php5', 'php7', 'phtml', 'phps',
-                    'exe', 'bat', 'sh', 'command', 'com',
-                    'htpasswd', 'ini', 'conf', 'config',
-                    'sql', 'sqlite', 'db',
-                    'git', 'gitignore', 'gitmodules', 'svn',
-                    'log', 'bak', 'backup', 'tmp', 'temp'
-                );
-
                 $filename = basename( $path );
                 if ( ! ( str_starts_with( $filename, '.' ) && $filename !== '.htaccess' ) &&
-                     ! in_array( $extension, $excluded_extensions ) ) {
+                     ! $this->is_blocked_file( $path ) ) {
                     return false;
                 }
             }
@@ -2520,10 +2597,10 @@ JS;
     }
 
     /**
-     * ディレクトリを再帰的にコピー
+     * Recursively copy a directory
      *
-     * @param string $src コピー元ディレクトリ
-     * @param string $dst コピー先ディレクトリ
+     * @param string $src Source directory
+     * @param string $dst Destination directory
      */
     private function copy_directory_recursive( string $src, string $dst, bool $log_progress = false ): bool {
         if ( ! is_dir( $src ) ) {
@@ -2531,7 +2608,7 @@ JS;
             return false;
         }
 
-        // パストラバーサル対策: realpath で正規化して検証
+        // Path traversal protection: normalize with realpath and validate
         $real_src = realpath( $src );
         if ( $real_src === false ) {
             $this->logger->add_log( 'ソースパスの解決に失敗しました: ' . $src, true );
@@ -2567,7 +2644,7 @@ JS;
                 continue;
             }
 
-            // ヌルバイト攻撃対策
+            // Null byte attack protection
             if ( str_contains( $file, "\0" ) ) {
                 continue;
             }
@@ -2575,7 +2652,7 @@ JS;
             $src_path = $real_src . '/' . $file;
             $dst_path = $dst . '/' . $file;
 
-            // パストラバーサル対策: src_pathがreal_src内にあることを確認
+            // Path traversal protection: ensure src_path is within real_src
             $real_src_path = realpath( $src_path );
             if ( $real_src_path === false || ! str_starts_with( $real_src_path, $real_src ) ) {
                 $this->logger->add_log( 'パストラバーサルを検出: ' . $file, true );
@@ -2583,7 +2660,7 @@ JS;
             }
 
             if ( is_dir( $real_src_path ) ) {
-                if ( ! $this->is_directory_empty_recursive( $src_path ) ) {
+                if ( ! $this->is_hidden_dir( $file ) && ! $this->is_directory_empty_recursive( $src_path ) ) {
                     if ( ! $this->copy_directory_recursive( $src_path, $dst_path ) ) {
                         $error_count++;
                     }
@@ -2591,27 +2668,12 @@ JS;
             } else {
                 $extension = strtolower( pathinfo( $src_path, PATHINFO_EXTENSION ) );
 
-                $excluded_extensions = array(
-                    // PHP関連
-                    'php', 'php3', 'php4', 'php5', 'php7', 'phtml', 'phps',
-                    // 実行ファイル
-                    'exe', 'bat', 'sh', 'command', 'com',
-                    // 設定ファイル（.htaccessは除く - 静的サイトで必要な場合がある）
-                    'htpasswd', 'ini', 'conf', 'config',
-                    // データベース
-                    'sql', 'sqlite', 'db',
-                    // 開発ファイル
-                    'git', 'gitignore', 'gitmodules', 'svn',
-                    // その他
-                    'log', 'bak', 'backup', 'tmp', 'temp'
-                );
-
                 $filename = basename( $src_path );
                 if ( str_starts_with( $filename, '.' ) && $filename !== '.htaccess' ) {
                     continue;
                 }
 
-                if ( in_array( $extension, $excluded_extensions ) ) {
+                if ( $this->is_blocked_file( $src_path ) ) {
                     continue;
                 }
 
@@ -2652,9 +2714,9 @@ JS;
     }
 
     /**
-     * ディレクトリの内容を削除
+     * Delete the contents of a directory
      *
-     * @param string $dir ディレクトリパス
+     * @param string $dir Directory path
      */
     private function remove_directory_contents( string $dir, array $exclude = array() ): void {
         if ( ! is_dir( $dir ) ) {
@@ -2681,10 +2743,10 @@ JS;
     }
 
     /**
-     * Gitコマンドのエラー出力をサニタイズ
+     * Sanitize error output from Git commands
      *
-     * @param array $output コマンドの出力配列
-     * @return string サニタイズされたエラーメッセージ
+     * @param array $output Command output array
+     * @return string Sanitized error message
      */
     private function sanitize_git_error( array $output ): string {
         if ( empty( $output ) ) {
@@ -2702,9 +2764,9 @@ JS;
     }
 
     /**
-     * gitコマンドのパスを検出（セキュリティ強化版）
+     * Detect the path of the git command (hardened version)
      *
-     * @return string|false gitコマンドのフルパス、見つからない場合はfalse
+     * @return string|false Full path of the git command, or false if not found
      */
     public static function find_git_command(): string|false {
         $allowed_paths = array(
@@ -2723,19 +2785,19 @@ JS;
                 continue;
             }
 
-            // シンボリックリンク攻撃対策: realpath で実際のパスを検証
+            // Symlink attack protection: verify the actual path with realpath
             $real_path = realpath( $path );
             if ( $real_path === false ) {
                 continue;
             }
 
-            // ファイル名が 'git' または 'git.exe' であることを確認
+            // Ensure the file name is 'git' or 'git.exe'
             $basename = basename( $real_path );
             if ( $basename !== 'git' && $basename !== 'git.exe' ) {
                 continue;
             }
 
-            // 許可されたディレクトリ内にあることを確認
+            // Ensure it is within an allowed directory
             $allowed_dirs = array(
                 '/usr/bin',
                 '/usr/local/bin',
@@ -2768,7 +2830,7 @@ JS;
     }
 
     /**
-     * ファビコン（サイトアイコン）をコピー
+     * Copy the favicon (site icon)
      */
     private function copy_favicon(): void {
         $site_icon_id = get_option( 'site_icon' );
@@ -2823,33 +2885,14 @@ JS;
     }
 
     /**
-     * robots.txtを生成
+     * Generate robots.txt
      */
     private function generate_robots_txt(): void {
         $robots_txt_path = $this->temp_dir . '/robots.txt';
 
-        $robots_content = "User-agent: Googlebot\n";
-        $robots_content .= "User-agent: Bingbot\n";
-        $robots_content .= "User-agent: DuckDuckBot\n";
-        $robots_content .= "Allow: /\n\n";
+        $robots_content = $this->build_crawler_access_rules();
 
-        // AI検索・ユーザー起点の参照は許可（User-agent: * のブロックに含まれるため明示）
-        $robots_content .= "User-agent: ChatGPT-User\n";
-        $robots_content .= "User-agent: Claude-User\n";
-        $robots_content .= "User-agent: OAI-SearchBot\n";
-        $robots_content .= "User-agent: Claude-SearchBot\n";
-        $robots_content .= "Allow: /\n\n";
-
-        // AI学習用クローラーは名指しでブロック
-        $ai_training_bots = array( 'GPTBot', 'ClaudeBot', 'Google-Extended', 'CCBot', 'meta-externalagent', 'Bytespider', 'Applebot-Extended' );
-        foreach ( $ai_training_bots as $bot ) {
-            $robots_content .= "User-agent: {$bot}\nDisallow: /\n\n";
-        }
-
-        $robots_content .= "User-agent: *\n";
-        $robots_content .= "Disallow: /\n";
-
-        // Sitemap ディレクティブは絶対URL必須のため、URL形式の設定に関係なく絶対URLで出力
+        // The Sitemap directive requires an absolute URL, so output an absolute URL regardless of the URL format setting
         if ( ! empty( $this->settings['enable_sitemap'] ) ) {
             $base_url = ! empty( $this->settings['base_url'] ) ? untrailingslashit( $this->settings['base_url'] ) : untrailingslashit( get_site_url() );
             $robots_content .= "\nSitemap: {$base_url}/sitemap.xml\n";
@@ -2861,9 +2904,40 @@ JS;
     }
 
     /**
-     * llms.txtを生成（llmstxt.org 形式）
+     * Generate per-crawler access rules (robots.txt format)
      *
-     * アクセスポリシーはコードブロック内に保持し、ページ一覧を H2 のリンクリストとして出力する。
+     * Shared so that robots.txt and llms.txt emit the same rules.
+     *
+     * @return string Rules text ending with a newline
+     */
+    private function build_crawler_access_rules(): string {
+        $rules = '';
+        foreach ( self::SEARCH_ENGINE_BOTS as $bot ) {
+            $rules .= "User-agent: {$bot}\n";
+        }
+        $rules .= "Allow: /\n\n";
+
+        // Allow AI search / user-initiated retrieval (explicit, since they fall under the User-agent: * block)
+        foreach ( self::AI_REFERENCE_BOTS as $bot ) {
+            $rules .= "User-agent: {$bot}\n";
+        }
+        $rules .= "Allow: /\n\n";
+
+        // Block AI training crawlers by name
+        foreach ( self::AI_TRAINING_BOTS as $bot ) {
+            $rules .= "User-agent: {$bot}\nDisallow: /\n\n";
+        }
+
+        $rules .= "User-agent: *\n";
+        $rules .= "Disallow: /\n";
+
+        return $rules;
+    }
+
+    /**
+     * Generate llms.txt (llmstxt.org format)
+     *
+     * Keeps the access policy in a code block and outputs the page list as an H2 link list.
      */
     private function generate_llms_txt(): void {
         $llms_txt_path = $this->temp_dir . '/llms.txt';
@@ -2871,12 +2945,11 @@ JS;
         $site_name = $this->llms_inline_text( get_bloginfo( 'name' ) );
         $site_name_escaped = str_replace( array( '\\', '"' ), array( '\\\\', '\\"' ), $site_name );
 
-        // 改行を除去してコードブロックからの脱出を防ぐ
+        // Strip newlines to prevent escaping from the code block
         $base_url = ! empty( $this->settings['base_url'] ) ? untrailingslashit( $this->settings['base_url'] ) : untrailingslashit( get_site_url() );
         $base_url = preg_replace( '/[\r\n]+/', '', $base_url );
 
-        $llms_content = "user-agent: *\n\n";
-        $llms_content .= "# License\n";
+        $llms_content = "# License\n";
         $llms_content .= 'x-content-license: "(c) ' . $site_name_escaped . '. All rights reserved."' . "\n";
         $llms_content .= 'x-ai-training-policy: "disallowed"' . "\n\n";
         $llms_content .= "# Rate Limits\n";
@@ -2899,13 +2972,13 @@ JS;
         $llms_content .= 'x-canonical-url-policy: "strict"' . "\n";
         $llms_content .= 'x-canonical-url: "' . $base_url . '"' . "\n";
         $llms_content .= 'x-canonical-url-description: "Access via other FQDNs or IP addresses is invalid. Use only the canonical URL as the base URL."' . "\n\n";
-        $llms_content .= "# Disallow\n";
-        $llms_content .= "disallow: /\n";
+        $llms_content .= "# Access (same as robots.txt)\n";
+        $llms_content .= $this->build_crawler_access_rules();
 
         $title = $site_name !== '' ? $site_name : ( wp_parse_url( $base_url, PHP_URL_HOST ) ?: $base_url );
         $description = $this->llms_inline_text( get_bloginfo( 'description' ) );
 
-        // charset なしの text/plain で配信されてもブラウザが UTF-8 と判定できるよう BOM を付与（仕様上許可）
+        // Add a BOM so browsers detect UTF-8 even when served as text/plain without a charset (allowed by the spec)
         $markdown = "\xEF\xBB\xBF# " . $this->llms_escape_markdown( $title ) . "\n\n";
         if ( $description !== '' ) {
             $markdown .= '> ' . $this->llms_escape_markdown( $description ) . "\n\n";
@@ -2924,13 +2997,11 @@ JS;
     }
 
     /**
-     * llms.txt用のページリンク一覧を生成
+     * Generate the page link list for llms.txt
      *
-     * サイトマップと異なり noindex ページも含める（noindex は検索エンジン向けの指示のため）。
-     *
-     * @param string $base_url  絶対URLのベース
-     * @param string $home_name トップページのリンク名
-     * @return string[] Markdownリスト行
+     * @param string $base_url  Base for absolute URLs
+     * @param string $home_name Link name for the top page
+     * @return string[] Markdown list lines
      */
     private function build_llms_page_links( string $base_url, string $home_name ): array {
         $path_to_post_id = $this->get_path_to_post_id_map();
@@ -2949,7 +3020,7 @@ JS;
                 $name = rawurldecode( $page['url'] );
             }
 
-            // リンクの括弧を閉じさせないよう、括弧と空白をエンコード
+            // Encode parentheses and spaces so the link's parenthesis cannot be closed early
             $url = str_replace( array( '(', ')', ' ' ), array( '%28', '%29', '%20' ), esc_url_raw( $base_url . $page['url'] ) );
 
             $links[ $url ] = '- [' . $this->llms_escape_markdown( $name ) . '](' . $url . ')';
@@ -2959,7 +3030,7 @@ JS;
     }
 
     /**
-     * HTMLタグ・エンティティ・改行を除去して1行のプレーンテキストにする
+     * Strip HTML tags, entities and newlines into single-line plain text
      */
     private function llms_inline_text( string $text ): string {
         $text = html_entity_decode( wp_strip_all_tags( $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
@@ -2967,22 +3038,22 @@ JS;
     }
 
     /**
-     * リンクテキスト・見出し用に Markdown のリンク記号をエスケープ
+     * Escape Markdown link characters for link text and headings
      */
     private function llms_escape_markdown( string $text ): string {
         return addcslashes( $text, '\\[]' );
     }
 
     /**
-     * _headersファイルを生成（Mati連携）
+     * Generate the _headers file (Mati integration)
      */
     private function generate_mati_headers(): void {
         if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
             return;
         }
 
-        // Cloudflare Workers（Direct Upload API）のみ有効で他の出力先がない場合は_headersを生成しない
-        // Wrangler使用時は_headersが機能するためスキップしない
+        // Don't generate _headers when only Cloudflare Workers (Direct Upload API) is enabled and there is no other output
+        // When using Wrangler, _headers works, so don't skip
         $settings = CP_Settings::get_instance()->get_settings();
         if ( ! empty( $settings['cloudflare_enabled'] ) && empty( $settings['cloudflare_use_wrangler'] ) ) {
             $other_destinations = array( 'github_enabled', 'gitlab_enabled', 'netlify_enabled', 'git_local_enabled', 'local_enabled', 'zip_enabled' );
@@ -3034,7 +3105,7 @@ JS;
                 $headers_content .= "  {$name}: {$value}\n";
             }
 
-            // /* はメディアにも適用されるため、メディア用ルールにはページ用に含まれないものだけを書く
+            // /* also applies to media, so media rules only contain entries not already in the page rules
             $media_headers = array_diff_key( $header_sets['media'], $header_sets['page'] );
             if ( ! empty( $media_headers ) ) {
                 $headers_content .= $cp_settings->get_static_uploads_path() . "*\n";
@@ -3066,7 +3137,7 @@ JS;
     }
 
     /**
-     * .well-known/atproto-did ファイルを生成（Mati連携）
+     * Generate the .well-known/atproto-did file (Mati integration)
      */
     private function generate_atproto_did(): void {
         if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) ) {
@@ -3108,9 +3179,9 @@ JS;
     }
 
     /**
-     * ディレクトリを再帰的に削除
+     * Recursively delete a directory
      *
-     * @param string $dir ディレクトリパス
+     * @param string $dir Directory path
      */
     private function remove_directory( string $dir ): void {
         if ( ! is_dir( $dir ) ) {
@@ -3122,10 +3193,10 @@ JS;
     }
 
     /**
-     * ディレクトリ内の全ファイルパスを取得（内容は読み込まない）
+     * Get all file paths in a directory (contents are not read)
      *
-     * @param string $dir ディレクトリパス
-     * @return array ファイルパスの配列（相対パス）
+     * @param string $dir Directory path
+     * @return array Array of file paths (relative paths)
      */
     private function get_directory_file_paths( string $dir ): array {
         $file_paths = array();
@@ -3156,59 +3227,10 @@ JS;
     }
 
     /**
-     * ディレクトリ内の全ファイルを読み込み（後方互換性のため残す）
+     * Copy only the active theme(s)
      *
-     * @param string $dir ディレクトリパス
-     * @return array ファイルの配列（相対パス => 内容）
-     */
-    private function read_directory_files( string $dir ): array {
-        $files = array();
-
-        if ( ! is_dir( $dir ) ) {
-            return $files;
-        }
-
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator( $dir, RecursiveDirectoryIterator::SKIP_DOTS ),
-            RecursiveIteratorIterator::SELF_FIRST
-        );
-
-        foreach ( $iterator as $file ) {
-            if ( $file->isFile() ) {
-                $file_path = $file->getRealPath();
-                $relative_path = str_replace( trailingslashit( $dir ), '', $file_path );
-
-                $file_size = $file->getSize();
-                if ( $file_size > 10 * 1024 * 1024 ) {
-                    $this->logger->add_log( "スキップ: ファイルが大きすぎます（{$relative_path}: " . size_format( $file_size ) . '）' );
-                    continue;
-                }
-
-                $extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
-                $allowed_extensions = array( 'html', 'css', 'js', 'json', 'xml', 'txt', 'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'ico', 'woff', 'woff2', 'ttf', 'eot', 'pdf' );
-
-                if ( ! in_array( $extension, $allowed_extensions ) ) {
-                    $this->logger->add_log( "スキップ: 許可されていない拡張子（{$relative_path}）" );
-                    continue;
-                }
-
-                if ( is_readable( $file_path ) ) {
-                    $content = file_get_contents( $file_path );
-                    if ( $content !== false ) {
-                        $files[ $relative_path ] = $content;
-                    }
-                }
-            }
-        }
-
-        return $files;
-    }
-
-    /**
-     * 有効なテーマのみコピー
-     *
-     * @param string $wp_content_dest コピー先のwp-contentディレクトリ
-     * @return bool 成功ならtrue
+     * @param string $wp_content_dest Destination wp-content directory
+     * @return bool True on success
      */
     private function copy_active_themes( string $wp_content_dest ): bool {
         $themes_dir = get_theme_root();
@@ -3247,10 +3269,10 @@ JS;
     }
 
     /**
-     * 参照されているメディアのみコピー
+     * Copy only referenced media
      *
-     * @param string $wp_content_dest コピー先のwp-contentディレクトリ
-     * @return bool 成功ならtrue
+     * @param string $wp_content_dest Destination wp-content directory
+     * @return bool True on success
      */
     private function copy_referenced_uploads( string $wp_content_dest ): bool {
         $uploads_dir = wp_upload_dir();
@@ -3319,12 +3341,12 @@ JS;
     }
 
     /**
-     * HTMLから参照されているuploads内の非メディアファイルをコピー
+     * Copy non-media files in uploads that are referenced from HTML
      *
-     * プラグインがuploadsディレクトリに生成するCSS等のファイルを対象とする
+     * Targets files such as CSS that plugins generate in the uploads directory
      *
-     * @param string $uploads_base uploadsのベースディレクトリ
-     * @param string $uploads_dest コピー先のuploadsディレクトリ
+     * @param string $uploads_base Base uploads directory
+     * @param string $uploads_dest Destination uploads directory
      */
     private function copy_referenced_upload_files( string $uploads_base, string $uploads_dest ): void {
         $html_files = $this->get_all_html_files( $this->temp_dir );
@@ -3349,7 +3371,7 @@ JS;
 
                 if ( $is_uploads_path ) {
                     $normalized = ltrim( $path, '/' );
-                    $normalized = preg_replace( '/\?.*$/', '', $normalized ); // クエリ文字列を除去
+                    $normalized = preg_replace( '/\?.*$/', '', $normalized );
 
                     $pattern = '/(?:wp-content|' . preg_quote( $content_dirname, '/' ) . ')\/uploads\/(.+)/';
                     if ( preg_match( $pattern, $normalized, $matches ) ) {
@@ -3383,7 +3405,7 @@ JS;
                 continue;
             }
 
-            if ( ! file_exists( $real_src_path ) ) {
+            if ( ! file_exists( $real_src_path ) || $this->is_blocked_file( $real_src_path ) ) {
                 continue;
             }
 
@@ -3403,9 +3425,9 @@ JS;
     }
 
     /**
-     * 公開済み投稿・固定ページに添付されているメディアIDを取得
+     * Get media IDs attached to published posts and pages
      *
-     * @return array attachment IDの配列
+     * @return array Array of attachment IDs
      */
     private function get_attached_media_ids(): array {
         global $wpdb;
@@ -3423,16 +3445,16 @@ JS;
     }
 
     /**
-     * カスタマイザー設定から全てのattachment IDを動的に取得
+     * Dynamically get all attachment IDs from Customizer settings
      *
-     * @return array attachment IDの配列
+     * @return array Array of attachment IDs
      */
     private function get_all_theme_mod_attachment_ids(): array {
         $attachment_ids = array();
 
         $standard_mods = array(
             'custom_logo',
-            'header_image',         // 追加
+            'header_image',         // Added
             'header_image_data',
             'background_image',
         );
@@ -3480,9 +3502,9 @@ JS;
     }
 
     /**
-     * 参照されているメディアIDを取得
+     * Get referenced media IDs
      *
-     * @return array 添付ファイルIDの配列
+     * @return array Array of attachment IDs
      */
     private function get_referenced_attachment_ids(): array {
         global $wpdb;
@@ -3533,13 +3555,13 @@ JS;
     }
 
     /**
-     * 有効なプラグインの静的アセットのみコピー（参照ベース）
+     * Copy only static assets of active plugins (reference-based)
      *
-     * HTMLから参照されているアセットのみをコピーし、
-     * 参照されていないプラグインアセットは除外する
+     * Copies only assets referenced from HTML and
+     * excludes unreferenced plugin assets
      *
-     * @param string $wp_content_dest コピー先のwp-contentディレクトリ
-     * @return bool 成功ならtrue
+     * @param string $wp_content_dest Destination wp-content directory
+     * @return bool True on success
      */
     private function copy_active_plugin_assets( string $wp_content_dest ): bool {
         $plugins_dir = WP_PLUGIN_DIR;
@@ -3562,24 +3584,42 @@ JS;
 
         $copied_count = 0;
         $total_size = 0;
+        $asset_extensions = array( 'css', 'js', 'mjs', 'json', 'map', 'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'avif', 'ico', 'woff', 'woff2', 'ttf', 'otf', 'eot', 'mp4', 'webm', 'mp3', 'wasm' );
 
         foreach ( $referenced_assets as $relative_path ) {
-            $plugin_relative = str_replace( 'wp-content/plugins/', '', $relative_path );
-            $src_path = $plugins_dir . '/' . $plugin_relative;
-            $dest_path = $plugins_dest . '/' . $plugin_relative;
+            $plugin_relative = ltrim( str_replace( 'wp-content/plugins/', '', $relative_path ), '/' );
+            $segments = explode( '/', $plugin_relative );
 
-            if ( ! file_exists( $src_path ) ) {
+            // Path traversal protection: no ".." anywhere, and the first segment must be a plugin folder
+            if ( in_array( '..', $segments, true ) || in_array( $segments[0], array( '', '.' ), true ) ) {
                 continue;
             }
 
+            if ( ! in_array( strtolower( pathinfo( $plugin_relative, PATHINFO_EXTENSION ) ), $asset_extensions, true ) || $this->is_hidden_path( $plugin_relative ) ) {
+                continue;
+            }
+
+            // Contain within the plugin's own folder (resolved, so symlinked plugin folders still work)
+            $real_plugin_root = realpath( $plugins_dir . '/' . $segments[0] );
+            $real_src_path = realpath( $plugins_dir . '/' . $plugin_relative );
+            if ( $real_plugin_root === false || $real_src_path === false || ! str_starts_with( $real_src_path, $real_plugin_root . DIRECTORY_SEPARATOR ) ) {
+                continue;
+            }
+
+            if ( ! is_file( $real_src_path ) ) {
+                continue;
+            }
+
+            // Build the destination from the resolved path so the reference itself cannot steer where it is written
+            $dest_path = $plugins_dest . '/' . $segments[0] . '/' . str_replace( '\\', '/', substr( $real_src_path, strlen( $real_plugin_root ) + 1 ) );
             $dest_dir = dirname( $dest_path );
             if ( ! is_dir( $dest_dir ) ) {
                 mkdir( $dest_dir, 0755, true );
             }
 
-            if ( copy( $src_path, $dest_path ) ) {
+            if ( copy( $real_src_path, $dest_path ) ) {
                 $copied_count++;
-                $total_size += filesize( $src_path );
+                $total_size += filesize( $real_src_path );
             }
         }
 
@@ -3589,52 +3629,9 @@ JS;
     }
 
     /**
-     * プラグインディレクトリから静的アセットのみコピー
+     * Collect plugin asset paths referenced from HTML
      *
-     * @param string $src ソースディレクトリ
-     * @param string $dest コピー先ディレクトリ
-     * @return bool 成功ならtrue
-     */
-    private function copy_plugin_assets_only( string $src, string $dest ): bool {
-        if ( ! is_dir( $src ) ) {
-            return false;
-        }
-
-        $asset_extensions = array( 'css', 'js', 'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'ico', 'woff', 'woff2', 'ttf', 'eot', 'json', 'map' );
-
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator( $src, RecursiveDirectoryIterator::SKIP_DOTS ),
-            RecursiveIteratorIterator::SELF_FIRST
-        );
-
-        $copied = false;
-        foreach ( $iterator as $file ) {
-            if ( $file->isFile() ) {
-                $extension = strtolower( pathinfo( $file->getFilename(), PATHINFO_EXTENSION ) );
-
-                if ( in_array( $extension, $asset_extensions ) ) {
-                    $relative_path = str_replace( trailingslashit( $src ), '', $file->getRealPath() );
-                    $dest_path = $dest . '/' . $relative_path;
-                    $dest_dir = dirname( $dest_path );
-
-                    if ( ! is_dir( $dest_dir ) ) {
-                        mkdir( $dest_dir, 0755, true );
-                    }
-
-                    if ( copy( $file->getRealPath(), $dest_path ) ) {
-                        $copied = true;
-                    }
-                }
-            }
-        }
-
-        return $copied;
-    }
-
-    /**
-     * HTMLから参照されているプラグインアセットのパスを収集
-     *
-     * @return array 参照されているアセットパスの配列
+     * @return array Array of referenced asset paths
      */
     private function get_referenced_plugin_assets(): array {
         $referenced_paths = array();
@@ -3688,10 +3685,10 @@ JS;
     }
 
     /**
-     * 一時ディレクトリ内の全HTMLファイルを再帰的に取得
+     * Recursively get all HTML files in the temp directory
      *
-     * @param string $dir ディレクトリパス
-     * @return array HTMLファイルパスの配列
+     * @param string $dir Directory path
+     * @return array Array of HTML file paths
      */
     private function get_all_html_files( string $dir ): array {
         $html_files = array();
@@ -3711,10 +3708,10 @@ JS;
     }
 
     /**
-     * プラグインアセットパスを正規化
+     * Normalize a plugin asset path
      *
-     * @param string $path アセットパス
-     * @return string 正規化されたパス（wp-content/plugins/... 形式）
+     * @param string $path Asset path
+     * @return string Normalized path (wp-content/plugins/... format)
      */
     private function normalize_plugin_asset_path( string $path ): string {
         $path = preg_replace( '/\?.*$/', '', $path );
@@ -3737,10 +3734,10 @@ JS;
     }
 
     /**
-     * CSSファイル内から参照されているプラグインアセットを収集
+     * Collect plugin assets referenced from within CSS files
      *
-     * @param array $html_referenced HTMLから参照されているパス
-     * @return array CSS内で参照されているアセットパス
+     * @param array $html_referenced Paths referenced from HTML
+     * @return array Asset paths referenced in CSS
      */
     private function get_css_referenced_plugin_assets( array $html_referenced ): array {
         $css_referenced = array();
@@ -3757,11 +3754,11 @@ JS;
     }
 
     /**
-     * CSSファイルから参照を抽出（再帰的）
+     * Extract references from a CSS file (recursive)
      *
-     * @param string $css_relative_path CSSファイルの相対パス（wp-content/plugins/...形式）
-     * @param array &$processed 処理済みCSSファイルの配列（参照渡し）
-     * @return array 参照されているアセットパス
+     * @param string $css_relative_path Relative path of the CSS file (wp-content/plugins/... format)
+     * @param array &$processed Array of already processed CSS files (passed by reference)
+     * @return array Referenced asset paths
      */
     private function extract_css_references( string $css_relative_path, array &$processed ): array {
         if ( in_array( $css_relative_path, $processed ) ) {
@@ -3816,11 +3813,11 @@ JS;
     }
 
     /**
-     * CSS内の相対パスを解決
+     * Resolve a relative path in CSS
      *
-     * @param string $css_dir CSSファイルのディレクトリ（wp-content/plugins/...形式）
-     * @param string $path 相対パス
-     * @return string 解決されたパス
+     * @param string $css_dir Directory of the CSS file (wp-content/plugins/... format)
+     * @param string $path Relative path
+     * @return string Resolved path
      */
     private function resolve_css_relative_path( string $css_dir, string $path ): string {
         $path = preg_replace( '/\?.*$/', '', $path );
@@ -3846,10 +3843,10 @@ JS;
     }
 
     /**
-     * Gitブランチ名が有効かどうかを検証（セキュリティ対策）
+     * Validate whether a Git branch name is valid (security measure)
      *
-     * @param string $branch ブランチ名
-     * @return bool 有効ならtrue
+     * @param string $branch Branch name
+     * @return bool True if valid
      */
     private function is_valid_git_branch_name( string $branch ): bool {
         if ( empty( $branch ) ) {
@@ -3865,18 +3862,18 @@ JS;
         }
 
         $forbidden_patterns = array(
-            '..',           // パストラバーサル
-            '//',           // 連続スラッシュ
-            '@{',           // Git reflog構文
-            '\\',           // バックスラッシュ
-            ' ',            // スペース
-            '~',            // チルダ
-            '^',            // キャレット
-            ':',            // コロン
-            '?',            // クエスチョン
-            '*',            // アスタリスク
-            '[',            // ブラケット
-            '\x00',         // ヌルバイト
+            '..',           // Path traversal
+            '//',           // Consecutive slashes
+            '@{',           // Git reflog syntax
+            '\\',           // Backslash
+            ' ',            // Space
+            '~',            // Tilde
+            '^',            // Caret
+            ':',            // Colon
+            '?',            // Question mark
+            '*',            // Asterisk
+            '[',            // Bracket
+            '\x00',         // Null byte
         );
 
         foreach ( $forbidden_patterns as $pattern ) {
@@ -3893,7 +3890,7 @@ JS;
     }
 
     /**
-     * カスタムサイトマップを生成
+     * Generate a custom sitemap
      */
     private function generate_sitemap(): void {
         if ( empty( $this->settings['enable_sitemap'] ) ) {
@@ -3913,13 +3910,9 @@ JS;
 
         $page_count = 0;
         foreach ( $this->get_listable_pages() as $page ) {
-            if ( $this->has_noindex_meta( (string) file_get_contents( $this->temp_dir . '/' . $page['path'] ) ) ) {
-                continue;
-            }
-
             $key = untrailingslashit( $page['url'] );
 
-            // 投稿は自身の更新日時、トップは最新投稿の更新日時。アーカイブは正確な値が取れないため省略
+            // Posts use their own modified date, the top page uses the latest post's modified date. Archives are omitted since an accurate value is unavailable
             $lastmod = '';
             if ( isset( $path_to_post_id[ $key ] ) ) {
                 $lastmod = (string) get_post_modified_time( DATE_W3C, true, $path_to_post_id[ $key ] );
@@ -3952,7 +3945,7 @@ JS;
     }
 
     /**
-     * サイトマップ・llms.txt に載せるページ（管理画面・フィード・除外パターンで削除済みを除く）
+     * Pages listed in the sitemap and llms.txt (excluding admin, feeds, pages deleted by exclusion patterns, and noindex)
      *
      * @return array<int, array{url: string, path: string}>
      */
@@ -3962,11 +3955,12 @@ JS;
             fn( array $page ): bool => stripos( $page['url'], '/wp-admin' ) === false
                 && ! str_ends_with( $page['path'], '.xml' )
                 && is_file( $this->temp_dir . '/' . $page['path'] )
+                && ! $this->has_noindex_meta( (string) file_get_contents( $this->temp_dir . '/' . $page['path'] ) )
         );
     }
 
     /**
-     * URLパス（末尾スラッシュなし）→ 投稿ID の対応表
+     * URL path (no trailing slash) → post ID mapping
      *
      * @return array<string, int>
      */
@@ -3979,9 +3973,9 @@ JS;
     }
 
     /**
-     * meta robots に noindex（または none）が指定されているか
+     * Whether meta robots specifies noindex (or none)
      *
-     * 属性の順序・引用符の種類に依存しないよう、meta タグ単位で name と content を個別に判定する。
+     * Checks name and content separately per meta tag so it doesn't depend on attribute order or quote style.
      */
     private function has_noindex_meta( string $html ): bool {
         if ( ! preg_match_all( '/<meta\b[^>]*>/i', $html, $tags ) ) {
@@ -3999,17 +3993,17 @@ JS;
     }
 
     /**
-     * HTMLを圧縮
+     * Minify HTML
      *
-     * @param string $html HTML内容
-     * @return string 圧縮後のHTML
+     * @param string $html HTML content
+     * @return string Minified HTML
      */
     private function minify_html( string $html ): string {
         if ( empty( $this->settings['minify_html'] ) ) {
             return $html;
         }
 
-        // 保護対象タグ内を退避
+        // Stash the contents of protected tags
         $protected = array();
         $html = preg_replace_callback(
             '/<(script|style|noscript|pre|textarea)(\s[^>]*)?>(.*?)<\/\1>/isu',
@@ -4023,7 +4017,7 @@ JS;
 
         $html = preg_replace('/(<!DOCTYPE[^>]+>)\s+/i', '$1' . "\n", $html);
 
-        // HTMLコメント削除（条件付きコメント<!--[if]>は保持）
+        // Remove HTML comments (conditional comments <!--[if]> are kept)
         $html = preg_replace('/<!--(?!\[if\s)(?!<!)[^\[].*?-->/s', '', $html);
 
         $html = preg_replace('/\s+/u', ' ', $html);
@@ -4037,10 +4031,10 @@ JS;
     }
 
     /**
-     * インラインCSSを圧縮
+     * Minify inline CSS
      *
-     * @param string $html HTML内容
-     * @return string 圧縮後のHTML
+     * @param string $html HTML content
+     * @return string Minified HTML
      */
     private function minify_inline_css( string $html ): string {
         if ( empty( $this->settings['minify_css'] ) ) {
@@ -4071,10 +4065,10 @@ JS;
     }
 
     /**
-     * CSS内容を圧縮
+     * Minify CSS content
      *
-     * @param string $css CSS内容
-     * @return string 圧縮後のCSS
+     * @param string $css CSS content
+     * @return string Minified CSS
      */
     private function minify_css_content( string $css ): string {
         $css = preg_replace_callback(
@@ -4097,9 +4091,9 @@ JS;
     }
 
     /**
-     * ファイルパスから適切なContent-Typeを取得
+     * Get the appropriate Content-Type from a file path
      *
-     * @param string $file_path ファイルパス
+     * @param string $file_path File path
      * @return string Content-Type
      */
     private function get_content_type( string $file_path ): string {

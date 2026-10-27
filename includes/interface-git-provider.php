@@ -1,6 +1,6 @@
 <?php
 /**
- * Git Provider インターフェース
+ * Git Provider interface
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

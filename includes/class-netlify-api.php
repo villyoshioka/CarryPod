@@ -1,6 +1,6 @@
 <?php
 /**
- * Netlify API連携クラス
+ * Netlify API integration class
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

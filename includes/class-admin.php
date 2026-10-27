@@ -1,6 +1,6 @@
 <?php
 /**
- * 管理画面クラス
+ * Admin screen class
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -328,7 +328,7 @@ class CP_Admin {
         $logger = CP_Logger::get_instance();
         $is_running = $logger->is_running();
 
-        // Playground（WordPress Studio）ではCLI依存機能（ローカルGit・Wrangler）のUIを出さない
+        // Do not show UI for CLI-dependent features (local Git, Wrangler) on Playground (WordPress Studio)
         $is_playground = CP_Settings::is_playground();
 
         if ( isset( $_GET['debugmode'] ) ) {
@@ -354,7 +354,6 @@ class CP_Admin {
             $beta_param = sanitize_text_field( wp_unslash( $_GET['cp_beta'] ) );
             if ( $beta_param === 'on' ) {
                 if ( $settings_manager->is_beta_mode_enabled() ) {
-                    // 既に有効
                 } elseif ( isset( $_POST['cp_beta_password'] ) && isset( $_POST['cp_beta_nonce'] ) ) {
                     if ( wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['cp_beta_nonce'] ) ), 'cp_beta_auth' ) ) {
                         $password = sanitize_text_field( wp_unslash( $_POST['cp_beta_password'] ) );
@@ -894,7 +893,7 @@ class CP_Admin {
                         $transform_guide        = $this->get_transform_guide_content();
                         $transform_guide_hidden = get_option( 'cp_transform_guide_hidden' );
                         $is_guide_dismissed     = md5( $transform_guide ) === $transform_guide_hidden;
-                        // 内容が変わって再表示したら非表示の記録を消す（内容が元に戻っても、再度非表示にするまで表示し続ける）
+                        // Clear the dismissal record when re-shown due to changed content (even if the content reverts, keep showing until dismissed again)
                         if ( false !== $transform_guide_hidden && ! $is_guide_dismissed ) {
                             delete_option( 'cp_transform_guide_hidden' );
                         }
@@ -913,7 +912,7 @@ class CP_Admin {
                              aria-labelledby="header-transform-guide"
                              aria-hidden="true">
                             <div class="cp-guide-content">
-                                <?php echo $transform_guide; // 内部で出力値はエスケープ済み ?>
+                                <?php echo $transform_guide; // Output values are escaped internally ?>
                                 <p>
                                     <label>
                                         <input type="checkbox" name="hide_transform_guide" value="1">
@@ -1040,7 +1039,7 @@ class CP_Admin {
             update_option( 'cp_settings', $settings );
         }
 
-        /** アトミックなロック取得で並行実行を防止 */
+        /** Prevent concurrent execution with atomic lock acquisition */
         $lock_key = 'cp_execution_lock';
         $lock_timeout = 3600;
         $lock_value = wp_generate_uuid4();
@@ -1057,7 +1056,7 @@ class CP_Admin {
                     wp_send_json_error( array( 'message' => '既に実行中です。しばらくお待ちください。' ) );
                 }
 
-                // 条件付き削除でアトミックにロック再取得
+                // Atomically re-acquire the lock via conditional delete
                 global $wpdb;
                 $deleted = $wpdb->delete(
                     $wpdb->options,
@@ -1151,12 +1150,11 @@ class CP_Admin {
             wp_send_json_error( array( 'message' => 'ダウンロード可能なZIPファイルが見つかりません。' ) );
         }
 
-        // パスが carry-pod-tmp/ 内であることを検証
-        $upload_dir   = wp_upload_dir();
-        $expected_dir = trailingslashit( $upload_dir['basedir'] ) . 'carry-pod-tmp' . DIRECTORY_SEPARATOR;
-        $real_path    = realpath( $zip_path );
-        $real_dir     = realpath( dirname( $zip_path ) );
-        if ( ! $real_path || ! $real_dir || ! str_starts_with( $real_path, rtrim( $real_dir, DIRECTORY_SEPARATOR ) . DIRECTORY_SEPARATOR ) ) {
+        // Verify that the path is within carry-pod-tmp/
+        $upload_dir = wp_upload_dir();
+        $real_dir   = realpath( trailingslashit( $upload_dir['basedir'] ) . 'carry-pod-tmp' );
+        $real_path  = realpath( $zip_path );
+        if ( ! $real_path || ! $real_dir || ! str_starts_with( $real_path, $real_dir . DIRECTORY_SEPARATOR ) || strtolower( pathinfo( $real_path, PATHINFO_EXTENSION ) ) !== 'zip' ) {
             wp_send_json_error( array( 'message' => '不正なファイルパスです。' ) );
         }
 
@@ -1360,7 +1358,7 @@ class CP_Admin {
             }
         }
 
-        // 保存前の設定で表示されていた案内を非表示にする（内容が変わると再表示される）
+        // Dismiss the notice that was shown under the pre-save settings (it is shown again if its content changes)
         $hidden_guide_hash = null;
         if ( ! empty( $_POST['hide_transform_guide'] ) && defined( 'MATI_VERSION' ) && class_exists( 'Mati_Settings' ) ) {
             $hidden_guide_hash = md5( $this->get_transform_guide_content() );
@@ -1375,7 +1373,7 @@ class CP_Admin {
             ) );
         }
 
-        // 画面上で Wrangler 不使用に切り替えて再表示した案内は、再度非表示にするまで表示し続ける
+        // A notice re-shown by switching to not using Wrangler on screen keeps showing until dismissed again
         $reshow_guide = ! empty( $_POST['reshow_transform_guide'] )
             || ( ! empty( $old_settings['cloudflare_use_wrangler'] ) && empty( $settings['cloudflare_use_wrangler'] ) );
         if ( null !== $hidden_guide_hash ) {
@@ -1438,7 +1436,7 @@ class CP_Admin {
             wp_send_json_error( array( 'message' => $result->get_error_message() ) );
         }
 
-        wp_send_json_success( array( 'message' => '設定をインポートしました。トークンを再入力してください。' ) );
+        wp_send_json_success( array( 'message' => '設定をインポートしました。トークンと、出力先・追加ファイルなどのフォルダの場所を設定し直してください。' ) );
     }
 
     public function ajax_clear_cache(): void {
@@ -1573,7 +1571,7 @@ class CP_Admin {
             $log_text .= "    - llms.txt: " . ( ! empty( $settings['enable_llms_txt'] ) ? '有効' : '無効' ) . "\n";
             if ( defined( 'MATI_VERSION' ) && class_exists( 'Mati_Settings' ) ) {
                 $headers_enabled = ! empty( $settings['generate_mati_headers'] );
-                // Cloudflare Workersのみ有効で他の出力先がない場合は無効扱い
+                // Treat as disabled when only Cloudflare Workers is enabled and there is no other output destination
                 if ( $headers_enabled && ! empty( $settings['cloudflare_enabled'] ) ) {
                     $other_destinations = array( 'github_enabled', 'gitlab_enabled', 'netlify_enabled', 'git_local_enabled', 'local_enabled', 'zip_enabled' );
                     $has_other          = false;
@@ -1742,6 +1740,12 @@ class CP_Admin {
     }
 
     public function ajax_check_error_notification(): void {
+        check_ajax_referer( 'cp_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'cp_execute' ) ) {
+            wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        }
+
         $error_notification = get_option( 'cp_error_notification', false );
         $has_error = $error_notification && ! empty( $error_notification['count'] );
 
@@ -1756,7 +1760,7 @@ class CP_Admin {
     }
 
     private function detect_wrangler(): array {
-        // Playground（WordPress Studio）ではproc_openがエラーなしで失敗するため検出しない
+        // Skip detection on Playground (WordPress Studio) since proc_open fails without an error
         if ( CP_Settings::is_playground() ) {
             return array(
                 'found'        => false,
@@ -1845,7 +1849,7 @@ class CP_Admin {
         );
     }
 
-    /** Node.js/npm/pnpmの一般的なインストールパスを補完したPATH */
+    /** PATH supplemented with common Node.js/npm/pnpm install paths */
     public function get_extended_path(): string {
         $path = getenv( 'PATH' ) ?: '';
         $is_windows = PHP_OS_FAMILY === 'Windows';
@@ -1853,7 +1857,7 @@ class CP_Admin {
         if ( ! $is_windows ) {
             $home = getenv( 'HOME' ) ?: ( $_SERVER['HOME'] ?? '' );
 
-            // nvmのNode.jsをシステムNodeより優先
+            // Prefer nvm's Node.js over the system Node
             $priority_paths = array();
             if ( ! empty( $home ) ) {
                 $nvm_version = $this->detect_node_version( $home );
@@ -1964,7 +1968,7 @@ class CP_Admin {
         }
     }
 
-    /** REMOTE_ADDRのみ信頼（HTTP_X_FORWARDED_FOR等はスプーフィング可能） */
+    /** Trust only REMOTE_ADDR (HTTP_X_FORWARDED_FOR etc. can be spoofed) */
     private function get_client_ip(): string {
         $ip = '';
         if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
@@ -2021,9 +2025,9 @@ class CP_Admin {
     }
 
     /**
-     * Cloudflare レスポンス ヘッダー変換ルールの案内（本文）
+     * Notice for Cloudflare Response Header Transform Rules (body)
      *
-     * 本文の md5 を非表示にした時点のものと比較し、内容が変わったら再表示する。
+     * Compares the body's md5 with the one at the time of dismissal, and re-shows the notice if the content has changed.
      */
     private function get_transform_guide_content(): string {
         ob_start();
@@ -2212,7 +2216,7 @@ class CP_Admin {
 
         $mati_version = MATI_VERSION;
 
-        if ( version_compare( $mati_version, '2.3.1', '>=' ) ) {
+        if ( version_compare( $mati_version, '2.6.0', '>=' ) ) {
             return;
         }
 
@@ -2220,8 +2224,8 @@ class CP_Admin {
         <div class="notice notice-warning">
             <p>
                 <strong>⚠️ Mati連携</strong><br>
-                Mati 2.3.1以降にアップデートすると、すべての連携機能が有効になります。<br>
-                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 2.3.1+</small>
+                Mati 2.6.0以降にアップデートすると、すべての連携機能が有効になります。<br>
+                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 2.6.0+</small>
             </p>
         </div>
         <?php
@@ -2238,7 +2242,7 @@ class CP_Admin {
             return;
         }
 
-        if ( version_compare( $sc_version, '2.2.0', '>=' ) ) {
+        if ( version_compare( $sc_version, '2.3.0', '>=' ) ) {
             return;
         }
 
@@ -2246,8 +2250,8 @@ class CP_Admin {
         <div class="notice notice-warning">
             <p>
                 <strong>⚠️ Screw連携</strong><br>
-                Screw 2.2.0以降にアップデートすると、双方向連携機能が有効になります。<br>
-                <small>現在: Screw <?php echo esc_html( $sc_version ); ?> → 推奨: Screw 2.2.0+</small>
+                Screw 2.3.0以降にアップデートすると、双方向連携機能が有効になります。<br>
+                <small>現在: Screw <?php echo esc_html( $sc_version ); ?> → 推奨: Screw 2.3.0+</small>
             </p>
         </div>
         <?php

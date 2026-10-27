@@ -1,5 +1,5 @@
 /**
- * Carry Pod 管理画面JavaScript
+ * Carry Pod admin JavaScript
  */
 
 jQuery(document).ready(function($) {
@@ -10,7 +10,6 @@ jQuery(document).ready(function($) {
     var motionDuration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 120;
     var motionDurationLong = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 200;
 
-    // HTMLエスケープ関数（XSS対策）
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -166,7 +165,7 @@ jQuery(document).ready(function($) {
             if (noTransition) { $transformGuide.hide(); } else { $transformGuide.slideUp(motionDurationLong); }
         }
 
-        // _headersチェックボックスグレーアウト: Workers（Direct Upload API）のみ有効時
+        // Gray out the _headers checkbox: when only Workers (Direct Upload API) is enabled
         var $headersCheckbox = $('#cp-mati-headers');
         if ($headersCheckbox.length) {
             var workersOnlyDirectApi = cfEnabled && !useWrangler && !otherEnabled;
@@ -240,7 +239,7 @@ jQuery(document).ready(function($) {
     $(window).on('resize', syncWranglerGuideWidth);
 
     $('#cp-cloudflare-use-wrangler').on('change', function() {
-        // Wrangler 不使用に切り替えたら、非表示にしていた案内も保存を待たずに再表示する
+        // When switched to not using Wrangler, re-show the hidden guidance without waiting for save
         if ($(this).val() === '0') {
             $('#cp-cf-transform-guide').removeAttr('data-dismissed');
             $('#cp-reshow-transform-guide').val('1');
@@ -314,7 +313,7 @@ jQuery(document).ready(function($) {
                 $executeButton.prop('disabled', true);
                 return;
             }
-            // 実行画面ではPHPで設定された初期状態を維持し、コミットメッセージの有無だけチェック
+            // On the execution screen, keep the initial state set by PHP and only check whether a commit message exists
             if ($commitSection.hasClass('active')) {
                 if ($commitMessage.val() && $commitMessage.val().trim() !== '') {
                     $executeButton.addClass('has-commit-message');
@@ -332,7 +331,6 @@ jQuery(document).ready(function($) {
 
         const autoGenerate = $('input[name="auto_generate"]').is(':checked');
 
-        // Git出力が有効かつ自動実行が無効な場合はコミットメッセージセクションを表示
         if ((githubEnabled || gitLocalEnabled || gitlabEnabled) && !autoGenerate) {
             $commitSection.addClass('active');
             $executeButton.addClass('commit-required');
@@ -351,7 +349,7 @@ jQuery(document).ready(function($) {
     }
 
     /**
-     * アコーディオン機能の初期化
+     * Initialize accordion behavior
      */
     function initAccordions() {
         const accordions = document.querySelectorAll('.nau-accordion-section');
@@ -366,7 +364,6 @@ jQuery(document).ready(function($) {
             const savedState = getAccordionState(sectionId);
             const isExpanded = savedState !== null ? savedState : getDefaultState(sectionId);
 
-            // トランジションを一時的に無効化
             content.classList.add('nau-no-transition');
             setAccordionState(header, content, isExpanded, true);
 
@@ -379,7 +376,7 @@ jQuery(document).ready(function($) {
                 const newState = !currentState;
 
                 setAccordionState(header, content, newState);
-                // LocalStorageへの保存はフォーム保存時のみ行う
+                // Save to LocalStorage only when the form is saved
             });
 
             header.addEventListener('keydown', function(e) {
@@ -392,8 +389,8 @@ jQuery(document).ready(function($) {
     }
 
     /**
-     * アコーディオンの状態を設定
-     * @param {boolean} noTransition - trueの場合、トランジションなしで即座に状態を変更
+     * Set the accordion state
+     * @param {boolean} noTransition - If true, change the state immediately without a transition
      */
     function setAccordionState(header, content, isExpanded, noTransition) {
         const $header = $(header);
@@ -418,7 +415,7 @@ jQuery(document).ready(function($) {
     }
 
     /**
-     * デフォルトの開閉状態を取得
+     * Get the default open/closed state
      */
     function getDefaultState(sectionId) {
         const defaultExpanded = ['output-destinations'];
@@ -426,7 +423,7 @@ jQuery(document).ready(function($) {
     }
 
     /**
-     * LocalStorageから状態を取得
+     * Get the state from LocalStorage
      */
     function getAccordionState(sectionId) {
         try {
@@ -442,7 +439,7 @@ jQuery(document).ready(function($) {
     }
 
     /**
-     * LocalStorageに状態を保存
+     * Save the state to LocalStorage
      */
     function saveAccordionState(sectionId, isExpanded) {
         try {
@@ -461,7 +458,7 @@ jQuery(document).ready(function($) {
     }
 
     /**
-     * すべてのアコーディオンの現在の状態をLocalStorageに保存
+     * Save the current state of all accordions to LocalStorage
      */
     function saveAllAccordionStates() {
         try {
@@ -471,7 +468,7 @@ jQuery(document).ready(function($) {
                 const isExpanded = $(this).attr('aria-expanded') === 'true';
                 states[sectionId] = isExpanded;
             });
-            // Wranglerガイドの<details>開閉状態
+            // Open/closed state of the Wrangler guide <details>
             var $wranglerGuideDetails = $('#cp-wrangler-guide .cp-guide-details');
             if ($wranglerGuideDetails.length) {
                 states['cf-wrangler-guide'] = $wranglerGuideDetails.prop('open');
@@ -592,7 +589,7 @@ jQuery(document).ready(function($) {
         const githubEnabled = $('#cp-github-enabled').is(':checked');
         let commitMessage = '';
 
-        // コミットメッセージが空でもサーバー側でデフォルト値が自動設定される
+        // Even if the commit message is empty, the server sets a default value automatically
         if (githubEnabled && $commitMessage.length > 0) {
             commitMessage = $commitMessage.val();
         }
@@ -709,7 +706,7 @@ jQuery(document).ready(function($) {
         if (progressPollInterval) {
             return;
         }
-        progressPollInterval = setInterval(loadProgress, 1000); // 1秒間隔
+        progressPollInterval = setInterval(loadProgress, 1000);
     }
 
     function stopProgressPolling() {
@@ -737,7 +734,6 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response.success) {
                     hasUnsavedChanges = false;
-                    // アコーディオンの状態をLocalStorageに保存
                     saveAllAccordionStates();
 
                     showNotice(response.data.message, 'success');
@@ -766,7 +762,6 @@ jQuery(document).ready(function($) {
                 success: function(response) {
                     if (response.success) {
                         hasUnsavedChanges = false;
-                        // アコーディオンの状態もリセット
                         localStorage.removeItem('cp_accordion_states');
 
                         showNotice(response.data.message, 'success');

@@ -1,6 +1,6 @@
 <?php
 /**
- * 並列クローラークラス（WP2Staticを参考に実装）
+ * Parallel crawler class (implementation based on WP2Static)
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -49,15 +49,10 @@ class CP_Parallel_Crawler {
                 curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, ! $is_localhost );
                 curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, $is_localhost ? 0 : 2 );
 
-                $auth_user = get_option( 'cp_basic_auth_user' );
-                if ( $auth_user ) {
-                    $encrypted_pass = get_option( 'cp_basic_auth_pass' );
-                    $settings_manager = CP_Settings::get_instance();
-                    $auth_pass = $settings_manager->decrypt_basic_auth( $encrypted_pass );
-                    if ( ! is_wp_error( $auth_pass ) ) {
-                        curl_setopt( $ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC );
-                        curl_setopt( $ch, CURLOPT_USERPWD, $auth_user . ':' . $auth_pass );
-                    }
+                $basic_auth = CP_Settings::get_instance()->get_basic_auth_credentials();
+                if ( $basic_auth ) {
+                    curl_setopt( $ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC );
+                    curl_setopt( $ch, CURLOPT_USERPWD, $basic_auth[0] . ':' . $basic_auth[1] );
                 }
 
                 curl_multi_add_handle( $multi_handle, $ch );
@@ -132,7 +127,7 @@ class CP_Parallel_Crawler {
 
             foreach ( $crawl_results as $url => $result ) {
                 if ( $result['status_code'] == 200 && ! empty( $result['content'] ) ) {
-                    // 前のURLの依存投稿が混入しないよう、URLごとにリセットする
+                    // Reset per URL so the previous URL's dependent posts do not carry over
                     $this->cache->clear_dependent_posts();
 
                     $post_id = $this->resolve_post_id( $url );
@@ -174,11 +169,11 @@ class CP_Parallel_Crawler {
     }
 
     /**
-     * URLから投稿IDを解決する
+     * Resolve a post ID from a URL
      *
-     * ジェネレーター側で構築したパーマリンクベースの対応表を優先し、
-     * 対応表にないURLのみ url_to_postid() にフォールバックする
-     * （url_to_postid() はフロントページや一部の固定ページで0を返すため）
+     * Prefer the permalink-based lookup map built by the generator,
+     * and fall back to url_to_postid() only for URLs not in the map
+     * (because url_to_postid() returns 0 for the front page and some static pages)
      */
     private function resolve_post_id( string $url ): int {
         $post_id = $this->url_to_post_id_map[ $url ] ?? 0;

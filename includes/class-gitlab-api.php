@@ -1,6 +1,6 @@
 <?php
 /**
- * GitLab API連携クラス
+ * GitLab API integration class
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -305,7 +305,7 @@ class CP_GitLab_API implements CP_Git_Provider_Interface {
         return $all_files;
     }
 
-    /** ツリーAPIのidフィールドにGit blob SHAが含まれる */
+    /** The tree API's id field contains the Git blob SHA */
     private function get_repository_tree_with_sha(): array|\WP_Error {
         return $this->get_repository_tree();
     }

@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: Carry Pod
- * Version: 3.3.3
+ * Version: 3.4.0
  * Description: WordPressサイトを静的化してデプロイするプラグイン
  * Requires at least: 7.0
  * Tested up to: 7.0
- * Requires PHP: 8.3
+ * Requires PHP: 8.5.12
  * Author: Vill Yoshioka
  * License: GPLv3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'CP_VERSION', '3.3.3' );
+define( 'CP_VERSION', '3.4.0' );
 define( 'CP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'CP_PLUGIN_FILE', __FILE__ );
@@ -50,7 +50,6 @@ class Carry_Pod {
         require_once CP_PLUGIN_DIR . 'includes/class-github-api.php';
         require_once CP_PLUGIN_DIR . 'includes/class-gitlab-api.php';
         require_once CP_PLUGIN_DIR . 'includes/class-parallel-crawler.php';
-        require_once CP_PLUGIN_DIR . 'includes/class-asset-detector.php';
         require_once CP_PLUGIN_DIR . 'includes/class-generator.php';
         require_once CP_PLUGIN_DIR . 'includes/class-cloudflare-workers.php';
         require_once CP_PLUGIN_DIR . 'includes/class-netlify-api.php';
@@ -87,9 +86,9 @@ class Carry_Pod {
             wp_die( 'このプラグインにはWordPress 7.0以上が必要です。' );
         }
 
-        if ( version_compare( PHP_VERSION, '8.3', '<' ) ) {
+        if ( version_compare( PHP_VERSION, '8.5.12', '<' ) ) {
             deactivate_plugins( plugin_basename( CP_PLUGIN_FILE ) );
-            wp_die( 'このプラグインにはPHP 8.3以上が必要です。' );
+            wp_die( 'このプラグインにはPHP 8.5.12以上が必要です。' );
         }
 
         if ( is_plugin_active( 'wp2static/wp2static.php' ) || is_plugin_active( 'simply-static/simply-static.php' ) ) {
@@ -97,7 +96,7 @@ class Carry_Pod {
         }
 
         require_once CP_PLUGIN_DIR . 'includes/class-generator.php';
-        // Playground（WordPress Studio）ではローカルGit機能自体を無効化するため警告不要
+        // No warning needed on Playground (WordPress Studio) since local Git features are disabled entirely
         if ( ! CP_Settings::is_playground() ) {
             $git_path = CP_Generator::find_git_command();
             if ( $git_path === false ) {
@@ -158,7 +157,7 @@ class Carry_Pod {
         }
     }
 
-    /** 権限が未登録の場合に登録（既存インストール対応） */
+    /** Register capabilities if not yet registered (for existing installs) */
     public function ensure_capabilities(): void {
         $admin = get_role( 'administrator' );
         if ( $admin && ! $admin->has_cap( 'cp_execute' ) ) {
@@ -211,7 +210,7 @@ class Carry_Pod {
             return;
         }
 
-        // 新規公開時のみグローバルタイムスタンプ更新（既存投稿の変更は依存投稿チェックで対応）
+        // Update the global timestamp only on new publish (changes to existing posts are handled by the dependent-post check)
         if ( $old_status !== 'publish' && $new_status === 'publish' ) {
             update_option( 'cp_last_post_change', microtime( true ) );
         }
@@ -223,8 +222,8 @@ class Carry_Pod {
                 return;
             }
 
-            // キャッシュクリアは自動生成のON/OFFに関わらず実行する
-            // （OFF時は次回の手動生成で該当ページが再生成される）
+            // Clear the cache regardless of whether auto-generation is ON or OFF
+            // (when OFF, the affected pages are regenerated on the next manual generation)
             $cache = CP_Cache::get_instance();
             $cache->clear_by_post( $post->ID );
             $cache->clear_adjacent_posts_cache( $post->ID, $old_status, $new_status );
@@ -254,7 +253,7 @@ class Carry_Pod {
         $generator->generate();
     }
 
-    /** Action Scheduler の時間制限を1時間に延長（大規模サイト対応） */
+    /** Extend the Action Scheduler time limit to 1 hour (for large sites) */
     public function extend_action_scheduler_time_limit( int $time_limit ): int {
         return 3600;
     }
@@ -271,8 +270,8 @@ class Carry_Pod {
         $current_version = get_option( 'cp_version', '0.0.0' );
 
         if ( version_compare( $current_version, CP_VERSION, '<' ) ) {
-            // 3.2.0未満で生成されたキャッシュは依存投稿の記録が不正確な
-            // 可能性があるため、3.2.0へのアップデート時のみ破棄して作り直す
+            // Cache generated before 3.2.0 may have inaccurate dependent-post records,
+            // so discard and rebuild it only when updating to 3.2.0
             if ( version_compare( $current_version, '3.2.0', '<' ) ) {
                 CP_Cache::get_instance()->clear_all();
             }
