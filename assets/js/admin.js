@@ -630,6 +630,8 @@ jQuery(document).ready(function($) {
         });
     });
 
+    let cancelLockedByBackup = false;
+
     function loadProgress() {
         $.ajax({
             url: sgeData.ajaxurl,
@@ -696,6 +698,14 @@ jQuery(document).ready(function($) {
                         }
                         $('#cp-progress-status').text(statusMessage);
                         $('#cp-download-log').prop('disabled', true);
+
+                        if (response.data.backup_running) {
+                            $('#cp-cancel-button').prop('disabled', true);
+                            cancelLockedByBackup = true;
+                        } else if (cancelLockedByBackup) {
+                            $('#cp-cancel-button').prop('disabled', false);
+                            cancelLockedByBackup = false;
+                        }
                     }
                 }
             }
@@ -716,7 +726,7 @@ jQuery(document).ready(function($) {
         }
     }
 
-    $('#cp-settings-form').on('keydown', 'input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]), textarea, select', function(e) {
+    $('#cp-settings-form').on('keydown', 'input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]), select', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
         }

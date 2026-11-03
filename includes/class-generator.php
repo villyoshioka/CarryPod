@@ -7,6 +7,16 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// Sub Pod plugin stubs for static analysis (never executed).
+if ( false ) {
+    class SP_Settings {
+        /** @return array<string, mixed> */
+        public static function get_settings(): array { return []; }
+        /** @return string[] */
+        public static function destinations( bool $automatic = false ): array { return []; }
+    }
+}
+
 class CP_Generator {
 
     /** Extensions excluded from the static site (server-side code, executables, config, DB, dev files, etc.) */
@@ -22,7 +32,7 @@ class CP_Generator {
         // Dev files
         'git', 'gitignore', 'gitmodules', 'svn',
         // Other
-        'log', 'bak', 'backup', 'tmp', 'temp',
+        'log', 'bak', 'backup', 'tmp', 'temp', 'enc', 'part',
     );
 
     /** Search engine crawlers (allowed) */
@@ -68,12 +78,19 @@ class CP_Generator {
                 @set_time_limit( 0 );
             }
 
+            // Must be read first: this flag is also set below for automatic runs
+            $context = get_transient( 'cp_manual_running' ) ? 'manual' : 'auto';
+
             set_transient( 'cp_manual_running', true, 3600 );
             delete_option( 'cp_error_notification' );
 
             $this->logger->start_timer();
             $this->logger->add_log( '静的化を開始します' );
             $this->logger->clear_progress();
+
+            if ( ! $this->run_before_generation( $context ) ) {
+                return;
+            }
 
             if ( is_dir( $this->temp_dir ) ) {
                 $this->remove_directory( $this->temp_dir );
@@ -387,6 +404,75 @@ class CP_Generator {
             delete_transient( 'cp_manual_running' );
             delete_transient( 'cp_auto_running' );
         }
+    }
+
+    /**
+     * Run the pre-generation filter (Sub Pod takes its backup here)
+     *
+     * Any value other than true stops the generation.
+     */
+    private function run_before_generation( string $context ): bool {
+        $destinations = $this->get_backup_destinations( $context );
+        $started_at = microtime( true );
+
+        $log_backup_result = function( array $result ) use ( $started_at ): void {
+            $this->logger->add_log( sprintf(
+                'バックアップが完了しました: %s（%s、%dファイル、%d秒）',
+                $result['name'],
+                size_format( $result['size'] ),
+                $result['file_count'],
+                (int) ( microtime( true ) - $started_at )
+            ) );
+
+            if ( $result['skipped_links'] > 0 ) {
+                $this->logger->add_log( 'バックアップに含められなかったリンク: ' . $result['skipped_links'] . '件' );
+            }
+        };
+
+        if ( $destinations ) {
+            $labels = array( 'download' => 'ダウンロード', 'directory' => 'フォルダ', 'r2' => 'R2' );
+            $names = array_map( fn( $destination ) => $labels[ $destination ] ?? $destination, $destinations );
+
+            $this->logger->add_log( 'バックアップを開始します（保存先: ' . implode( '、', $names ) . '）' );
+            $this->logger->update_progress( 0, 100, 'バックアップの実行中...' );
+            $this->logger->flush_logs();
+        }
+
+        add_action( 'sp_backup_completed', $log_backup_result );
+        $proceed = apply_filters( 'cp_before_static_generation', true, $context );
+        remove_action( 'sp_backup_completed', $log_backup_result );
+
+        if ( true === $proceed ) {
+            // The backup used up part of the flag's lifetime, so generation restarts it
+            if ( $destinations ) {
+                set_transient( 'cp_manual_running', true, 3600 );
+            }
+            return true;
+        }
+
+        $message = is_wp_error( $proceed ) ? $proceed->get_error_message() : '静的化の前処理により中止されました';
+        $this->logger->add_log( $message, true );
+        $this->logger->update_progress( 0, 0, 'エラーが発生しました' );
+
+        return false;
+    }
+
+    /**
+     * Destinations Sub Pod will back up to in this run (empty when no backup will run)
+     *
+     * @return string[]
+     */
+    private function get_backup_destinations( string $context ): array {
+        // has_filter: Sub Pod's classes exist on multisite too, where it does not register the backup
+        if ( ! has_filter( 'cp_before_static_generation', array( 'SP_Backup', 'on_static_generation' ) ) || ! class_exists( 'SP_Settings' ) ) {
+            return array();
+        }
+
+        if ( empty( SP_Settings::get_settings()['cp_backup'] ) ) {
+            return array();
+        }
+
+        return SP_Settings::destinations( 'manual' !== $context );
     }
 
     private function get_urls_to_generate(): array {
@@ -1740,7 +1826,10 @@ class CP_Generator {
      * @return bool True if excluded
      */
     private function is_blocked_file( string $path ): bool {
-        return in_array( strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ), self::BLOCKED_EXTENSIONS, true );
+        $path = strtolower( $path );
+
+        // Backup archives: checked separately because other .gz files stay allowed
+        return str_ends_with( $path, '.tar.gz' ) || in_array( pathinfo( $path, PATHINFO_EXTENSION ), self::BLOCKED_EXTENSIONS, true );
     }
 
     /**

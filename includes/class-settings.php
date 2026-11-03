@@ -12,6 +12,14 @@ if ( false ) {
     define( 'CP_ENCRYPTION_KEY', '' );
 }
 
+// Sub Pod plugin stubs for static analysis (never executed).
+if ( false ) {
+    class SP_Settings {
+        /** @return array<string, mixed> */
+        public static function get_settings(): array { return []; }
+    }
+}
+
 class CP_Settings {
 
     private static ?self $instance = null;
@@ -434,6 +442,8 @@ class CP_Settings {
                 $errors[] = 'Git作業ディレクトリのパスに".."を含めることはできません。';
             } elseif ( $this->overlaps_wordpress_install( $settings['git_local_work_dir'] ) ) {
                 $errors[] = 'Git作業ディレクトリにWordPressのフォルダ（またはその中・上位のフォルダ）は指定できません。';
+            } elseif ( $this->overlaps_backup_directory( $settings['git_local_work_dir'] ) ) {
+                $errors[] = 'Git作業ディレクトリにSub Podのバックアップ保存先と重なるフォルダは指定できません。';
             } else {
                 $validated_path = $this->validate_safe_path( $settings['git_local_work_dir'] );
                 if ( is_wp_error( $validated_path ) ) {
@@ -472,6 +482,8 @@ class CP_Settings {
                 $errors[] = 'ローカル出力先に指定されたパスは使用できません。';
             } elseif ( $this->overlaps_wordpress_install( $settings['local_output_path'] ) ) {
                 $errors[] = 'ローカル出力先にWordPressのフォルダ（またはその中・上位のフォルダ）は指定できません。';
+            } elseif ( $this->overlaps_backup_directory( $settings['local_output_path'] ) ) {
+                $errors[] = 'ローカル出力先にSub Podのバックアップ保存先と重なるフォルダは指定できません。';
             } else {
                 $validated_path = $this->validate_safe_path( $settings['local_output_path'] );
                 if ( is_wp_error( $validated_path ) ) {
@@ -586,6 +598,12 @@ class CP_Settings {
                     $include_error_added = true;
                 } elseif ( preg_match( '/[<>"|?*]/', $path ) ) {
                     $errors[] = 'インクルードパスに使用できない文字が含まれています。';
+                    $include_error_added = true;
+                } elseif ( preg_match( '/\.(tar\.gz|enc|part)$/i', trim( $path, "'" ) ) ) {
+                    $errors[] = 'バックアップファイル（.tar.gz / .enc / .part）はインクルードパスに指定できません。';
+                    $include_error_added = true;
+                } elseif ( $this->overlaps_backup_directory( trim( $path, "'" ) ) ) {
+                    $errors[] = 'Sub Podのバックアップ保存先と重なるフォルダはインクルードパスに指定できません。';
                     $include_error_added = true;
                 }
             }
@@ -778,6 +796,23 @@ class CP_Settings {
      * Outputs that empty their target folder before writing must never point here.
      */
     private function overlaps_wordpress_install( string $path ): bool {
+        return $this->paths_overlap( $path, ABSPATH );
+    }
+
+    /**
+     * Whether the path is Sub Pod's backup folder, inside it, or one of its parent folders
+     */
+    private function overlaps_backup_directory( string $path ): bool {
+        if ( ! class_exists( 'SP_Settings' ) ) {
+            return false;
+        }
+
+        $directory = (string) ( SP_Settings::get_settings()['directory'] ?? '' );
+
+        return $directory !== '' && $this->paths_overlap( $path, $directory );
+    }
+
+    private function paths_overlap( string $path, string $other ): bool {
         $normalize = function ( string $p ): string {
             // Resolve the deepest existing ancestor so symlinks are followed even for folders not created yet
             $missing = '';
@@ -788,10 +823,10 @@ class CP_Settings {
             $p = untrailingslashit( wp_normalize_path( ( realpath( $p ) ?: $p ) . $missing ) );
             return in_array( PHP_OS_FAMILY, array( 'Darwin', 'Windows' ), true ) ? strtolower( $p ) : $p;
         };
-        $wp     = $normalize( ABSPATH );
+        $base   = $normalize( $other );
         $target = $normalize( $path );
 
-        return $target === $wp || str_starts_with( $target, $wp . '/' ) || str_starts_with( $wp, $target . '/' );
+        return $target === $base || str_starts_with( $target, $base . '/' ) || str_starts_with( $base, $target . '/' );
     }
 
     private function validate_safe_path( string $path ): string|\WP_Error {

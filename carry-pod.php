@@ -1,10 +1,10 @@
 <?php
 /**
  * Plugin Name: Carry Pod
- * Version: 3.4.0
+ * Version: 3.5.0
  * Description: WordPressサイトを静的化してデプロイするプラグイン
  * Requires at least: 7.0
- * Tested up to: 7.0
+ * Tested up to: 7.1
  * Requires PHP: 8.5.12
  * Author: Vill Yoshioka
  * License: GPLv3
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'CP_VERSION', '3.4.0' );
+define( 'CP_VERSION', '3.5.0' );
 define( 'CP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'CP_PLUGIN_FILE', __FILE__ );
@@ -218,15 +218,16 @@ class Carry_Pod {
         $trigger_statuses = array( 'publish' );
 
         if ( in_array( $new_status, $trigger_statuses ) || in_array( $old_status, $trigger_statuses ) ) {
-            if ( get_transient( 'cp_manual_running' ) ) {
-                return;
-            }
-
-            // Clear the cache regardless of whether auto-generation is ON or OFF
-            // (when OFF, the affected pages are regenerated on the next manual generation)
+            // Clear the cache regardless of whether auto-generation is ON or OFF, and even during a run
+            // (when OFF, the affected pages are regenerated on the next manual generation;
+            // during a backup, the crawl that follows picks up the change)
             $cache = CP_Cache::get_instance();
             $cache->clear_by_post( $post->ID );
             $cache->clear_adjacent_posts_cache( $post->ID, $old_status, $new_status );
+
+            if ( get_transient( 'cp_manual_running' ) ) {
+                return;
+            }
 
             $settings = get_option( 'cp_settings', array() );
             if ( empty( $settings['auto_generate'] ) ) {

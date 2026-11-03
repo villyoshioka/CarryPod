@@ -17,6 +17,13 @@ if ( false ) {
     define( 'MATI_VERSION', '' );
 }
 
+// Sub Pod plugin stubs for static analysis (never executed).
+if ( false ) {
+    class SP_Backup {
+        public static function is_running(): bool { return false; }
+    }
+}
+
 class CP_Admin {
 
     private static ?self $instance = null;
@@ -1134,6 +1141,7 @@ class CP_Admin {
         wp_send_json_success( array(
             'progress' => $progress,
             'is_running' => $is_running,
+            'backup_running' => $this->is_backup_running(),
             'zip_download_available' => $zip_download_available,
         ) );
     }
@@ -1646,6 +1654,10 @@ class CP_Admin {
 
         if ( ! current_user_can( 'cp_execute' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません。' ) );
+        }
+
+        if ( $this->is_backup_running() ) {
+            wp_send_json_error( array( 'message' => 'バックアップの実行中は中止できません。' ) );
         }
 
         try {
@@ -2207,6 +2219,11 @@ class CP_Admin {
         } catch ( Exception $e ) {
             return "frame-ancestors 'self'";
         }
+    }
+
+    /** Sub Pod holds a file lock while running, so this turns false by itself if the process dies */
+    private function is_backup_running(): bool {
+        return class_exists( 'SP_Backup' ) && method_exists( 'SP_Backup', 'is_running' ) && SP_Backup::is_running();
     }
 
     public function check_mati_compatibility(): void {
