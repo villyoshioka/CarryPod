@@ -17,6 +17,14 @@ if ( false ) {
     }
 }
 
+// Mati plugin stubs for static analysis (never executed).
+if ( false ) {
+    class Mati_Frontend {
+        public static function get_instance(): self { return new self(); }
+        public function get_protection_markup(): string { return ''; }
+    }
+}
+
 class CP_Generator {
 
     /** Extensions excluded from the static site (server-side code, executables, config, DB, dev files, etc.) */
@@ -1705,6 +1713,7 @@ class CP_Generator {
         $paths = explode( "\n", $this->settings['include_paths'] );
         $copied_count = 0;
         $error_count = 0;
+        $mati_markup = $this->get_mati_protection_markup();
 
         foreach ( $paths as $path ) {
             $path = trim( $path );
@@ -1741,6 +1750,7 @@ class CP_Generator {
                 $dest = $this->temp_dir . '/' . basename( $real_path );
                 if ( copy( $real_path, $dest ) ) {
                     $copied_count++;
+                    $this->inject_mati_protection( $real_path, $dest, $mati_markup );
                 } else {
                     $this->logger->add_log( "ファイルのコピーに失敗: {$real_path}", true );
                     $error_count++;
@@ -1752,11 +1762,73 @@ class CP_Generator {
                 } else {
                     $error_count++;
                 }
+                // Also covers files copied before a partial failure
+                $this->inject_mati_protection( $real_path, $dest, $mati_markup );
             }
         }
 
         if ( $copied_count > 0 || $error_count > 0 ) {
             $this->logger->debug( '追加ファイル: ' . $copied_count . '件コピー' . ( $error_count > 0 ? '、' . $error_count . '件エラー' : '' ) );
+        }
+    }
+
+    /**
+     * Mati's protection styles/scripts for HTML that does not go through WordPress
+     *
+     * @return string Empty when Mati is unavailable or every protection is off
+     */
+    private function get_mati_protection_markup(): string {
+        if ( ! class_exists( 'Mati_Frontend' ) || ! method_exists( 'Mati_Frontend', 'get_protection_markup' ) ) {
+            return '';
+        }
+
+        try {
+            return Mati_Frontend::get_instance()->get_protection_markup();
+        } catch ( \Throwable $e ) {
+            $this->logger->add_log( 'Matiの保護設定の取得に失敗しました: ' . $e->getMessage(), true );
+            return '';
+        }
+    }
+
+    /**
+     * Insert Mati's protection before </head> in the HTML copied from an additional file/directory
+     *
+     * Walks the source, not the destination: the destination may be a directory that already
+     * holds generated pages (which already carry the protection) under the same name.
+     * Only writes into temp_dir, which holds regular files only (copies never keep symlinks).
+     */
+    private function inject_mati_protection( string $src, string $dest, string $markup ): void {
+        if ( $markup === '' ) {
+            return;
+        }
+
+        $targets = array();
+        if ( is_dir( $src ) ) {
+            $files = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $src, FilesystemIterator::SKIP_DOTS ) );
+            foreach ( $files as $file ) {
+                if ( in_array( strtolower( $file->getExtension() ), array( 'html', 'htm' ), true ) ) {
+                    $targets[] = $dest . substr( $file->getPathname(), strlen( $src ) );
+                }
+            }
+        } elseif ( in_array( strtolower( pathinfo( $src, PATHINFO_EXTENSION ) ), array( 'html', 'htm' ), true ) ) {
+            $targets[] = $dest;
+        }
+
+        foreach ( $targets as $target ) {
+            // Skipped during the copy (hidden directory, etc.)
+            if ( ! is_file( $target ) ) {
+                continue;
+            }
+
+            $html = file_get_contents( $target );
+            $head_end = $html === false ? false : stripos( $html, '</head>' );
+            if ( $head_end === false ) {
+                continue;
+            }
+
+            if ( file_put_contents( $target, substr_replace( $html, $markup, $head_end, 0 ) ) === false ) {
+                $this->logger->add_log( 'ファイルの書き込みに失敗しました: ' . $target, true );
+            }
         }
     }
 
