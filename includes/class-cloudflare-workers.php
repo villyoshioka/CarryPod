@@ -270,6 +270,7 @@ class CP_Cloudflare_Workers {
                     $completion_token = $response_body['result']['jwt'];
                 }
                 $this->logger->debug( "バケット {$bucket_num} アップロード成功 (Status: {$status_code})" );
+                $this->logger->step_progress( $bucket_num, $total_buckets );
             } else {
                 $error_message = $response_body['errors'][0]['message']
                     ?? 'ファイルアップロードに失敗しました';

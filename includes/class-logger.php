@@ -21,6 +21,14 @@ class CP_Logger {
     private int $batch_threshold = 10;
     private ?bool $debug_mode_cache = null;
 
+    /** @var int[] [from, to] out of 100 */
+    private array $progress_range = array( 0, 100 );
+
+    /** @var array{0: int, 1: int, 2: string}|null [from, to, status] of the current step */
+    private ?array $step = null;
+
+    private ?array $last_progress = null;
+
     public static function get_instance(): static {
         if ( null === self::$instance ) {
             self::$instance = new self();
@@ -172,13 +180,51 @@ class CP_Logger {
         return (bool) ( get_transient( 'cp_manual_running' ) || get_transient( 'cp_auto_running' ) );
     }
 
+    /**
+     * Map subsequent progress into part of the bar (the backup takes the start of it)
+     */
+    public function set_progress_range( int $from, int $to ): void {
+        $this->progress_range = array( $from, $to );
+    }
+
     public function update_progress( int $current, int $total, string $status = '' ): void {
-        set_transient( 'cp_progress', array(
+        if ( $total > 0 ) {
+            [ $from, $to ] = $this->progress_range;
+            $current = $from + (int) round( ( $to - $from ) * min( 1, max( 0, $current / $total ) ) );
+            $total = 100;
+        }
+
+        $progress = array(
             'current' => $current,
             'total' => $total,
             'status' => $status,
-            'percentage' => $total > 0 ? round( ( $current / $total ) * 100 ) : 0,
-        ), 3600 );
+            'percentage' => $total > 0 ? $current : 0,
+        );
+
+        // Callers may report per file, so skip writes that would not change what is shown
+        if ( $progress === $this->last_progress ) {
+            return;
+        }
+        $this->last_progress = $progress;
+
+        set_transient( 'cp_progress', $progress, 3600 );
+    }
+
+    /**
+     * Start a step that fills the bar from $from to $to (out of 100) as step_progress() is reported
+     */
+    public function begin_step( int $from, int $to, string $status ): void {
+        $this->step = array( $from, $to, $status );
+        $this->update_progress( $from, 100, $status );
+    }
+
+    public function step_progress( int $done, int $total ): void {
+        if ( $total <= 0 || null === $this->step ) {
+            return;
+        }
+
+        [ $from, $to, $status ] = $this->step;
+        $this->update_progress( $from + (int) ( ( $to - $from ) * min( 1, $done / $total ) ), 100, $status );
     }
 
     public function get_progress(): array {
@@ -195,6 +241,9 @@ class CP_Logger {
     }
 
     public function clear_progress(): void {
+        $this->progress_range = array( 0, 100 );
+        $this->step = null;
+        $this->last_progress = null;
         delete_transient( 'cp_progress' );
     }
 

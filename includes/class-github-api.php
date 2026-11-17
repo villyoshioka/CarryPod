@@ -11,6 +11,10 @@ class CP_GitHub_API {
 
     private CP_Logger $logger;
 
+    /** Blobs created so far / to create in push_files_batch_from_disk (for the progress bar) */
+    private int $blobs_done = 0;
+    private int $blobs_total = 0;
+
     public function __construct(
         private readonly string $token,
         private readonly string $repo,
@@ -275,6 +279,8 @@ class CP_GitHub_API {
 
         $path_batches = array_chunk( $changed_file_paths, $batch_size );
         $total_batches = count( $path_batches );
+        $this->blobs_done = 0;
+        $this->blobs_total = count( $changed_file_paths );
 
         if ( $total_batches > 1 ) {
             $this->logger->debug( "合計 {$total_batches} バッチでコミットします（各バッチ最大{$batch_size}ファイル）" );
@@ -629,6 +635,9 @@ class CP_GitHub_API {
                     }
                 }
             }
+
+            $this->blobs_done += count( $chunk_paths );
+            $this->logger->step_progress( $this->blobs_done, $this->blobs_total );
 
             if ( $total_chunks > 1 ) {
                 $chunk_num = $chunk_index + 1;

@@ -247,6 +247,8 @@ class CP_GitLab_API implements CP_Git_Provider_Interface {
             }
 
             unset( $actions );
+            $this->logger->step_progress( $batch_num, $total_batches );
+
             if ( function_exists( 'gc_collect_cycles' ) ) {
                 gc_collect_cycles();
             }

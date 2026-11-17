@@ -27,6 +27,9 @@ if ( false ) {
 
 class CP_Generator {
 
+    /** Share of the progress bar (out of 100) given to the Sub Pod backup that runs before generation */
+    private const int BACKUP_PROGRESS_END = 30;
+
     /** Extensions excluded from the static site (server-side code, executables, config, DB, dev files, etc.) */
     private const array BLOCKED_EXTENSIONS = array(
         // PHP-related
@@ -60,6 +63,9 @@ class CP_Generator {
 
     /** URL → post ID map (for speed) */
     private array $url_to_post_id_map = array();
+
+    /** URL path (no trailing slash) → archive name, to describe archives in llms.txt */
+    private array $archive_labels = array();
 
     /** URL → dependent post ID list map (for archive pages) */
     private array $url_to_dependent_posts_map = array();
@@ -317,6 +323,9 @@ class CP_Generator {
             if ( ! empty( $this->settings['gitlab_enabled'] ) ) {
                 $output_count++;
             }
+            if ( ! empty( $this->settings['netlify_enabled'] ) ) {
+                $output_count++;
+            }
             $output_step = 0;
             $output_progress_per_step = $output_count > 0 ? 10.0 / $output_count : 10;
 
@@ -324,7 +333,7 @@ class CP_Generator {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
                 $this->logger->add_log( 'ローカルディレクトリに出力中...' );
-                $this->logger->update_progress( $progress, $total_steps, 'ローカルディレクトリに出力中...' );
+                $this->logger->begin_step( $progress, $progress + (int) $output_progress_per_step, 'ローカルディレクトリに出力中...' );
                 $this->output_to_local();
             }
 
@@ -332,7 +341,7 @@ class CP_Generator {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
                 $this->logger->add_log( 'GitHubに出力中...' );
-                $this->logger->update_progress( $progress, $total_steps, 'GitHubに出力中...' );
+                $this->logger->begin_step( $progress, $progress + (int) $output_progress_per_step, 'GitHubに出力中...' );
                 $this->output_to_github_api();
             }
 
@@ -344,7 +353,7 @@ class CP_Generator {
                     $output_step++;
                     $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
                     $this->logger->add_log( 'ローカルGitに出力中...' );
-                    $this->logger->update_progress( $progress, $total_steps, 'ローカルGitに出力中...' );
+                    $this->logger->begin_step( $progress, $progress + (int) $output_progress_per_step, 'ローカルGitに出力中...' );
                     $this->output_to_git_local();
                 }
             }
@@ -353,7 +362,7 @@ class CP_Generator {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
                 $this->logger->add_log( 'ZIPファイルを作成中...' );
-                $this->logger->update_progress( $progress, $total_steps, 'ZIPファイルを作成中...' );
+                $this->logger->begin_step( $progress, $progress + (int) $output_progress_per_step, 'ZIPファイルを作成中...' );
                 $this->output_to_zip();
             }
 
@@ -361,7 +370,7 @@ class CP_Generator {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
                 $this->logger->add_log( 'Cloudflare Workersにデプロイ中...' );
-                $this->logger->update_progress( $progress, $total_steps, 'Cloudflare Workersにデプロイ中...' );
+                $this->logger->begin_step( $progress, $progress + (int) $output_progress_per_step, 'Cloudflare Workersにデプロイ中...' );
                 $this->output_to_cloudflare_workers();
             }
 
@@ -369,7 +378,7 @@ class CP_Generator {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
                 $this->logger->add_log( 'GitLabに出力中...' );
-                $this->logger->update_progress( $progress, $total_steps, 'GitLabに出力中...' );
+                $this->logger->begin_step( $progress, $progress + (int) $output_progress_per_step, 'GitLabに出力中...' );
                 $this->output_to_gitlab_api();
             }
 
@@ -377,7 +386,7 @@ class CP_Generator {
                 $output_step++;
                 $progress = 90 + (int) ( $output_step * $output_progress_per_step ) - (int) $output_progress_per_step;
                 $this->logger->add_log( 'Netlifyに出力中...' );
-                $this->logger->update_progress( $progress, $total_steps, 'Netlifyに出力中...' );
+                $this->logger->begin_step( $progress, $progress + (int) $output_progress_per_step, 'Netlifyに出力中...' );
                 $this->output_to_netlify();
             }
 
@@ -437,18 +446,32 @@ class CP_Generator {
             }
         };
 
+        // Sub Pod versions that do not report progress leave the bar at the start until the backup ends
+        $show_backup_progress = function( mixed $message, mixed $percent ): void {
+            if ( is_string( $message ) && is_numeric( $percent ) ) {
+                $this->logger->update_progress( (int) $percent, 100, 'バックアップの実行中: ' . $message );
+            }
+        };
+
         if ( $destinations ) {
             $labels = array( 'download' => 'ダウンロード', 'directory' => 'フォルダ', 'r2' => 'R2' );
             $names = array_map( fn( $destination ) => $labels[ $destination ] ?? $destination, $destinations );
 
             $this->logger->add_log( 'バックアップを開始します（保存先: ' . implode( '、', $names ) . '）' );
+            $this->logger->set_progress_range( 0, self::BACKUP_PROGRESS_END );
             $this->logger->update_progress( 0, 100, 'バックアップの実行中...' );
             $this->logger->flush_logs();
         }
 
         add_action( 'sp_backup_completed', $log_backup_result );
+        add_action( 'sp_backup_progress', $show_backup_progress, 10, 2 );
         $proceed = apply_filters( 'cp_before_static_generation', true, $context );
+        remove_action( 'sp_backup_progress', $show_backup_progress, 10 );
         remove_action( 'sp_backup_completed', $log_backup_result );
+
+        if ( $destinations ) {
+            $this->logger->set_progress_range( self::BACKUP_PROGRESS_END, 100 );
+        }
 
         if ( true === $proceed ) {
             // The backup used up part of the flag's lifetime, so generation restarts it
@@ -543,6 +566,7 @@ class CP_Generator {
                 $archive_link = trailingslashit( get_post_type_archive_link( $post_type ) );
                 $urls[] = $archive_link;
                 $archive_bases[] = $archive_link;
+                $this->add_archive_label( $archive_link, $post_type_obj->labels->name );
             }
         }
 
@@ -558,6 +582,7 @@ class CP_Generator {
                 $category_link = trailingslashit( get_category_link( $category->term_id ) );
                 $urls[] = $category_link;
                 $archive_bases[] = $category_link;
+                $this->add_archive_label( $category_link, $category->name );
             }
         }
 
@@ -574,6 +599,7 @@ class CP_Generator {
                     $tag_link = trailingslashit( get_tag_link( $tag->term_id ) );
                     $urls[] = $tag_link;
                     $archive_bases[] = $tag_link;
+                    $this->add_archive_label( $tag_link, $tag->name );
                 }
             }
         }
@@ -589,6 +615,12 @@ class CP_Generator {
                 $day_link   = trailingslashit( get_day_link( $date['year'], $date['month'], $date['day'] ) );
                 $urls = array_merge( $urls, array( $year_link, $month_link, $day_link ) );
                 $archive_bases = array_merge( $archive_bases, array( $year_link, $month_link, $day_link ) );
+
+                $year = (int) $date['year'] . '年';
+                $month = $year . (int) $date['month'] . '月';
+                $this->add_archive_label( $year_link, $year );
+                $this->add_archive_label( $month_link, $month );
+                $this->add_archive_label( $day_link, $month . (int) $date['day'] . '日' );
             }
         }
 
@@ -603,6 +635,7 @@ class CP_Generator {
                         $term_link = trailingslashit( $term_link );
                         $urls[] = $term_link;
                         $archive_bases[] = $term_link;
+                        $this->add_archive_label( $term_link, $term->name );
                     }
                 }
             }
@@ -621,6 +654,7 @@ class CP_Generator {
                         $format_link = trailingslashit( $format_link );
                         $urls[] = $format_link;
                         $archive_bases[] = $format_link;
+                        $this->add_archive_label( $format_link, $format->name );
                     }
                 }
             }
@@ -633,6 +667,7 @@ class CP_Generator {
                 $author_link = trailingslashit( get_author_posts_url( $user->ID ) );
                 $urls[] = $author_link;
                 $archive_bases[] = $author_link;
+                $this->add_archive_label( $author_link, $user->display_name );
             }
         }
 
@@ -655,6 +690,10 @@ class CP_Generator {
         $urls = array_merge( $urls, $discovered_urls );
 
         return array_unique( $urls );
+    }
+
+    private function add_archive_label( string $url, string $name ): void {
+        $this->archive_labels[ untrailingslashit( wp_parse_url( $url, PHP_URL_PATH ) ?? '' ) ] = $name;
     }
 
     /**
@@ -2360,6 +2399,7 @@ JS;
             }
 
             $uploaded++;
+            $this->logger->step_progress( $uploaded, $total_required );
 
             if ( $uploaded % 10 === 0 || $uploaded === $total_required ) {
                 $this->logger->add_log( sprintf( 'Netlify: %d / %d ファイルアップロード済み', $uploaded, $total_required ) );
@@ -3110,14 +3150,12 @@ JS;
         $base_url = ! empty( $this->settings['base_url'] ) ? untrailingslashit( $this->settings['base_url'] ) : untrailingslashit( get_site_url() );
         $base_url = preg_replace( '/[\r\n]+/', '', $base_url );
 
-        $llms_content = "# License\n";
-        $llms_content .= 'x-content-license: "(c) ' . $site_name_escaped . '. All rights reserved."' . "\n";
+        // No "# ..." section comments: validators count them as extra H1s even inside the code block
+        $llms_content = 'x-content-license: "(c) ' . $site_name_escaped . '. All rights reserved."' . "\n";
         $llms_content .= 'x-ai-training-policy: "disallowed"' . "\n\n";
-        $llms_content .= "# Rate Limits\n";
         $llms_content .= "crawl-delay: 2\n";
         $llms_content .= "x-rate-limit: 30\n";
         $llms_content .= "x-rate-limit-window: 60\n\n";
-        $llms_content .= "# Error Handling and Retry Policy\n";
         $llms_content .= 'x-error-retry-policy: "no-retry"' . "\n";
         $llms_content .= 'x-error-retry-policy-description: "Do not retry on any errors. Move on to the next request."' . "\n";
         $llms_content .= "x-max-retries: 0\n";
@@ -3129,27 +3167,29 @@ JS;
         $llms_content .= "  - 502\n";
         $llms_content .= "  - 503\n";
         $llms_content .= "  - 504\n\n";
-        $llms_content .= "# Canonical URL\n";
         $llms_content .= 'x-canonical-url-policy: "strict"' . "\n";
         $llms_content .= 'x-canonical-url: "' . $base_url . '"' . "\n";
         $llms_content .= 'x-canonical-url-description: "Access via other FQDNs or IP addresses is invalid. Use only the canonical URL as the base URL."' . "\n\n";
-        $llms_content .= "# Access (same as robots.txt)\n";
         $llms_content .= $this->build_crawler_access_rules();
 
         $title = $site_name !== '' ? $site_name : ( wp_parse_url( $base_url, PHP_URL_HOST ) ?: $base_url );
-        $description = $this->llms_inline_text( get_bloginfo( 'description' ) );
+        $tagline = $this->llms_inline_text( get_bloginfo( 'description' ) );
+        $links = $this->build_llms_page_links( $base_url, $title, $tagline );
+        $summary = $tagline !== '' ? $tagline : $links['home_description'];
 
         // Add a BOM so browsers detect UTF-8 even when served as text/plain without a charset (allowed by the spec)
         $markdown = "\xEF\xBB\xBF# " . $this->llms_escape_markdown( $title ) . "\n\n";
-        if ( $description !== '' ) {
-            $markdown .= '> ' . $this->llms_escape_markdown( $description ) . "\n\n";
+        if ( $summary !== '' ) {
+            $markdown .= '> ' . $this->llms_escape_markdown( $summary ) . "\n\n";
         }
         $markdown .= "This file describes the AI access policy for this site.\n\n";
         $markdown .= "```text\n" . $llms_content . "```\n";
 
-        $links = $this->build_llms_page_links( $base_url, $title );
-        if ( ! empty( $links ) ) {
-            $markdown .= "\n## Pages\n\n" . implode( "\n", $links ) . "\n";
+        if ( ! empty( $links['main'] ) ) {
+            $markdown .= "\n## Pages\n\n" . implode( "\n", $links['main'] ) . "\n";
+        }
+        if ( ! empty( $links['optional'] ) ) {
+            $markdown .= "\n## Optional\n\n" . implode( "\n", $links['optional'] ) . "\n";
         }
 
         if ( file_put_contents( $llms_txt_path, $markdown ) === false ) {
@@ -3158,16 +3198,23 @@ JS;
     }
 
     /**
-     * Generate the page link list for llms.txt
+     * Generate the page link lists for llms.txt
+     *
+     * Posts and pages (and the top page) go in the main list, archives and pagination in Optional.
+     * Each link is described by the page's meta description, unless it is the same as the top page's,
+     * the tagline or the site name (SEO plugins fill pages without their own text with those);
+     * archives then get a fixed description instead.
      *
      * @param string $base_url  Base for absolute URLs
      * @param string $home_name Link name for the top page
-     * @return string[] Markdown list lines
+     * @param string $tagline   Site tagline (plain text)
+     * @return array{main: string[], optional: string[], home_description: string} Markdown list lines
      */
-    private function build_llms_page_links( string $base_url, string $home_name ): array {
+    private function build_llms_page_links( string $base_url, string $home_name, string $tagline ): array {
         $path_to_post_id = $this->get_path_to_post_id_map();
 
-        $links = array();
+        $pages = array();
+        $home_description = '';
         foreach ( $this->get_listable_pages() as $page ) {
             $key = untrailingslashit( $page['url'] );
             if ( $key === '' ) {
@@ -3181,13 +3228,87 @@ JS;
                 $name = rawurldecode( $page['url'] );
             }
 
+            $description = $this->get_meta_description( (string) file_get_contents( $this->temp_dir . '/' . $page['path'] ) );
+            if ( $key === '' && $home_description === '' ) {
+                $home_description = $description;
+            }
+
             // Encode parentheses and spaces so the link's parenthesis cannot be closed early
             $url = str_replace( array( '(', ')', ' ' ), array( '%28', '%29', '%20' ), esc_url_raw( $base_url . $page['url'] ) );
 
-            $links[ $url ] = '- [' . $this->llms_escape_markdown( $name ) . '](' . $url . ')';
+            $pages[ $url ] = array(
+                'key'         => $key,
+                'name'        => $name,
+                'description' => $description,
+                'main'        => $key === '' || isset( $path_to_post_id[ $key ] ),
+            );
         }
 
-        return array_values( $links );
+        $links = array( 'main' => array(), 'optional' => array(), 'home_description' => $home_description );
+        foreach ( $pages as $url => $page ) {
+            $description = $page['description'];
+            if ( $page['key'] === '' ) {
+                // The top page is described even if this repeats the blockquote
+                $description = $home_description !== '' ? $home_description : $tagline;
+            } elseif ( in_array( $description, array( '', $home_description, $tagline, $home_name ), true ) ) {
+                $description = $page['main'] ? '' : $this->get_archive_description( $page['key'] );
+            }
+
+            $line = '- [' . $this->llms_escape_markdown( $page['name'] ) . '](' . $url . ')';
+            if ( $description !== '' ) {
+                $line .= ': ' . $this->llms_escape_markdown( $description );
+            }
+            $links[ $page['main'] ? 'main' : 'optional' ][] = $line;
+        }
+
+        return $links;
+    }
+
+    /**
+     * Fixed description for an archive without text of its own ('' when the archive is unknown)
+     *
+     * @param string $key URL path without trailing slash
+     */
+    private function get_archive_description( string $key ): string {
+        $page = '';
+        if ( preg_match( '#^(.*)/page/(\d+)$#', $key, $m ) ) {
+            $key = $m[1];
+            $page = '（' . $m[2] . 'ページ目）';
+        }
+
+        if ( $key === '' ) {
+            return '記事一覧' . $page;
+        }
+
+        if ( ! isset( $this->archive_labels[ $key ] ) ) {
+            return '';
+        }
+
+        $name = $this->llms_inline_text( $this->archive_labels[ $key ] );
+        return $name !== '' ? $name . 'の記事一覧' . $page : '';
+    }
+
+    /**
+     * Meta description of a generated page as single-line plain text ('' when there is none)
+     *
+     * Checks name and content per meta tag so it doesn't depend on attribute order or quote style.
+     */
+    private function get_meta_description( string $html ): string {
+        if ( ! preg_match_all( '/<meta\b[^>]*>/i', $html, $tags ) ) {
+            return '';
+        }
+
+        foreach ( $tags[0] as $tag ) {
+            if ( preg_match( '/\bname\s*=\s*["\']?description["\'\s\/>]/i', $tag )
+                && preg_match( '/\bcontent\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'>]+))/i', $tag, $m ) ) {
+                $text = $this->llms_inline_text( $m[1] . ( $m[2] ?? '' ) . ( $m[3] ?? '' ) );
+
+                // Cap the length in case a plugin or theme outputs the whole post
+                return mb_strlen( $text ) > 200 ? mb_substr( $text, 0, 200 ) . '…' : $text;
+            }
+        }
+
+        return '';
     }
 
     /**
