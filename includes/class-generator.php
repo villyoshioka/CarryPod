@@ -3419,7 +3419,7 @@ JS;
             $front['content-signal'] = self::CONTENT_SIGNAL;
 
             if ( $protected ) {
-                $body = "このページの本文は保護対象のため掲載していません。転載・要約による再現・学習を許可しません。原文はページでお読みください。\n\n<{$page_url}>";
+                $body = "このページの本文は保護対象のため掲載していません。転載・要約による再現・学習を許可しません。原文はページでお読みください。";
             } else {
                 try {
                     $body = CP_Markdown::convert( $this->render_post_content( $post ), $media_paths );
