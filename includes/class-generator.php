@@ -47,10 +47,16 @@ class CP_Generator {
     );
 
     /** Search engine crawlers (allowed) */
-    private const array SEARCH_ENGINE_BOTS = array( 'Googlebot', 'Bingbot', 'DuckDuckBot' );
+    private const array SEARCH_ENGINE_BOTS = array( 'Googlebot', 'Bingbot', 'DuckDuckBot', 'Applebot' );
 
-    /** AI search / user-initiated retrieval crawlers (allowed) */
-    private const array AI_REFERENCE_BOTS = array( 'ChatGPT-User', 'Claude-User', 'OAI-SearchBot', 'Claude-SearchBot' );
+    /** AI search / user-initiated retrieval crawlers (allowed; each vendor states they are not used for training) */
+    private const array AI_REFERENCE_BOTS = array(
+        'ChatGPT-User', 'Claude-User', 'OAI-SearchBot', 'Claude-SearchBot',
+        'PerplexityBot', 'Perplexity-User', 'DuckAssistBot', 'MistralAI-User',
+    );
+
+    /** Content Signals (contentsignals.org): search and AI answers allowed, AI training not */
+    private const string CONTENT_SIGNAL = 'search=yes, ai-input=yes, ai-train=no';
 
     /** AI training crawlers (blocked) */
     private const array AI_TRAINING_BOTS = array( 'GPTBot', 'ClaudeBot', 'Google-Extended', 'CCBot', 'meta-externalagent', 'Bytespider', 'Applebot-Extended' );
@@ -293,7 +299,9 @@ class CP_Generator {
 
             // Generate after exclusion processing so excluded pages are not listed
             if ( ! empty( $this->settings['enable_llms_txt'] ) ) {
-                $this->generate_llms_txt();
+                $this->logger->add_log( 'Markdown版を生成中...' );
+                $markdown_count = $this->generate_markdown_versions();
+                $this->generate_llms_txt( $markdown_count > 0 );
             }
 
             $this->logger->add_log( 'サイトマップを生成中...' );
@@ -3116,12 +3124,19 @@ JS;
         foreach ( self::SEARCH_ENGINE_BOTS as $bot ) {
             $rules .= "User-agent: {$bot}\n";
         }
-        $rules .= "Allow: /\n\n";
+        $rules .= 'Content-Signal: ' . self::CONTENT_SIGNAL . "\n";
+        $rules .= "Allow: /\n";
+        // Markdown versions duplicate the pages, so keep them out of search results
+        if ( ! empty( $this->settings['enable_llms_txt'] ) ) {
+            $rules .= 'Disallow: /*.md$' . "\n";
+        }
+        $rules .= "\n";
 
         // Allow AI search / user-initiated retrieval (explicit, since they fall under the User-agent: * block)
         foreach ( self::AI_REFERENCE_BOTS as $bot ) {
             $rules .= "User-agent: {$bot}\n";
         }
+        $rules .= 'Content-Signal: ' . self::CONTENT_SIGNAL . "\n";
         $rules .= "Allow: /\n\n";
 
         // Block AI training crawlers by name
@@ -3139,8 +3154,10 @@ JS;
      * Generate llms.txt (llmstxt.org format)
      *
      * Keeps the access policy in a code block and outputs the page list as an H2 link list.
+     *
+     * @param bool $has_markdown Whether Markdown versions of the pages were generated
      */
-    private function generate_llms_txt(): void {
+    private function generate_llms_txt( bool $has_markdown ): void {
         $llms_txt_path = $this->temp_dir . '/llms.txt';
 
         $site_name = $this->llms_inline_text( get_bloginfo( 'name' ) );
@@ -3183,6 +3200,11 @@ JS;
             $markdown .= '> ' . $this->llms_escape_markdown( $summary ) . "\n\n";
         }
         $markdown .= "This file describes the AI access policy for this site.\n\n";
+        if ( $has_markdown ) {
+            $markdown .= 'Posts and pages have a text-only Markdown version (no images), linked from each page as `rel="alternate" type="text/markdown"`.'
+                . ' For a page URL ending in `/`, append `index.md`.'
+                . " Some pages describe the page without its body.\n\n";
+        }
         $markdown .= "```text\n" . $llms_content . "```\n";
 
         if ( ! empty( $links['main'] ) ) {
@@ -3327,6 +3349,159 @@ JS;
     }
 
     /**
+     * Generate the Markdown version of each post and page, and link it from the page's head
+     *
+     * Same pages as the llms.txt page list (noindex and excluded pages are left out), minus password-protected posts.
+     * Text only: media never appears (see CP_Markdown). Pages that Mati protects from text selection get
+     * only their details, without the body.
+     * ponytail: renders every post on every run, including cached pages; render only changed posts if this gets slow
+     *
+     * @return int Number of Markdown files written
+     */
+    private function generate_markdown_versions(): int {
+        if ( ! class_exists( 'DOMDocument' ) ) {
+            $this->logger->add_log( 'Markdown版の生成をスキップ（PHPのDOM拡張がありません）', true );
+            return 0;
+        }
+
+        require_once CP_PLUGIN_DIR . 'includes/class-markdown.php';
+
+        $base_url = ! empty( $this->settings['base_url'] ) ? untrailingslashit( $this->settings['base_url'] ) : untrailingslashit( get_site_url() );
+        $absolute = $this->settings['url_mode'] === 'absolute';
+
+        $uploads_path = wp_parse_url( wp_upload_dir()['baseurl'], PHP_URL_PATH );
+        $media_paths  = array_unique(
+            array(
+                CP_Settings::get_instance()->get_static_uploads_path(),
+                is_string( $uploads_path ) ? trailingslashit( $uploads_path ) : '',
+            )
+        );
+
+        $site_name = $this->llms_inline_text( get_bloginfo( 'name' ) );
+        $copyright = '(c) ' . ( $site_name !== '' ? $site_name : wp_parse_url( $base_url, PHP_URL_HOST ) ) . '. All rights reserved.';
+
+        $path_to_post_id = $this->get_path_to_post_id_map();
+        $count = 0;
+
+        foreach ( $this->get_listable_pages() as $page ) {
+            $key  = untrailingslashit( $page['url'] );
+            $post = isset( $path_to_post_id[ $key ] ) ? get_post( $path_to_post_id[ $key ] ) : null;
+            if ( ! $post instanceof WP_Post || $post->post_password !== '' || ! preg_match( '/\.html?$/i', $page['path'] ) ) {
+                continue;
+            }
+
+            $html_file   = $this->temp_dir . '/' . $page['path'];
+            $md_path     = preg_replace( '/\.html?$/i', '.md', $page['path'] );
+            $md_url_path = preg_match( '/\.html?$/i', $page['url'] )
+                ? preg_replace( '/\.html?$/i', '.md', $page['url'] )
+                : trailingslashit( $page['url'] ) . 'index.md';
+            $page_url    = esc_url_raw( $base_url . $page['url'] );
+            $html        = (string) file_get_contents( $html_file );
+            $protected   = $this->is_text_selection_protected( $post->ID );
+
+            $title = $this->llms_inline_text( get_the_title( $post ) );
+            $front = array( 'title' => $title !== '' ? $title : rawurldecode( $page['url'] ) );
+            // Same text as the page's meta description, which is public already (also on protected pages)
+            $description = $this->get_meta_description( $html );
+            if ( $description !== '' ) {
+                $front['description'] = $description;
+            }
+            $front['canonical'] = $page_url;
+            if ( $post->post_type === 'post' ) {
+                $front['published']    = (string) get_post_time( DATE_W3C, true, $post );
+                $front['last-updated'] = (string) get_post_modified_time( DATE_W3C, true, $post );
+                $categories = get_the_category( $post->ID );
+                if ( ! empty( $categories ) ) {
+                    $front['category'] = $this->llms_inline_text( $categories[0]->name );
+                }
+            }
+            $front['copyright']      = $copyright;
+            $front['content-signal'] = self::CONTENT_SIGNAL;
+
+            if ( $protected ) {
+                $body = "このページの本文は保護対象のため掲載していません。転載・要約による再現・学習を許可しません。原文はページでお読みください。\n\n<{$page_url}>";
+            } else {
+                try {
+                    $body = CP_Markdown::convert( $this->render_post_content( $post ), $media_paths );
+                } catch ( Throwable $e ) {
+                    $this->logger->add_log( 'Markdown版の生成に失敗: ' . $page['url'] . ' (' . $e->getMessage() . ')', true );
+                    continue;
+                }
+            }
+
+            // JSON strings are valid YAML double-quoted scalars
+            $yaml = '';
+            foreach ( $front as $name => $value ) {
+                $yaml .= $name . ': ' . wp_json_encode( $value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . "\n";
+            }
+            $markdown = "---\n{$yaml}---\n\n# " . $front['title'] . "\n\n" . $body . "\n";
+
+            if ( file_put_contents( $this->temp_dir . '/' . $md_path, $markdown ) === false ) {
+                $this->logger->add_log( 'Markdown版の書き込みに失敗: ' . $md_path, true );
+                continue;
+            }
+            $count++;
+
+            // Cached pages are written fresh each run, so this only guards against a theme or plugin adding its own link
+            $head_end = stripos( $html, '</head>' );
+            if ( $head_end !== false && stripos( $html, 'type="text/markdown"' ) === false ) {
+                $href = $absolute ? esc_url_raw( $base_url . $md_url_path ) : $md_url_path;
+                $link = '<link rel="alternate" type="text/markdown" href="' . esc_attr( $href ) . '">';
+                file_put_contents( $html_file, substr_replace( $html, $link, $head_end, 0 ) );
+            }
+        }
+
+        $this->logger->add_log( 'Markdown版を生成しました: ' . $count . '件' );
+
+        return $count;
+    }
+
+    /**
+     * Post content as shown on the page, with URLs converted for the static site
+     *
+     * Uses the raw content rather than get_the_content(), which would stop at <!--more--> and <!--nextpage-->.
+     */
+    private function render_post_content( WP_Post $post ): string {
+        $previous_post = $GLOBALS['post'] ?? null;
+        $GLOBALS['post'] = $post;
+        setup_postdata( $post );
+
+        try {
+            $html = (string) apply_filters( 'the_content', $post->post_content );
+        } finally {
+            $GLOBALS['post'] = $previous_post;
+            if ( $previous_post instanceof WP_Post ) {
+                setup_postdata( $previous_post );
+            }
+        }
+
+        return $this->replace_custom_folder_names( $this->convert_to_absolute_urls( $html ) );
+    }
+
+    /**
+     * Whether Mati protects the post from text selection (its body is then left out of the Markdown version)
+     *
+     * Mati versions without the check: protected whenever text selection protection is configured at all.
+     */
+    private function is_text_selection_protected( int $post_id ): bool {
+        if ( ! defined( 'MATI_VERSION' ) || ! class_exists( 'Mati_Settings' ) || ! method_exists( 'Mati_Settings', 'get_instance' ) ) {
+            return false;
+        }
+
+        try {
+            $mati = Mati_Settings::get_instance();
+            if ( method_exists( $mati, 'is_text_selection_protected' ) ) {
+                return (bool) $mati->is_text_selection_protected( $post_id );
+            }
+
+            $mati_settings = $mati->get_settings();
+            return ! empty( $mati_settings['disable_text_selection'] ) || ! empty( $mati_settings['text_selection_categories'] );
+        } catch ( Throwable ) {
+            return true;
+        }
+    }
+
+    /**
      * Generate the _headers file (Mati integration)
      */
     private function generate_mati_headers(): void {
@@ -3385,6 +3560,11 @@ JS;
 
             foreach ( $header_sets['page'] as $name => $value ) {
                 $headers_content .= "  {$name}: {$value}\n";
+            }
+
+            $link_header = $cp_settings->get_agent_link_header();
+            if ( $link_header !== '' ) {
+                $headers_content .= "  Link: {$link_header}\n";
             }
 
             // /* also applies to media, so media rules only contain entries not already in the page rules

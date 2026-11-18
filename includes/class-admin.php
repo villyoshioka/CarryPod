@@ -859,15 +859,15 @@ class CP_Admin {
                         <label>
                             <input type="checkbox" name="enable_robots_txt" value="1" <?php checked( $settings['enable_robots_txt'] ?? true ); ?>>
                             robots.txtを出力
-                            <?php echo $this->render_tooltip( '検索エンジンのクロール制御ファイルです。AIクローラーをブロックする設定で生成されます' ); ?>
+                            <?php echo $this->render_tooltip( '検索エンジンのクロール制御ファイルです。AI学習のクローラーはブロックし、AI検索は許可する設定で生成されます' ); ?>
                         </label>
                     </div>
 
                     <div class="nau-form-group">
                         <label>
                             <input type="checkbox" name="enable_llms_txt" value="1" <?php checked( $settings['enable_llms_txt'] ?? true ); ?>>
-                            llms.txtを出力
-                            <?php echo $this->render_tooltip( 'LLM向けのアクセスポリシーファイルです。デフォルトではAI学習利用を禁止します' ); ?>
+                            Agent Ready対応ファイルを出力
+                            <?php echo $this->render_tooltip( 'AIが内容を正確に読み取れるよう、サイトの案内（llms.txt）と各ページの本文のテキスト版を出力します。AI学習への利用は禁止します。画像と、Matiで文字選択を禁止したページの本文は含みません' ); ?>
                         </label>
                     </div>
 
@@ -1576,7 +1576,7 @@ class CP_Admin {
             $log_text .= "    - 著者アーカイブ: " . ( ! empty( $settings['enable_author_archive'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "    - サイトマップ: " . ( ! empty( $settings['enable_sitemap'] ) ? '有効' : '無効' ) . "\n";
             $log_text .= "    - robots.txt: " . ( ! empty( $settings['enable_robots_txt'] ) ? '有効' : '無効' ) . "\n";
-            $log_text .= "    - llms.txt: " . ( ! empty( $settings['enable_llms_txt'] ) ? '有効' : '無効' ) . "\n";
+            $log_text .= "    - Agent Ready対応ファイル: " . ( ! empty( $settings['enable_llms_txt'] ) ? '有効' : '無効' ) . "\n";
             if ( defined( 'MATI_VERSION' ) && class_exists( 'Mati_Settings' ) ) {
                 $headers_enabled = ! empty( $settings['generate_mati_headers'] );
                 // Treat as disabled when only Cloudflare Workers is enabled and there is no other output destination
@@ -2067,6 +2067,10 @@ class CP_Admin {
                     <?php foreach ( $mati_header_sets['page'] as $header_name => $header_value ) : ?>
                     <tr><td><code><?php echo esc_html( $header_name ); ?></code></td><td><code><?php echo esc_html( $header_value ); ?></code></td></tr>
                     <?php endforeach; ?>
+                    <?php $agent_link_header = $cp_settings_manager->get_agent_link_header(); ?>
+                    <?php if ( $agent_link_header !== '' ) : ?>
+                    <tr><td><code>Link</code></td><td><code><?php echo esc_html( $agent_link_header ); ?></code></td></tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
 
@@ -2233,7 +2237,7 @@ class CP_Admin {
 
         $mati_version = MATI_VERSION;
 
-        if ( version_compare( $mati_version, '2.6.0', '>=' ) ) {
+        if ( version_compare( $mati_version, '2.7.0', '>=' ) ) {
             return;
         }
 
@@ -2241,8 +2245,8 @@ class CP_Admin {
         <div class="notice notice-warning">
             <p>
                 <strong>⚠️ Mati連携</strong><br>
-                Mati 2.6.0以降にアップデートすると、すべての連携機能が有効になります。<br>
-                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 2.6.0+</small>
+                Mati 2.7.0以降にアップデートすると、すべての連携機能が有効になります。<br>
+                <small>現在: Mati <?php echo esc_html( $mati_version ); ?> → 推奨: Mati 2.7.0+</small>
             </p>
         </div>
         <?php

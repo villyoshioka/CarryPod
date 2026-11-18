@@ -26,6 +26,14 @@ Carry Pod の開発にあたり、以下のオープンソースプロジェク�
 
 バックグラウンドタスクの処理に使用しています。
 
+### league/html-to-markdown
+
+- URL: <https://github.com/thephpleague/html-to-markdown>
+- 作者: Colin O'Dell / The League of Extraordinary Packages
+- ライセンス: MIT
+
+ページの Markdown 版の生成に使用しています（バージョン 5.2.3 を `lib/html-to-markdown` に同梱）。
+
 ---
 
 ## 開発者

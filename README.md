@@ -5,7 +5,7 @@
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![WordPress](https://img.shields.io/badge/WordPress-7.0%2B-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.5.12%2B-blue.svg)](https://www.php.net/)
-[![Version](https://img.shields.io/badge/Version-3.6.0-green.svg)](https://github.com/villyoshioka/CarryPod/releases)
+[![Version](https://img.shields.io/badge/Version-3.7.0-green.svg)](https://github.com/villyoshioka/CarryPod/releases)
 
 > **注意**: **このプラグインについて、コードは公開していますが、サポートは行っていません。**
 
@@ -26,6 +26,7 @@ WordPress サイトをまるごと静的ファイルに変換するプラグイ�
 - 管理画面の自動ロック: 実行中は投稿編集やテーマ変更などの操作を自動で無効化し、状態のズレを防ぎます。
 - 設定のインポート / エクスポート: 設定を JSON で書き出して、別環境にそのまま持ち込めます。
 - 実行前バリデーション: 設定不備があれば、実行ボタンが押せないように警告を出します。
+- Agent Ready 対応: AI が内容を正確に読み取れるよう、サイトの案内（llms.txt）と各ページの本文のテキスト版（Markdown）を出力します。AI 学習への利用は禁止の意思を示し、画像や、Mati で文字選択を禁止したページの本文は含めません。
 
 ---
 
@@ -56,7 +57,7 @@ Carry Pod は [Local](https://localwp.com/) や [MAMP](https://www.mamp.info/) �
 ## ライセンスと使用モジュール
 
 Carry Pod は [GPLv3 ライセンス](https://www.gnu.org/licenses/gpl-3.0) で公開されています。  
-バックグラウンド処理には [Action Scheduler](https://actionscheduler.org/) を利用しています。
+バックグラウンド処理には [Action Scheduler](https://actionscheduler.org/)、Markdown 版の生成には [league/html-to-markdown](https://github.com/thephpleague/html-to-markdown) を利用しています。
 
 このプラグインの制作にあたり、先人である [WP2Static](https://github.com/elementor/wp2static) 作者の Leon Stafford 氏に深く敬意を表します。
 

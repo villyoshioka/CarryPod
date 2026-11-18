@@ -1,5 +1,27 @@
 # リリースノート
 
+## 3.7.0 - 2026-11-18
+
+### 重要な変更
+
+- 連携プラグイン（Mati）の推奨バージョンを 2.7.0 に更新しました。
+
+### 機能追加
+
+- **Agent Ready対応**: 「llms.txtを出力」を「Agent Ready対応ファイルを出力」に変更しました。有効にすると、llms.txtに加えて、投稿・固定ページの本文のテキスト版（Markdown）を各ページと同じフォルダに index.md として出力します。各ページとllms.txtからMarkdown版の場所を案内します。今の設定はそのまま引き継がれます。
+  - Markdown版には画像・動画・埋め込みと、そのアドレスを含めません。
+  - Matiで文字選択を禁止しているページは、本文を含めずにページの情報だけを出力します。
+  - Markdown版の先頭に、著作権表記とAI学習を許可しない旨を記載します。
+
+### 改善
+
+- robots.txtとllms.txtで、AI学習を許可しない意思をContent-Signalでも示すようにしました（検索とAIの回答への利用は許可）。
+- AIの検索・回答のための取得ボット（PerplexityBot / Perplexity-User / DuckAssistBot / MistralAI-User）と、Applebotを許可するようにしました。AI学習用のクローラーは引き続きブロックします。
+- robots.txtで、検索エンジンがMarkdown版を読み込まないようにしました。
+- _headersとCloudflareの設定案内に、サイトマップ・llms.txt・RSSの場所を示すLinkヘッダーを追加しました（Agent Ready対応ファイルを出力が有効なとき）。
+
+---
+
 ## 3.6.0 - 2026-11-17
 
 ### 改善

@@ -116,6 +116,34 @@ class CP_Settings {
     }
 
     /**
+     * Link header (RFC 8288) pointing agents to the sitemap, llms.txt and RSS feed
+     *
+     * Part of the Agent Ready files, so '' when they are off. Only lists what is output.
+     */
+    public function get_agent_link_header(): string {
+        $settings = $this->get_settings();
+        if ( empty( $settings['enable_llms_txt'] ) ) {
+            return '';
+        }
+
+        $base_url = esc_url_raw( untrailingslashit( ! empty( $settings['base_url'] ) ? $settings['base_url'] : get_site_url() ) );
+
+        $links = array();
+        if ( ! empty( $settings['enable_sitemap'] ) ) {
+            $links[] = "<{$base_url}/sitemap.xml>; rel=\"sitemap\"; type=\"application/xml\"";
+        }
+        $links[] = "<{$base_url}/llms.txt>; rel=\"describedby\"; type=\"text/plain\"";
+        if ( ! empty( $settings['enable_rss'] ) ) {
+            $links[] = "<{$base_url}/feed/>; rel=\"alternate\"; type=\"application/rss+xml\"";
+        }
+
+        $value = implode( ', ', $links );
+
+        // Output as-is to _headers and notices, so keep it to one line of printable ASCII
+        return 1 === preg_match( '/^[\x20-\x7E]+$/', $value ) ? $value : '';
+    }
+
+    /**
      * Path of the uploads folder on the static site (e.g. /wp-content/uploads/)
      */
     public function get_static_uploads_path(): string {
